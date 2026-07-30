@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Web\LanguageController;
 use App\Http\Controllers\Web\PageController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,3 +28,5 @@ foreach ([
         ->defaults('page', $page)
         ->name($page);
 }
+
+Route::get('language/{locale}', [LanguageController::class, 'switch'])->name('language.switch');
