@@ -1,6 +1,6 @@
 # Deployment — Instance + name.com domain mapping
 
-Replace `nexmile.in` with your actual name.com domain and `203.0.113.10` with your
+Replace `nexmile.in` with your actual name.com domain and `3.0.119.102` with your
 instance's public IPv4 address throughout.
 
 ## 1. Subdomain plan
@@ -38,10 +38,10 @@ In name.com: **My Domains → nexmile.in → Manage DNS → Add Record**.
 
 | Type | Host | Answer | TTL |
 |---|---|---|---|
-| A | `api` | `203.0.113.10` | 300 |
-| A | `merchant` | `203.0.113.10` | 300 |
-| A | `admin` | `203.0.113.10` | 300 |
-| A | `@` | `203.0.113.10` | 300 |
+| A | `api` | `3.0.119.102` | 300 |
+| A | `merchant` | `3.0.119.102` | 300 |
+| A | `admin` | `3.0.119.102` | 300 |
+| A | `@` | `3.0.119.102` | 300 |
 
 Use a low TTL (300s) while setting up, then raise it to 3600 once stable.
 
@@ -59,8 +59,8 @@ If it returns nothing, wait — Certbot will fail until DNS resolves.
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y nginx mysql-server redis-server git unzip \
-  php8.3-fpm php8.3-mysql php8.3-mbstring php8.3-xml php8.3-curl \
-  php8.3-zip php8.3-bcmath php8.3-redis php8.3-intl
+  php8.5-fpm php8.5-mysql php8.5-mbstring php8.5-xml php8.5-curl \
+  php8.5-zip php8.5-bcmath php8.5-redis php8.5-intl
 
 # Composer
 curl -sS https://getcomposer.org/installer | php
@@ -151,7 +151,7 @@ server {
     }
 
     location ~ \.php$ {
-        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+        fastcgi_pass unix:/var/run/php/php8.5-fpm.sock;
         fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
         include fastcgi_params;
     }
@@ -228,7 +228,7 @@ git pull origin master
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force
 php artisan config:cache && php artisan route:cache
-sudo systemctl restart php8.3-fpm nexmile-worker
+sudo systemctl restart php8.5-fpm nexmile-worker
 ```
 
 Run `php artisan config:clear` first if a changed `.env` value seems to be ignored —

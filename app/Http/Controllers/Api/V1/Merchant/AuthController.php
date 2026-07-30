@@ -2,17 +2,16 @@
 
 namespace App\Http\Controllers\Api\V1\Merchant;
 
+use App\Actions\RegisterMerchant;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Merchant\LoginRequest;
 use App\Http\Requests\Merchant\RegisterRequest;
 use App\Http\Resources\UserResource;
-use App\Models\Merchant;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -26,44 +25,9 @@ class AuthController extends Controller
      * one transaction. The account starts as `pending` and cannot take orders
      * until an admin verifies KYC (EP2).
      */
-    public function register(RegisterRequest $request): JsonResponse
+    public function register(RegisterRequest $request, RegisterMerchant $registerMerchant): JsonResponse
     {
-        $data = $request->validated();
-
-        $user = DB::transaction(function () use ($data) {
-            $user = User::create([
-                'name' => $data['owner_name'],
-                'phone' => $data['phone'],
-                'email' => $data['email'],
-                'password' => $data['password'],
-                'role' => UserRole::Merchant,
-                'status' => UserStatus::Pending,
-                'preferred_locale' => $data['preferred_locale'] ?? 'en',
-            ]);
-
-            Merchant::create([
-                'user_id' => $user->id,
-                'business_name' => $data['business_name'],
-                'owner_name' => $data['owner_name'],
-                'business_phone' => $data['business_phone'] ?? $data['phone'],
-                'business_email' => $data['business_email'] ?? $data['email'],
-                'address_line1' => $data['address_line1'],
-                'address_line2' => $data['address_line2'] ?? null,
-                'city' => $data['city'],
-                'state' => $data['state'] ?? 'Tamil Nadu',
-                'pincode' => $data['pincode'],
-                'latitude' => $data['latitude'] ?? null,
-                'longitude' => $data['longitude'] ?? null,
-                'fssai_license_no' => $data['fssai_license_no'] ?? null,
-                'fssai_expiry_date' => $data['fssai_expiry_date'] ?? null,
-                'gstin' => $data['gstin'] ?? null,
-                'pan' => $data['pan'] ?? null,
-            ]);
-
-            return $user;
-        });
-
-        $user->load('merchant');
+        $user = $registerMerchant->handle($request->validated());
 
         return response()->json([
             'message' => 'Registration successful. Your account is pending verification.',
