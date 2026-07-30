@@ -5,9 +5,25 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Public site
+| Marketing site
 |--------------------------------------------------------------------------
-| A single coming-soon page until launch. All application functionality is
-| served by the JSON API in routes/api.php.
+| Static pages only. All application functionality is served by the JSON
+| API in routes/api.php.
 */
-Route::get('/', [PageController::class, 'home'])->name('home');
+
+Route::get('/', fn () => view('pages.home'))->name('home');
+
+foreach ([
+    'about',
+    'services',
+    'food-rescue',
+    'merchants',
+    'delivery-partners',
+    'technology',
+    'investors',
+    'contact',
+] as $page) {
+    Route::get($page, [PageController::class, 'show'])
+        ->defaults('page', $page)
+        ->name($page);
+}

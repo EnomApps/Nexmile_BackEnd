@@ -1,0 +1,61 @@
+@extends('layouts.site')
+
+@section('title', 'Contact Us')
+@section('description', 'Get in touch with Nexmile India Pvt. Ltd. — general, business and investor enquiries.')
+
+@section('content')
+
+<section class="max-w-5xl mx-auto px-4 sm:px-6 py-16">
+    <span class="text-xs font-bold tracking-widest uppercase text-brand-green">Contact Us</span>
+    <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-white">Talk to Nexmile</h1>
+    <p class="mt-4 text-lg text-gray-400 max-w-2xl leading-relaxed">
+        Whether you run a local business, want to ride with us, or are exploring an investment —
+        we'd like to hear from you.
+    </p>
+
+    <div class="mt-12 grid sm:grid-cols-3 gap-5">
+        @foreach ([
+            ['General enquiries', config('site.email.info'), 'Questions about Nexmile, orders or delivery partners.'],
+            ['Business enquiries', config('site.email.business'), 'Merchant onboarding, partnerships and collaborations.'],
+            ['Investor relations', config('site.email.investors'), 'Investment, strategy and shareholder matters.'],
+        ] as [$title, $email, $blurb])
+            <div class="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+                <h2 class="font-semibold text-white">{{ $title }}</h2>
+                <p class="mt-1.5 text-sm text-gray-400 leading-relaxed">{{ $blurb }}</p>
+                <a href="mailto:{{ $email }}" class="mt-4 inline-block text-brand-green font-semibold hover:underline break-all">
+                    {{ $email }}
+                </a>
+            </div>
+        @endforeach
+    </div>
+
+    <div class="mt-12 rounded-2xl border border-white/10 bg-white/[0.02] p-8">
+        <h2 class="text-xl font-bold text-white">Nexmile India Pvt. Ltd.</h2>
+        <dl class="mt-5 grid sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+            <div class="flex justify-between gap-4 border-b border-white/10 pb-3">
+                <dt class="text-gray-500">Corporate office</dt>
+                <dd class="text-right text-gray-200">Tamil Nadu, India</dd>
+            </div>
+            <div class="flex justify-between gap-4 border-b border-white/10 pb-3">
+                <dt class="text-gray-500">Website</dt>
+                <dd class="text-right">
+                    <a href="https://www.nexmile.in" class="text-brand-green hover:underline">www.nexmile.in</a>
+                </dd>
+            </div>
+            <div class="flex justify-between gap-4 border-b border-white/10 pb-3">
+                <dt class="text-gray-500">Email</dt>
+                <dd class="text-right">
+                    <a href="mailto:{{ config('site.email.info') }}" class="text-brand-green hover:underline break-all">
+                        {{ config('site.email.info') }}
+                    </a>
+                </dd>
+            </div>
+            <div class="flex justify-between gap-4 border-b border-white/10 pb-3">
+                <dt class="text-gray-500">Founder</dt>
+                <dd class="text-right text-gray-200">{{ config('site.founder') }}</dd>
+            </div>
+        </dl>
+    </div>
+</section>
+
+@endsection

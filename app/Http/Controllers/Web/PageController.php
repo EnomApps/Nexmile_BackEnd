@@ -5,14 +5,14 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use Illuminate\View\View;
 
+/**
+ * Static marketing pages. Copy lives in config/site.php so it can be
+ * updated without touching the templates.
+ */
 class PageController extends Controller
 {
-    /**
-     * Public landing page. Replaced with the full marketing site
-     * (home / about / contact) closer to consumer launch.
-     */
-    public function home(): View
+    public function show(string $page): View
     {
-        return view('pages.coming-soon');
+        return view("pages.{$page}");
     }
 }
