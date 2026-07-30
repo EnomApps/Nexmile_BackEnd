@@ -29,12 +29,6 @@
             <span class="text-lg font-bold tracking-tight">Nexmile</span>
         </a>
 
-        <div class="hidden md:flex items-center gap-8 text-sm font-medium">
-            <a href="{{ route('home') }}" class="hover:text-brand {{ request()->routeIs('home') ? 'text-brand' : '' }}">Home</a>
-            <a href="{{ route('about') }}" class="hover:text-brand {{ request()->routeIs('about') ? 'text-brand' : '' }}">About Us</a>
-            <a href="{{ route('contact') }}" class="hover:text-brand {{ request()->routeIs('contact') ? 'text-brand' : '' }}">Contact Us</a>
-        </div>
-
         <div class="flex items-center gap-3">
             @auth
                 <a href="{{ route('merchant.dashboard') }}" class="text-sm font-medium hover:text-brand">Dashboard</a>
@@ -66,7 +60,7 @@
 </main>
 
 <footer class="border-t border-gray-100 mt-20">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-8 sm:grid-cols-3 text-sm">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-8 sm:grid-cols-2 text-sm">
         <div>
             <div class="flex items-center gap-2 mb-3">
                 <span class="w-7 h-7 rounded-lg bg-brand flex items-center justify-center text-white font-bold text-xs">N</span>
@@ -76,14 +70,7 @@
                 Ultra-hyperlocal food delivery. Restaurants within 1 km, delivered in 10&ndash;15 minutes.
             </p>
         </div>
-        <div>
-            <h3 class="font-semibold mb-3">Company</h3>
-            <ul class="space-y-2 text-gray-500">
-                <li><a href="{{ route('about') }}" class="hover:text-brand">About Us</a></li>
-                <li><a href="{{ route('contact') }}" class="hover:text-brand">Contact Us</a></li>
-            </ul>
-        </div>
-        <div>
+        <div class="sm:text-right">
             <h3 class="font-semibold mb-3">Partners</h3>
             <ul class="space-y-2 text-gray-500">
                 <li><a href="{{ route('merchant.register') }}" class="hover:text-brand">Register your restaurant</a></li>

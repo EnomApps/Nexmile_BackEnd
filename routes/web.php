@@ -6,13 +6,10 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Public marketing site
+| Public landing — coming-soon page until consumer launch
 |--------------------------------------------------------------------------
 */
 Route::get('/', [PageController::class, 'home'])->name('home');
-Route::get('/about', [PageController::class, 'about'])->name('about');
-Route::get('/contact', [PageController::class, 'contact'])->name('contact');
-Route::post('/contact', [PageController::class, 'submitContact'])->name('contact.submit');
 
 /*
 |--------------------------------------------------------------------------
