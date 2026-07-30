@@ -15,10 +15,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
         ]);
-
-        // The Blade portal has no generic /login or /dashboard route.
-        $middleware->redirectGuestsTo('/merchant/login');
-        $middleware->redirectUsersTo('/merchant/dashboard');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

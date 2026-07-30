@@ -42,21 +42,6 @@
             riders and neighbourhoods ready. Launching shortly.
         </p>
 
-        <div class="mt-10 flex flex-wrap gap-3 justify-center">
-            <a href="{{ route('merchant.register') }}"
-               class="px-6 py-3 rounded-lg bg-brand text-white font-semibold hover:bg-orange-600 transition">
-                Partner with us
-            </a>
-            <a href="{{ route('merchant.login') }}"
-               class="px-6 py-3 rounded-lg border border-gray-700 font-semibold text-gray-300 hover:border-brand hover:text-brand transition">
-                Merchant sign in
-            </a>
-        </div>
-
-        <p class="mt-8 text-sm text-gray-500">
-            Restaurant owner? Register now and be live from day one.
-        </p>
-
     </div>
 </main>
 
