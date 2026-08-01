@@ -31,7 +31,7 @@ payments is the safer behaviour.
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| POST | `/auth/otp/request` | — | Send a code to a mobile number |
+| POST | `/auth/otp/request` | — | Send a code by email or SMS |
 | POST | `/auth/otp/verify` | — | Exchange the code for tokens |
 | POST | `/auth/refresh` | — | Rotate the token pair |
 | GET | `/auth/me` | Bearer | Current user |
@@ -42,33 +42,57 @@ payments is the safer behaviour.
 
 ### Request a code
 
+Send **either** `email` **or** `phone` — never both. Sending both is rejected
+with a 422, because there would be no way to tell which channel you meant.
+
+```http
+POST /auth/otp/request
+{ "email": "karthik@example.in", "intended_role": "customer" }
+```
+
 ```http
 POST /auth/otp/request
 { "phone": "9876543210", "intended_role": "customer" }
 ```
 
 `intended_role` accepts `customer` or `rider` only, and applies solely when the
-number has never signed in before. Merchant and admin accounts cannot be
+identifier has never signed in before. Merchant and admin accounts cannot be
 created this way.
 
 ```json
 {
-  "message": "A verification code has been sent to your mobile number.",
-  "data": { "phone": "9876543210", "expires_in": 300, "resend_after": 60 }
+  "message": "A verification code has been sent to your email address.",
+  "data": {
+    "identifier": "karthik@example.in",
+    "channel": "email",
+    "expires_in": 300,
+    "resend_after": 60
+  }
 }
 ```
 
+`identifier` is the normalised value — email addresses come back lowercased.
+Use it as-is when verifying.
+
 ### Verify
+
+Send the same identifier used to request the code.
 
 ```http
 POST /auth/otp/verify
-{ "phone": "9876543210", "code": "123456", "device_name": "pixel-8" }
+{ "email": "karthik@example.in", "code": "123456", "device_name": "pixel-8" }
 ```
 
 ```json
 {
   "data": {
-    "user": { "id": 1, "phone": "9876543210", "role": "customer", "status": "active" },
+    "user": {
+      "id": 1,
+      "email": "karthik@example.in",
+      "phone": null,
+      "role": "customer",
+      "status": "active"
+    },
     "access_token": "1|xxxxx",
     "refresh_token": "64-hex-characters",
     "token_type": "Bearer",
@@ -76,6 +100,9 @@ POST /auth/otp/verify
   }
 }
 ```
+
+An account created by email has a **null phone** until SMS login is enabled,
+and vice versa.
 
 Store the refresh token in secure storage — Keychain on iOS, EncryptedSharedPreferences
 on Android. It is as sensitive as a password.
@@ -100,7 +127,7 @@ Call this when a request returns 401, then retry the original request once.
 | Code lifetime | 5 minutes | `otp.ttl_seconds` |
 | Wrong attempts allowed | 5 | `otp.max_attempts` |
 | Resend cooldown | 60s | `otp.resend_cooldown_seconds` |
-| Codes per number per hour | 5 | `otp.max_per_hour` |
+| Codes per identifier per hour | 5 | `otp.max_per_hour` |
 | Requests per IP per hour | 20 | controller |
 | Access token life | 60 min | `ACCESS_TOKEN_TTL_MINUTES` |
 | Refresh token life | 30 days | `REFRESH_TOKEN_TTL_DAYS` |
@@ -110,7 +137,7 @@ Call this when a request returns 401, then retry the original request once.
 **Codes are stored hashed.** A leaked database dump must not hand an attacker
 working login codes for every pending sign-in.
 
-**Requesting a new code burns the old one.** Two live codes for one number
+**Requesting a new code burns the old one.** Two live codes for one identifier
 would double the guessing surface.
 
 **The attempt budget burns the code, not just the request.** Once five wrong
@@ -130,10 +157,42 @@ authenticates with.
 **A suspended account is rejected after the code is verified**, not before, so
 the response cannot be used to discover which numbers are suspended.
 
+## Sending email
+
+Email is the live channel. It needs a working mail transport — until one is
+configured, `MAIL_MAILER=log` writes the whole message to
+`storage/logs/laravel.log` and nothing is actually delivered:
+
+```bash
+grep -A2 "Subject: .* is your Nexmile" storage/logs/laravel.log | tail -5
+```
+
+For real delivery, set SMTP credentials for a mailbox on your own domain:
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.your-provider.com
+MAIL_PORT=587
+MAIL_USERNAME=no-reply@nexmile.in
+MAIL_PASSWORD=...
+MAIL_SCHEME=tls
+MAIL_FROM_ADDRESS="no-reply@nexmile.in"
+MAIL_FROM_NAME="Nexmile"
+```
+
+Add **SPF and DKIM** records for nexmile.in before going live. Login codes sent
+from a domain with no mail authentication land in spam, and a user who never
+sees the code simply cannot sign in.
+
+Amazon SES is the natural fit given the stack is already on AWS, but a new SES
+account starts in sandbox mode and can only send to verified addresses — the
+move to production access takes a support request, so start it early.
+
 ## Sending SMS
 
-No gateway is wired up yet. `SMS_DRIVER=log` writes the message to
-`storage/logs/laravel.log`, so the whole flow works end to end today:
+No gateway is wired up yet, and Indian SMS needs DLT registration first.
+`SMS_DRIVER=log` writes the message to `storage/logs/laravel.log`, so the flow
+works end to end today:
 
 ```bash
 grep "is your Nexmile" storage/logs/laravel.log | tail -1
