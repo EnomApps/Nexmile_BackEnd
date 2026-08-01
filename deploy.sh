@@ -11,7 +11,11 @@
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/var/www/nexmile}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1/up}"
+
+# The public URL, not 127.0.0.1. Nginx routes by Host header and serves TLS,
+# so a loopback request matches no server block and 404s even when the site is
+# perfectly healthy. This also proves DNS and the certificate still work.
+HEALTH_URL="${HEALTH_URL:-https://api.nexmile.in/up}"
 PHP_FPM_SERVICE="${PHP_FPM_SERVICE:-php8.5-fpm}"
 BRANCH="${BRANCH:-master}"
 
@@ -21,7 +25,6 @@ log()  { printf '\n\033[1;36m==> %s\033[0m\n' "$1"; }
 fail() { printf '\n\033[1;31mFAILED: %s\033[0m\n' "$1" >&2; }
 
 PREVIOUS_COMMIT="$(git rev-parse HEAD)"
-log "Deploying from ${PREVIOUS_COMMIT:0:8}"
 
 build() {
     log "Fetching ${BRANCH}"
@@ -52,12 +55,12 @@ build() {
 }
 
 health_check() {
-    local attempt
-    for attempt in 1 2 3 4 5; do
-        local code
-        code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$HEALTH_URL" || echo 000)"
+    local attempts="${1:-5}"
+    local attempt code
+    for attempt in $(seq 1 "$attempts"); do
+        code="$(curl -sL -o /dev/null -w '%{http_code}' --max-time 15 "$HEALTH_URL" || echo 000)"
         if [ "$code" = "200" ]; then
-            printf '    health check OK (attempt %s)\n' "$attempt"
+            printf '    health check OK (%s)\n' "$HEALTH_URL"
             return 0
         fi
         printf '    health check returned %s, retrying...\n' "$code"
@@ -83,6 +86,23 @@ rollback() {
     fi
     exit 1
 }
+
+log "Deploying from ${PREVIOUS_COMMIT:0:8}"
+
+# Confirm the health check passes *before* touching anything. Without this a
+# misconfigured HEALTH_URL is indistinguishable from a broken release: the
+# deploy rolls back, the check fails again, and the script reports a dead site
+# that was never down.
+log "Pre-flight health check"
+if ! health_check 2; then
+    fail "the site is already failing its health check at ${HEALTH_URL}"
+    printf '  Nothing was deployed. Either the site is genuinely down, or\n'
+    printf '  HEALTH_URL is pointing at the wrong place. Check by hand:\n\n'
+    printf '      curl -i %s\n\n' "$HEALTH_URL"
+    printf '  Then re-run, overriding the URL if needed:\n\n'
+    printf '      HEALTH_URL=https://your-domain/up ./deploy.sh\n\n'
+    exit 1
+fi
 
 if ! build; then
     rollback
