@@ -8,7 +8,7 @@
 
     <title>@yield('title', 'Nexmile') — Nexmile India Pvt. Ltd.</title>
 
-    <link rel="icon" href="{{ asset('images/nexmile-logo.jpg') }}">
+    <link rel="icon" href="{{ asset('images/nexmile-mark.png') }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
     {{-- Noto Sans Tamil / Devanagari so Tamil and Hindi render cleanly rather
          than falling back to whatever the device happens to ship. --}}
@@ -44,8 +44,10 @@
 
 <header class="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-white/10">
     <nav class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-        <a href="{{ route('home') }}" class="text-xl font-extrabold tracking-tight shrink-0">
-            <span class="text-white">Nex</span><span class="text-brand-orange">mile</span>
+        <a href="{{ route('home') }}" class="shrink-0" aria-label="Nexmile">
+            <img src="{{ asset('images/nexmile-wordmark.png') }}" alt="Nexmile"
+                 width="631" height="128"
+                 class="h-7 sm:h-8 w-auto">
         </a>
 
         <div class="hidden xl:flex items-center gap-5 text-sm font-medium">
@@ -110,10 +112,10 @@
 <footer class="border-t border-white/10 mt-24">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 text-sm">
         <div>
-            <div class="text-xl font-extrabold tracking-tight">
-                <span class="text-white">Nex</span><span class="text-brand-orange">mile</span>
-            </div>
-            <p class="mt-2 text-xs font-semibold tracking-wider">
+            <img src="{{ asset('images/nexmile-wordmark.png') }}" alt="Nexmile"
+                 width="631" height="128"
+                 class="h-8 w-auto">
+            <p class="mt-3 text-xs font-semibold tracking-wider">
                 <span class="text-brand-green">{{ __('site.tagline.fast') }}</span>
                 <span class="text-brand-orange">{{ __('site.tagline.fresh') }}</span>
                 <span class="text-gray-400">{{ __('site.tagline.trusted') }}</span>
