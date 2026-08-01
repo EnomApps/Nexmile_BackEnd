@@ -1,7 +1,15 @@
-# Mobile OTP auth (EP2)
+# OTP auth (EP2)
 
-Phone-number login for every role, with short-lived access tokens and
+Passwordless login for every role, with short-lived access tokens and
 long-lived refresh tokens.
+
+**The channel follows the identifier.** Send an `email` and the code is emailed;
+send a `phone` and it is texted. Nothing else changes, so moving the apps from
+email login to SMS login later needs no backend work and no config flag — the
+client simply starts sending a phone number.
+
+Email is the channel in use now, because SMS in India requires DLT registration
+(entity, sender ID and template approval) before a single message is delivered.
 
 Base URL: `https://api.nexmile.in/api/v1`
 Always send `Accept: application/json`.

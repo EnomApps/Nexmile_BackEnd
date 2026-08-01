@@ -2,7 +2,6 @@
 
 namespace App\Services\Auth;
 
-use App\Contracts\SmsSender;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\OtpCode;
@@ -12,18 +11,24 @@ use Illuminate\Validation\ValidationException;
 
 class OtpService
 {
-    public function __construct(private readonly SmsSender $sms) {}
+    public function __construct(private readonly OtpDelivery $delivery) {}
 
     /**
-     * Issue a code and send it.
+     * Issue a code and deliver it.
+     *
+     * $identifier is a 10-digit mobile number or an email address; the channel
+     * follows from which it is.
      *
      * @throws ValidationException when throttled
      */
-    public function request(string $phone, string $intendedRole = 'customer', ?string $ip = null): OtpCode
+    public function request(string $identifier, string $intendedRole = 'customer', ?string $ip = null): OtpCode
     {
-        $this->guardResendCooldown($phone);
-        $this->guardHourlyLimit($phone);
+        $identifier = $this->normalise($identifier);
 
+        $this->guardResendCooldown($identifier);
+        $this->guardHourlyLimit($identifier);
+
+        $channel = OtpDelivery::channelFor($identifier);
         $code = $this->generateCode();
 
         /*
@@ -31,12 +36,13 @@ class OtpService
          * would have two valid codes, doubling the guessing surface and making
          * "which code is current" ambiguous.
          */
-        OtpCode::where('phone', $phone)
+        OtpCode::where('identifier', $identifier)
             ->whereNull('consumed_at')
             ->update(['consumed_at' => now()]);
 
         $otp = OtpCode::create([
-            'phone' => $phone,
+            'identifier' => $identifier,
+            'channel' => $channel,
             'code_hash' => Hash::make($code),
             'purpose' => 'login',
             'intended_role' => $intendedRole,
@@ -44,8 +50,7 @@ class OtpService
             'ip_address' => $ip,
         ]);
 
-        $minutes = (int) ceil(config('otp.ttl_seconds') / 60);
-        $this->sms->send($phone, "{$code} is your Nexmile verification code. It expires in {$minutes} minutes. Do not share it with anyone.");
+        $this->delivery->send($identifier, $channel, $code);
 
         return $otp;
     }
@@ -56,9 +61,11 @@ class OtpService
      *
      * @throws ValidationException when the code is wrong, expired or exhausted
      */
-    public function verify(string $phone, string $code): User
+    public function verify(string $identifier, string $code): User
     {
-        $otp = OtpCode::where('phone', $phone)
+        $identifier = $this->normalise($identifier);
+
+        $otp = OtpCode::where('identifier', $identifier)
             ->whereNull('consumed_at')
             ->latest('id')
             ->first();
@@ -83,13 +90,23 @@ class OtpService
 
         $otp->update(['consumed_at' => now()]);
 
-        return $this->resolveUser($phone, $otp->intended_role);
+        return $this->resolveUser($identifier, $otp->channel, $otp->intended_role);
+    }
+
+    /** Email addresses are case-insensitive; mobile numbers are left alone. */
+    private function normalise(string $identifier): string
+    {
+        $identifier = trim($identifier);
+
+        return filter_var($identifier, FILTER_VALIDATE_EMAIL)
+            ? mb_strtolower($identifier)
+            : $identifier;
     }
 
     /**
-     * A fixed code for QA and for the Flutter developer while no gateway
-     * exists. Hard-blocked outside local and testing so it can never become a
-     * master key in production, however the environment is configured.
+     * A fixed code for QA and for the app developers while no gateway exists.
+     * Hard-blocked outside local and testing so it can never become a master
+     * key in production, however the environment is configured.
      */
     private function generateCode(): string
     {
@@ -105,14 +122,17 @@ class OtpService
         return str_pad((string) random_int(0, (10 ** $length) - 1), $length, '0', STR_PAD_LEFT);
     }
 
-    private function resolveUser(string $phone, string $intendedRole): User
+    private function resolveUser(string $identifier, string $channel, string $intendedRole): User
     {
-        $user = User::where('phone', $phone)->first();
+        $column = $channel === OtpDelivery::EMAIL ? 'email' : 'phone';
+        $verifiedColumn = $channel === OtpDelivery::EMAIL ? 'email_verified_at' : 'phone_verified_at';
+
+        $user = User::where($column, $identifier)->first();
 
         if ($user) {
-            $user->forceFill(['phone_verified_at' => now()]);
+            $user->forceFill([$verifiedColumn => now()]);
 
-            // A customer who verified their number has nothing left to check,
+            // A customer who verified their contact has nothing left to check,
             // so activate them. Riders and merchants stay pending until KYC.
             if ($user->status === UserStatus::Pending && $user->role === UserRole::Customer) {
                 $user->forceFill(['status' => UserStatus::Active]);
@@ -127,7 +147,7 @@ class OtpService
 
         $user = User::create([
             'name' => 'Nexmile user',
-            'phone' => $phone,
+            $column => $identifier,
             'password' => Hash::make(str()->random(40)),
             'role' => $role,
             // Riders must complete KYC before they can work; customers are
@@ -137,16 +157,16 @@ class OtpService
 
         // Deliberately not mass-assignable: verification status must never be
         // settable from request input.
-        $user->forceFill(['phone_verified_at' => now()])->save();
+        $user->forceFill([$verifiedColumn => now()])->save();
 
         return $user;
     }
 
-    private function guardResendCooldown(string $phone): void
+    private function guardResendCooldown(string $identifier): void
     {
         $cooldown = (int) config('otp.resend_cooldown_seconds');
 
-        $recent = OtpCode::where('phone', $phone)
+        $recent = OtpCode::where('identifier', $identifier)
             ->where('created_at', '>=', now()->subSeconds($cooldown))
             ->latest('id')
             ->first();
@@ -157,14 +177,14 @@ class OtpService
         }
     }
 
-    private function guardHourlyLimit(string $phone): void
+    private function guardHourlyLimit(string $identifier): void
     {
-        $count = OtpCode::where('phone', $phone)
+        $count = OtpCode::where('identifier', $identifier)
             ->where('created_at', '>=', now()->subHour())
             ->count();
 
         if ($count >= (int) config('otp.max_per_hour')) {
-            $this->fail('Too many codes requested for this number. Please try again later.');
+            $this->fail('Too many codes requested. Please try again later.');
         }
     }
 

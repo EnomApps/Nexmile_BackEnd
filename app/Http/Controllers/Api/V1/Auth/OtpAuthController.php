@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\OtpRequestRequest;
 use App\Http\Requests\Auth\OtpVerifyRequest;
 use App\Http\Resources\UserResource;
+use App\Services\Auth\OtpDelivery;
 use App\Services\Auth\OtpService;
 use App\Services\Auth\TokenService;
 use Illuminate\Http\JsonResponse;
@@ -24,18 +25,21 @@ class OtpAuthController extends Controller
     /**
      * Request a login code
      *
-     * Sends a 6-digit code by SMS. Works for a new number too — the account is
-     * created on first successful verification.
+     * Send **either** `email` **or** `phone`, not both. An email address gets
+     * the code by email; a mobile number gets it by SMS.
      *
-     * Codes last 5 minutes. A number may request 5 codes per hour, with 60
-     * seconds between requests.
+     * Works for an unknown address or number too — the account is created on
+     * first successful verification.
+     *
+     * Codes last 5 minutes. Each identifier may request 5 codes per hour, with
+     * 60 seconds between requests.
      */
     public function request(OtpRequestRequest $request, OtpService $otp): JsonResponse
     {
-        $phone = $request->string('phone')->toString();
+        $identifier = $request->identifier();
 
-        // Per-IP ceiling on top of the per-phone limits, so one source cannot
-        // enumerate numbers or run up an SMS bill.
+        // Per-IP ceiling on top of the per-identifier limits, so one source
+        // cannot enumerate accounts or run up a messaging bill.
         $key = 'otp-request:'.$request->ip();
 
         if (RateLimiter::tooManyAttempts($key, 20)) {
@@ -47,17 +51,22 @@ class OtpAuthController extends Controller
         RateLimiter::hit($key, 3600);
 
         $otp->request(
-            $phone,
+            $identifier,
             $request->string('intended_role', 'customer')->toString(),
             $request->ip(),
         );
 
+        $channel = OtpDelivery::channelFor($identifier);
+
         // Always 200. Whether a row was created is an implementation detail,
         // and a varying status code only complicates the client.
         return response()->json([
-            'message' => 'A verification code has been sent to your mobile number.',
+            'message' => $channel === OtpDelivery::EMAIL
+                ? 'A verification code has been sent to your email address.'
+                : 'A verification code has been sent to your mobile number.',
             'data' => [
-                'phone' => $phone,
+                'identifier' => $identifier,
+                'channel' => $channel,
                 'expires_in' => (int) config('otp.ttl_seconds'),
                 'resend_after' => (int) config('otp.resend_cooldown_seconds'),
                 // Only ever present outside production, so the Flutter app can
@@ -72,14 +81,16 @@ class OtpAuthController extends Controller
     /**
      * Verify the code and sign in
      *
-     * Returns the user plus an access token (60 minutes) and a refresh token
+     * Send the same identifier used to request the code, plus the code itself.
+     *
+     * Returns the user with an access token (60 minutes) and a refresh token
      * (30 days). Five wrong attempts burn the code and a new one must be
      * requested.
      */
     public function verify(OtpVerifyRequest $request, OtpService $otp, TokenService $tokens): JsonResponse
     {
         $user = $otp->verify(
-            $request->string('phone')->toString(),
+            $request->identifier(),
             $request->string('code')->toString(),
         );
 

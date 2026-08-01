@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Mail\OtpCodeMail;
 use App\Models\OtpCode;
 use App\Models\RefreshToken;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
@@ -62,9 +64,9 @@ class OtpAuthTest extends TestCase
     {
         $this->postJson('/api/v1/auth/otp/request', ['phone' => self::PHONE])
             ->assertSuccessful()
-            ->assertJsonPath('data.phone', self::PHONE);
+            ->assertJsonPath('data.identifier', self::PHONE);
 
-        $otp = OtpCode::where('phone', self::PHONE)->firstOrFail();
+        $otp = OtpCode::where('identifier', self::PHONE)->firstOrFail();
 
         // A database leak must not hand an attacker working login codes.
         $this->assertNotEmpty($otp->code_hash);
@@ -127,7 +129,7 @@ class OtpAuthTest extends TestCase
         $this->postJson('/api/v1/auth/otp/verify', ['phone' => self::PHONE, 'code' => '000000'])
             ->assertStatus(422);
 
-        $this->assertSame(1, OtpCode::where('phone', self::PHONE)->first()->attempts);
+        $this->assertSame(1, OtpCode::where('identifier', self::PHONE)->first()->attempts);
         $this->assertDatabaseCount('users', 0);
     }
 
@@ -177,7 +179,7 @@ class OtpAuthTest extends TestCase
     {
         $code = $this->requestCode();
 
-        OtpCode::where('phone', self::PHONE)->update(['expires_at' => now()->subMinute()]);
+        OtpCode::where('identifier', self::PHONE)->update(['expires_at' => now()->subMinute()]);
 
         $this->postJson('/api/v1/auth/otp/verify', ['phone' => self::PHONE, 'code' => $code])
             ->assertStatus(422);
@@ -189,13 +191,13 @@ class OtpAuthTest extends TestCase
         $firstId = OtpCode::latest('id')->first()->id;
 
         // Skip past the resend cooldown.
-        OtpCode::where('phone', self::PHONE)->update(['created_at' => now()->subMinutes(5)]);
+        OtpCode::where('identifier', self::PHONE)->update(['created_at' => now()->subMinutes(5)]);
         $this->requestCode();
 
         // Two live codes for one number would double the guessing surface.
         $this->assertNotNull(OtpCode::find($firstId)->consumed_at);
         $this->assertNull(OtpCode::latest('id')->first()->consumed_at);
-        $this->assertSame(1, OtpCode::where('phone', self::PHONE)->whereNull('consumed_at')->count());
+        $this->assertSame(1, OtpCode::where('identifier', self::PHONE)->whereNull('consumed_at')->count());
     }
 
     public function test_resending_too_soon_is_blocked(): void
@@ -211,7 +213,7 @@ class OtpAuthTest extends TestCase
     {
         for ($i = 0; $i < config('otp.max_per_hour'); $i++) {
             $this->postJson('/api/v1/auth/otp/request', ['phone' => self::PHONE])->assertSuccessful();
-            OtpCode::where('phone', self::PHONE)->update(['created_at' => now()->subMinutes(2)]);
+            OtpCode::where('identifier', self::PHONE)->update(['created_at' => now()->subMinutes(2)]);
         }
 
         $this->postJson('/api/v1/auth/otp/request', ['phone' => self::PHONE])
@@ -333,7 +335,7 @@ class OtpAuthTest extends TestCase
         $deviceA = $this->postJson('/api/v1/auth/otp/verify',
             ['phone' => self::PHONE, 'code' => $codeA, 'device_name' => 'phone'])->assertOk();
 
-        OtpCode::where('phone', self::PHONE)->update(['created_at' => now()->subMinutes(5)]);
+        OtpCode::where('identifier', self::PHONE)->update(['created_at' => now()->subMinutes(5)]);
         $codeB = $this->requestCode();
         $deviceB = $this->postJson('/api/v1/auth/otp/verify',
             ['phone' => self::PHONE, 'code' => $codeB, 'device_name' => 'tablet'])->assertOk();
@@ -351,7 +353,7 @@ class OtpAuthTest extends TestCase
         $deviceA = $this->postJson('/api/v1/auth/otp/verify',
             ['phone' => self::PHONE, 'code' => $codeA, 'device_name' => 'phone'])->assertOk();
 
-        OtpCode::where('phone', self::PHONE)->update(['created_at' => now()->subMinutes(5)]);
+        OtpCode::where('identifier', self::PHONE)->update(['created_at' => now()->subMinutes(5)]);
         $codeB = $this->requestCode();
         $deviceB = $this->postJson('/api/v1/auth/otp/verify',
             ['phone' => self::PHONE, 'code' => $codeB, 'device_name' => 'tablet'])->assertOk();
@@ -369,7 +371,7 @@ class OtpAuthTest extends TestCase
         $deviceA = $this->postJson('/api/v1/auth/otp/verify',
             ['phone' => self::PHONE, 'code' => $codeA, 'device_name' => 'phone'])->assertOk();
 
-        OtpCode::where('phone', self::PHONE)->update(['created_at' => now()->subMinutes(5)]);
+        OtpCode::where('identifier', self::PHONE)->update(['created_at' => now()->subMinutes(5)]);
         $codeB = $this->requestCode();
         $deviceB = $this->postJson('/api/v1/auth/otp/verify',
             ['phone' => self::PHONE, 'code' => $codeB, 'device_name' => 'tablet'])->assertOk();
@@ -404,6 +406,113 @@ class OtpAuthTest extends TestCase
             ->assertStatus(404);
 
         $this->api($victim->json('data.access_token'))->getJson('/api/v1/auth/me')->assertOk();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Email channel — used until DLT registration and an SMS gateway are ready
+    |--------------------------------------------------------------------------
+    */
+
+    public function test_an_email_identifier_sends_the_code_by_email(): void
+    {
+        Mail::fake();
+
+        $this->postJson('/api/v1/auth/otp/request', ['email' => 'Karthik@Example.IN'])
+            ->assertSuccessful()
+            ->assertJsonPath('data.channel', 'email')
+            // Addresses are case-insensitive, so they are stored lowercased —
+            // otherwise "Karthik@" and "karthik@" become two accounts.
+            ->assertJsonPath('data.identifier', 'karthik@example.in');
+
+        Mail::assertSent(OtpCodeMail::class, fn ($mail) => $mail->hasTo('karthik@example.in'));
+
+        $otp = OtpCode::latest('id')->firstOrFail();
+        $this->assertSame('email', $otp->channel);
+        $this->assertSame('karthik@example.in', $otp->identifier);
+    }
+
+    public function test_a_phone_identifier_does_not_send_an_email(): void
+    {
+        Mail::fake();
+
+        $this->postJson('/api/v1/auth/otp/request', ['phone' => self::PHONE])->assertSuccessful()
+            ->assertJsonPath('data.channel', 'sms');
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_email_signin_creates_the_account_and_marks_email_verified(): void
+    {
+        Mail::fake();
+
+        $this->postJson('/api/v1/auth/otp/request', ['email' => 'meena@example.in'])->assertSuccessful();
+
+        $this->postJson('/api/v1/auth/otp/verify', [
+            'email' => 'meena@example.in',
+            'code' => self::CODE,
+            'device_name' => 'pixel-8',
+        ])->assertOk()->assertJsonPath('data.user.email', 'meena@example.in');
+
+        $user = User::where('email', 'meena@example.in')->firstOrFail();
+        $this->assertSame(UserRole::Customer, $user->role);
+        $this->assertSame(UserStatus::Active, $user->status);
+        $this->assertNotNull($user->email_verified_at);
+        // The account has no mobile number yet; that comes when SMS is enabled.
+        $this->assertNull($user->phone);
+    }
+
+    public function test_an_existing_email_account_is_reused_not_duplicated(): void
+    {
+        Mail::fake();
+
+        User::create([
+            'name' => 'Existing', 'email' => 'meena@example.in', 'password' => 'x',
+            'role' => UserRole::Customer, 'status' => UserStatus::Active,
+        ]);
+
+        $this->postJson('/api/v1/auth/otp/request', ['email' => 'meena@example.in'])->assertSuccessful();
+        $this->postJson('/api/v1/auth/otp/verify', ['email' => 'meena@example.in', 'code' => self::CODE])
+            ->assertOk();
+
+        $this->assertSame(1, User::where('email', 'meena@example.in')->count());
+    }
+
+    public function test_the_identifier_is_required_and_cannot_be_both(): void
+    {
+        $this->postJson('/api/v1/auth/otp/request', [])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['email', 'phone']);
+
+        // Ambiguous: which channel would the code go to?
+        $this->postJson('/api/v1/auth/otp/request', [
+            'email' => 'a@b.in', 'phone' => self::PHONE,
+        ])->assertStatus(422)->assertJsonValidationErrors('email');
+    }
+
+    public function test_a_malformed_email_is_rejected(): void
+    {
+        foreach (['not-an-email', 'a@', '@b.in', 'a b@c.in'] as $bad) {
+            $this->postJson('/api/v1/auth/otp/request', ['email' => $bad])
+                ->assertStatus(422)
+                ->assertJsonValidationErrors('email');
+        }
+    }
+
+    public function test_email_codes_obey_the_same_limits_as_sms(): void
+    {
+        Mail::fake();
+
+        $this->postJson('/api/v1/auth/otp/request', ['email' => 'meena@example.in'])->assertSuccessful();
+
+        // Resend cooldown.
+        $this->postJson('/api/v1/auth/otp/request', ['email' => 'meena@example.in'])
+            ->assertStatus(422);
+
+        // Wrong code still burns attempts.
+        $this->postJson('/api/v1/auth/otp/verify', ['email' => 'meena@example.in', 'code' => '000000'])
+            ->assertStatus(422);
+        $this->assertSame(1, OtpCode::where('identifier', 'meena@example.in')->first()->attempts);
     }
 
     public function test_protected_endpoints_reject_anonymous_callers(): void

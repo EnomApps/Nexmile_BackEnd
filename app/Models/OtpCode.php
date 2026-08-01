@@ -7,7 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class OtpCode extends Model
 {
     protected $fillable = [
-        'phone',
+        'identifier',
+        'channel',
         'code_hash',
         'purpose',
         'intended_role',
