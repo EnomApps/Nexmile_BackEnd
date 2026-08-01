@@ -29,6 +29,10 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <!-- High database numbers so a test run can never touch dev live state. -->
+        <env name="REDIS_CACHE_DB" value="11"/>
+        <env name="REDIS_LIVE_DB" value="12"/>
+        <env name="REDIS_DISPATCH_DB" value="13"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
