@@ -22,7 +22,13 @@ use Illuminate\Support\Facades\RateLimiter;
 class OtpAuthController extends Controller
 {
     /**
-     * POST /api/v1/auth/otp/request
+     * Request a login code
+     *
+     * Sends a 6-digit code by SMS. Works for a new number too — the account is
+     * created on first successful verification.
+     *
+     * Codes last 5 minutes. A number may request 5 codes per hour, with 60
+     * seconds between requests.
      */
     public function request(OtpRequestRequest $request, OtpService $otp): JsonResponse
     {
@@ -40,12 +46,14 @@ class OtpAuthController extends Controller
 
         RateLimiter::hit($key, 3600);
 
-        $code = $otp->request(
+        $otp->request(
             $phone,
             $request->string('intended_role', 'customer')->toString(),
             $request->ip(),
         );
 
+        // Always 200. Whether a row was created is an implementation detail,
+        // and a varying status code only complicates the client.
         return response()->json([
             'message' => 'A verification code has been sent to your mobile number.',
             'data' => [
@@ -58,11 +66,15 @@ class OtpAuthController extends Controller
                     ? config('otp.fixed_code')
                     : null,
             ],
-        ], $code->wasRecentlyCreated ? 201 : 200);
+        ]);
     }
 
     /**
-     * POST /api/v1/auth/otp/verify
+     * Verify the code and sign in
+     *
+     * Returns the user plus an access token (60 minutes) and a refresh token
+     * (30 days). Five wrong attempts burn the code and a new one must be
+     * requested.
      */
     public function verify(OtpVerifyRequest $request, OtpService $otp, TokenService $tokens): JsonResponse
     {
@@ -89,7 +101,13 @@ class OtpAuthController extends Controller
     }
 
     /**
-     * POST /api/v1/auth/refresh
+     * Refresh the token pair
+     *
+     * Call this once after a 401, then retry the original request. Both tokens
+     * are replaced; the old pair stops working immediately.
+     *
+     * Presenting a refresh token that was already exchanged is treated as
+     * theft and signs the user out of every device.
      */
     public function refresh(Request $request, TokenService $tokens): JsonResponse
     {
@@ -109,7 +127,7 @@ class OtpAuthController extends Controller
     }
 
     /**
-     * GET /api/v1/auth/me
+     * Current signed-in user
      */
     public function me(Request $request): JsonResponse
     {
@@ -119,7 +137,10 @@ class OtpAuthController extends Controller
     }
 
     /**
-     * POST /api/v1/auth/logout — this device only.
+     * Sign out this device
+     *
+     * Revokes the access token used for this request and its refresh token.
+     * Other devices stay signed in.
      */
     public function logout(Request $request, TokenService $tokens): JsonResponse
     {
@@ -129,7 +150,7 @@ class OtpAuthController extends Controller
     }
 
     /**
-     * POST /api/v1/auth/logout-all — every device.
+     * Sign out every device
      */
     public function logoutAll(Request $request, TokenService $tokens): JsonResponse
     {
@@ -139,7 +160,9 @@ class OtpAuthController extends Controller
     }
 
     /**
-     * GET /api/v1/auth/sessions
+     * List active sessions
+     *
+     * Every device currently signed in, for a "where am I signed in" screen.
      */
     public function sessions(Request $request, TokenService $tokens): JsonResponse
     {
@@ -149,7 +172,7 @@ class OtpAuthController extends Controller
     }
 
     /**
-     * DELETE /api/v1/auth/sessions/{session}
+     * Sign out one device
      */
     public function revokeSession(Request $request, TokenService $tokens, int $session): JsonResponse
     {

@@ -19,11 +19,13 @@ use Illuminate\Support\Str;
 class AuthController extends Controller
 {
     /**
-     * POST /api/v1/merchant/register
+     * Register a restaurant
      *
-     * Creates the owner's user account and the merchant business profile in
-     * one transaction. The account starts as `pending` and cannot take orders
-     * until an admin verifies KYC (EP2).
+     * Creates the owner's account and the business profile in one transaction,
+     * and returns a token so the merchant is signed in immediately.
+     *
+     * The account starts as `pending` and cannot accept orders until an admin
+     * verifies the KYC documents.
      */
     public function register(RegisterRequest $request, RegisterMerchant $registerMerchant): JsonResponse
     {
@@ -40,7 +42,10 @@ class AuthController extends Controller
     }
 
     /**
-     * POST /api/v1/merchant/login
+     * Merchant sign in
+     *
+     * `identifier` accepts either the registered email or the 10-digit mobile
+     * number. Throttled to 5 failed attempts per identifier and IP per minute.
      */
     public function login(LoginRequest $request): JsonResponse
     {
@@ -85,7 +90,9 @@ class AuthController extends Controller
     }
 
     /**
-     * GET /api/v1/merchant/me
+     * Current merchant profile
+     *
+     * Includes the business profile and KYC status.
      */
     public function me(Request $request): JsonResponse
     {
@@ -97,7 +104,9 @@ class AuthController extends Controller
     }
 
     /**
-     * POST /api/v1/merchant/logout — revokes only the token used for this request.
+     * Merchant sign out
+     *
+     * Revokes only the token used for this request.
      */
     public function logout(Request $request): JsonResponse
     {

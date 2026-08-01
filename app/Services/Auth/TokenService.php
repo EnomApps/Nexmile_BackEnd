@@ -47,7 +47,9 @@ class TokenService
             'access_token' => $accessToken->plainTextToken,
             'refresh_token' => $plainRefresh,
             'token_type' => 'Bearer',
-            'expires_in' => $ttlMinutes * 60,
+            // Cast so the generated API schema types this as an integer;
+            // a Dart client expecting int would fail on a string.
+            'expires_in' => (int) ($ttlMinutes * 60),
         ];
     }
 
