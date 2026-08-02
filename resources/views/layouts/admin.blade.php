@@ -26,10 +26,9 @@
 @auth
     <header class="border-b border-white/10 bg-black">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-            <a href="{{ route('admin.index') }}" class="flex items-center gap-2.5">
-                <span class="text-lg font-extrabold tracking-tight">
-                    <span class="text-white">Nex</span><span class="text-brand-orange">mile</span>
-                </span>
+            <a href="{{ route('admin.index') }}" class="flex items-center gap-2.5" aria-label="Nexmile Admin">
+                <img src="{{ asset('images/nexmile-wordmark.png') }}" alt="Nexmile"
+                     width="631" height="128" class="h-6 w-auto">
                 <span class="text-xs font-semibold tracking-widest uppercase text-gray-500 border-l border-white/15 pl-2.5">Admin</span>
             </a>
             <div class="flex items-center gap-4 text-sm">

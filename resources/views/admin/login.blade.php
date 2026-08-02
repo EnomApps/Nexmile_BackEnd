@@ -11,10 +11,9 @@
 
 <section class="max-w-sm mx-auto px-4 py-20">
     <div class="text-center">
-        <span class="text-2xl font-extrabold tracking-tight">
-            <span class="text-white">Nex</span><span class="text-brand-orange">mile</span>
-        </span>
-        <p class="mt-1 text-xs font-semibold tracking-widest uppercase text-gray-500">Admin</p>
+        <img src="{{ asset('images/nexmile-wordmark.png') }}" alt="Nexmile"
+             width="631" height="128" class="h-9 w-auto mx-auto">
+        <p class="mt-2 text-xs font-semibold tracking-widest uppercase text-gray-500">Admin</p>
     </div>
 
     <form method="POST" action="{{ route('admin.login.submit') }}"
