@@ -1,0 +1,111 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Rider;
+
+use App\Enums\RiderStatus;
+use App\Http\Controllers\Controller;
+use App\Http\Resources\RiderResource;
+use App\Models\Rider;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+/**
+ * Rider profile (EP2).
+ *
+ * Document submission and KYC review are a separate ticket; this covers the
+ * profile itself and going on or off duty.
+ */
+class ProfileController extends Controller
+{
+    /**
+     * Rider profile
+     */
+    public function show(Request $request): JsonResponse
+    {
+        return response()->json([
+            'data' => new RiderResource($this->profile($request)),
+        ]);
+    }
+
+    /**
+     * Update rider profile
+     *
+     * KYC fields are not editable here. Once documents are submitted they are
+     * changed through the KYC endpoints, so an approved rider cannot quietly
+     * swap in a different licence afterwards.
+     */
+    public function update(Request $request): JsonResponse
+    {
+        $rider = $this->profile($request);
+
+        $data = $request->validate([
+            'full_name' => ['sometimes', 'string', 'max:255'],
+            'date_of_birth' => ['sometimes', 'date', 'before:-18 years'],
+            'vehicle_type' => ['sometimes', 'in:bicycle,motorcycle,scooter,ev'],
+            'vehicle_number' => ['sometimes', 'nullable', 'string', 'max:15'],
+        ], [
+            'date_of_birth.before' => 'Riders must be at least 18 years old.',
+        ]);
+
+        $rider->update($data);
+
+        return response()->json([
+            'message' => 'Profile updated.',
+            'data' => new RiderResource($rider->fresh()),
+        ]);
+    }
+
+    /**
+     * Go on or off duty
+     *
+     * A rider can only go available with verified KYC and current documents —
+     * dispatching someone with a lapsed licence or insurance is a legal
+     * exposure, not a paperwork detail.
+     */
+    public function setDutyStatus(Request $request): JsonResponse
+    {
+        $rider = $this->profile($request);
+
+        $data = $request->validate([
+            'duty_status' => ['required', 'in:offline,available,on_break'],
+        ]);
+
+        $requested = RiderStatus::from($data['duty_status']);
+
+        if ($requested === RiderStatus::Available) {
+            if (! $rider->isKycVerified()) {
+                return response()->json([
+                    'message' => 'Your documents are still being verified.',
+                ], 403);
+            }
+
+            if ($rider->hasExpiredDocuments()) {
+                return response()->json([
+                    'message' => 'Your licence or insurance has expired. Upload current documents to go online.',
+                ], 403);
+            }
+        }
+
+        // on_order is set by dispatch, never by the rider.
+        $rider->update(['duty_status' => $requested]);
+
+        return response()->json([
+            'message' => 'Duty status updated.',
+            'data' => new RiderResource($rider->fresh()),
+        ]);
+    }
+
+    /**
+     * A rider account always has a profile row; create it lazily on first use
+     * so an OTP signup does not have to know about this table.
+     */
+    private function profile(Request $request): Rider
+    {
+        $user = $request->user();
+
+        return $user->rider ?? Rider::create([
+            'user_id' => $user->id,
+            'full_name' => $user->name,
+        ]);
+    }
+}

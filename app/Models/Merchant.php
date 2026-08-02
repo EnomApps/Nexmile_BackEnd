@@ -6,6 +6,7 @@ use App\Enums\KycStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Merchant extends Model
@@ -57,6 +58,42 @@ class Merchant extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function zone(): BelongsTo
+    {
+        return $this->belongsTo(Zone::class);
+    }
+
+    public function categories(): HasMany
+    {
+        return $this->hasMany(Category::class);
+    }
+
+    public function menuItems(): HasMany
+    {
+        return $this->hasMany(MenuItem::class);
+    }
+
+    public function operatingHours(): HasMany
+    {
+        return $this->hasMany(MerchantOperatingHour::class);
+    }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    /**
+     * A merchant may only receive orders once KYC is verified, the FSSAI
+     * licence is current, and they have switched themselves on.
+     */
+    public function canReceiveOrders(): bool
+    {
+        return $this->isKycVerified()
+            && $this->hasValidFssai()
+            && $this->is_accepting_orders;
     }
 
     public function isKycVerified(): bool
