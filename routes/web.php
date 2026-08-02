@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Web\LanguageController;
+use App\Http\Controllers\Web\MerchantPortalController;
 use App\Http\Controllers\Web\PageController;
 use Illuminate\Support\Facades\Route;
 
@@ -28,5 +29,28 @@ foreach ([
         ->defaults('page', $page)
         ->name($page);
 }
+
+/*
+|--------------------------------------------------------------------------
+| Merchant portal — registration and onboarding happen here, on nexmile.in
+|--------------------------------------------------------------------------
+| Session-based, sharing the users table with the JSON API.
+*/
+Route::prefix('merchants')->name('merchants.')->group(function () {
+    Route::middleware('guest')->group(function () {
+        Route::get('register', [MerchantPortalController::class, 'showRegister'])->name('register');
+        Route::post('register', [MerchantPortalController::class, 'register'])->name('register.submit');
+        Route::get('login', [MerchantPortalController::class, 'showLogin'])->name('login');
+        Route::post('login', [MerchantPortalController::class, 'login'])->name('login.submit');
+    });
+
+    Route::middleware(['auth', 'role:merchant'])->group(function () {
+        Route::get('dashboard', [MerchantPortalController::class, 'dashboard'])->name('dashboard');
+        Route::post('dashboard/documents', [MerchantPortalController::class, 'uploadDocument'])->name('documents.upload');
+        Route::delete('dashboard/documents/{document}', [MerchantPortalController::class, 'destroyDocument'])->name('documents.destroy');
+        Route::post('dashboard/submit', [MerchantPortalController::class, 'submitKyc'])->name('kyc.submit');
+        Route::post('logout', [MerchantPortalController::class, 'logout'])->name('logout');
+    });
+});
 
 Route::get('language/{locale}', [LanguageController::class, 'switch'])->name('language.switch');

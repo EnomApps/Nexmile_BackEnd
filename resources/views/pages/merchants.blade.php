@@ -26,10 +26,16 @@
             <div>
                 <h2 class="text-2xl font-bold text-white">{{ __('site.cta.become_merchant') }}</h2>
                 <p class="mt-3 text-gray-400 leading-relaxed">{{ __('site.merchants.cta_body') }}</p>
-                <a href="mailto:{{ config('site.email.business') }}?subject=Merchant%20onboarding%20enquiry"
-                   class="mt-6 inline-block px-6 py-3 rounded-lg bg-brand-orange text-black font-bold hover:bg-orange-400 transition break-all">
-                    {{ config('site.email.business') }}
-                </a>
+                <div class="mt-6 flex flex-wrap gap-3">
+                    <a href="{{ route('merchants.register') }}"
+                       class="px-6 py-3 rounded-lg bg-brand-orange text-black font-bold hover:bg-orange-400 transition">
+                        {{ __('portal.register.title') }}
+                    </a>
+                    <a href="{{ route('merchants.login') }}"
+                       class="px-6 py-3 rounded-lg border border-white/20 font-semibold text-gray-200 hover:border-brand-orange hover:text-brand-orange transition">
+                        {{ __('portal.login.submit') }}
+                    </a>
+                </div>
             </div>
             <div class="rounded-xl bg-black/50 border border-white/10 p-6">
                 <h3 class="font-semibold text-white">{{ __('site.cta.what_you_need') }}</h3>

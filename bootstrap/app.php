@@ -16,6 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
         ]);
 
+        // The site has no generic /login; guests go to the merchant portal.
+        $middleware->redirectGuestsTo(fn () => route("merchants.login"));
+        $middleware->redirectUsersTo(fn () => route("merchants.dashboard"));
+
         // Runs after the session starts so the chosen locale is available.
         $middleware->web(append: [
             \App\Http\Middleware\SetLocale::class,
