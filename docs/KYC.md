@@ -19,12 +19,20 @@ minutes**, regenerated each time the document is fetched.
 Create the bucket in the **same region as the EC2 instance** (`ap-southeast-1`)
 so transfers stay in-region and free.
 
-1. S3 → Create bucket → `nexmile-documents`
+1. S3 → Create bucket → `nexmile-documents`, General purpose
 2. **Block all public access** — leave every box ticked
-3. Enable **Default encryption** (SSE-S3 is enough)
-4. Enable **Versioning**, so a replaced document can still be produced if a
-   dispute reaches back years
-5. IAM → create a user with programmatic access and this policy only:
+3. **Bucket Versioning: Enable**, so a replaced document can still be produced
+   if a dispute reaches back years
+4. **Default encryption: SSE-S3** with Bucket Key enabled
+5. Object Lock: disabled
+
+### Credentials — IAM role, not access keys
+
+The application runs on EC2, so it takes credentials from an instance role.
+**There is no access key anywhere**: nothing to leak, rotate, or accidentally
+commit.
+
+Policy `NexmileDocumentsAccess`:
 
 ```json
 {
@@ -37,18 +45,44 @@ so transfers stay in-region and free.
 }
 ```
 
-Scoped to one bucket and three actions. If the key leaks, the damage is
-bounded — it cannot list buckets, read other buckets, or delete the bucket.
+Three actions on one bucket. Even with the server fully compromised, that is
+the entire blast radius — it cannot list buckets, read other buckets, or delete
+the bucket itself.
+
+Attach it to a role trusted by **EC2** (`NexmileAppRole`), then
+**EC2 → Instance → Actions → Security → Modify IAM role**. Effective within
+seconds; no restart.
 
 ```env
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
 AWS_DEFAULT_REGION=ap-southeast-1
 AWS_BUCKET=nexmile-documents
+AWS_USE_PATH_STYLE_ENDPOINT=false
 KYC_DISK=s3
 ```
 
+**Leave the two key lines empty.** Laravel only passes explicit credentials
+when both are set; otherwise the AWS SDK falls back to the instance role.
+
 Set `KYC_DISK=local` for development to keep files under `storage/app`.
+
+Verify:
+
+```bash
+php artisan tinker --execute="Storage::disk('s3')->put('healthcheck.txt','ok'); echo Storage::disk('s3')->get('healthcheck.txt'),PHP_EOL; Storage::disk('s3')->delete('healthcheck.txt'); echo 'S3 working',PHP_EOL;"
+```
+
+If you ever run the app off EC2, you will need an IAM user with access keys
+instead — the role only works on AWS compute.
+
+### The S3 driver package
+
+`league/flysystem-aws-s3-v3` must be installed, or every upload fails with
+`PortableVisibilityConverter not found`. It is in `composer.json`, so a normal
+`composer install` covers it — but note that `Storage::fake('s3')` in tests
+does **not** load the real adapter, so the test suite cannot catch a missing
+package.
 
 ## Required documents
 
