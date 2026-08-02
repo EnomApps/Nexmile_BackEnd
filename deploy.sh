@@ -10,6 +10,25 @@
 
 set -euo pipefail
 
+# Re-exec from a copy outside the repository.
+#
+# `git reset --hard` below rewrites this very file, and bash reads a script
+# incrementally rather than all at once — a script that overwrites itself
+# mid-run continues executing whatever bytes now sit at its current offset.
+#
+# It also means a rollback reverts deploy.sh along with everything else, so a
+# fix to this script could never survive a failed deploy: the old version would
+# restore itself and fail the same way again.
+if [ "${DEPLOY_REEXEC:-}" != "1" ]; then
+    _copy="$(mktemp /tmp/nexmile-deploy.XXXXXX)"
+    cp "$0" "$_copy"
+    chmod +x "$_copy"
+    export DEPLOY_REEXEC=1
+    trap 'rm -f "$_copy"' EXIT
+    "$_copy" "$@"
+    exit $?
+fi
+
 APP_DIR="${APP_DIR:-/var/www/nexmile}"
 
 # The public URL, not 127.0.0.1. Nginx routes by Host header and serves TLS,
