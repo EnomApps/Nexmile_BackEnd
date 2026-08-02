@@ -17,17 +17,26 @@ class EnsureUserHasRole
         $user = $request->user();
 
         if (! $user || ! in_array($user->role->value, $roles, true)) {
-            return response()->json([
-                'message' => 'This account is not allowed to access this resource.',
-            ], 403);
+            return $this->deny($request, 'This account is not allowed to access this resource.');
         }
 
         if ($user->status === UserStatus::Suspended) {
-            return response()->json([
-                'message' => 'This account has been suspended. Contact support.',
-            ], 403);
+            return $this->deny($request, 'This account has been suspended. Contact support.');
         }
 
         return $next($request);
+    }
+
+    /**
+     * API callers get JSON; a browser gets the standard 403 page rather than a
+     * wall of JSON it cannot render.
+     */
+    private function deny(Request $request, string $message): Response
+    {
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message], 403);
+        }
+
+        abort(403, $message);
     }
 }
