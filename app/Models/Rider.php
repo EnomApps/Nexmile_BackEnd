@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Rider extends Model
@@ -45,6 +46,11 @@ class Rider extends Model
             'completed_deliveries' => 'integer',
             'rating' => 'decimal:2',
         ];
+    }
+
+    public function kycDocuments(): MorphMany
+    {
+        return $this->morphMany(KycDocument::class, "documentable");
     }
 
     public function user(): BelongsTo

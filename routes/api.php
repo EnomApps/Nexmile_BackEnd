@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AddressController;
+use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
 use App\Http\Controllers\Api\V1\Merchant\AuthController as MerchantAuthController;
+use App\Http\Controllers\Api\V1\Merchant\KycController as MerchantKycController;
 use App\Http\Controllers\Api\V1\Merchant\ProfileController as MerchantProfileController;
 use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
 use App\Http\Controllers\Api\V1\Rider\ProfileController as RiderProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -64,6 +67,28 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('profile', [RiderProfileController::class, 'show'])->name('profile.show');
         Route::patch('profile', [RiderProfileController::class, 'update'])->name('profile.update');
         Route::post('duty-status', [RiderProfileController::class, 'setDutyStatus'])->name('duty-status');
+
+        Route::prefix('kyc')->name('kyc.')->group(function () {
+            Route::get('/', [RiderKycController::class, 'show'])->name('show');
+            Route::patch('details', [RiderKycController::class, 'updateDetails'])->name('details');
+            Route::post('documents', [RiderKycController::class, 'upload'])->name('documents.upload');
+            Route::delete('documents/{document}', [RiderKycController::class, 'destroy'])->name('documents.destroy');
+            Route::post('submit', [RiderKycController::class, 'submit'])->name('submit');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin — EP2 KYC review
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
+        Route::get('kyc/queue', [KycReviewController::class, 'queue'])->name('kyc.queue');
+        Route::get('kyc/{type}/{id}/documents', [KycReviewController::class, 'documents'])->name('kyc.documents');
+        Route::post('kyc/documents/{document}/review', [KycReviewController::class, 'reviewDocument'])->name('kyc.documents.review');
+        Route::post('kyc/{type}/{id}/verify', [KycReviewController::class, 'verify'])->name('kyc.verify');
+        Route::post('kyc/{type}/{id}/reject', [KycReviewController::class, 'reject'])->name('kyc.reject');
+        Route::post('kyc/{type}/{id}/status', [KycReviewController::class, 'setUserStatus'])->name('kyc.status');
     });
 
     /*
@@ -82,6 +107,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('profile', [MerchantProfileController::class, 'show'])->name('profile.show');
             Route::patch('profile', [MerchantProfileController::class, 'update'])->name('profile.update');
             Route::post('accepting-orders', [MerchantProfileController::class, 'setAcceptingOrders'])->name('accepting-orders');
+
+            Route::prefix('kyc')->name('kyc.')->group(function () {
+                Route::get('/', [MerchantKycController::class, 'show'])->name('show');
+                Route::post('documents', [MerchantKycController::class, 'upload'])->name('documents.upload');
+                Route::delete('documents/{document}', [MerchantKycController::class, 'destroy'])->name('documents.destroy');
+                Route::post('submit', [MerchantKycController::class, 'submit'])->name('submit');
+            });
         });
     });
 });
