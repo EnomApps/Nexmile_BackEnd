@@ -21,6 +21,46 @@ use Illuminate\Validation\ValidationException;
 class DocumentService
 {
     /**
+     * Validation for an uploaded document, shared by the API and the merchant
+     * portal so the two cannot drift apart.
+     *
+     * @param  list<string>  $types  document types the caller's role may send
+     * @return array<string, mixed>
+     */
+    public static function uploadRules(array $types): array
+    {
+        return [
+            'type' => ['required', 'string', 'in:'.implode(',', $types)],
+            'file' => [
+                'required', 'file',
+                'mimes:'.implode(',', config('kyc.allowed_mimes')),
+                'max:'.config('kyc.max_file_size_kb'),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function uploadMessages(): array
+    {
+        $mb = round(config('kyc.max_file_size_kb') / 1024);
+
+        return [
+            'file.max' => "Files must be under {$mb} MB.",
+            'file.mimes' => 'Upload a JPG, PNG or PDF.',
+
+            /*
+             * PHP throws away a file larger than upload_max_filesize before
+             * Laravel sees it, so the max rule above never runs. The default
+             * message for that case is "The file failed to upload." — true,
+             * but it tells the merchant nothing they can act on.
+             */
+            'file.uploaded' => "That file is too large to upload. Keep it under {$mb} MB.",
+        ];
+    }
+
+    /**
      * Replace or add a document of a given type.
      *
      * Uploading a type that already exists supersedes the old file, so an

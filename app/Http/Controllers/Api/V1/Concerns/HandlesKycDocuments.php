@@ -46,17 +46,10 @@ trait HandlesKycDocuments
 
     protected function uploadDocument(Request $request, DocumentService $service): JsonResponse
     {
-        $data = $request->validate([
-            'type' => ['required', 'string', 'in:'.implode(',', DocumentType::values())],
-            'file' => [
-                'required', 'file',
-                'mimes:'.implode(',', config('kyc.allowed_mimes')),
-                'max:'.config('kyc.max_file_size_kb'),
-            ],
-        ], [
-            'file.max' => 'Files must be under '.round(config('kyc.max_file_size_kb') / 1024).' MB.',
-            'file.mimes' => 'Upload a JPG, PNG or PDF.',
-        ]);
+        $data = $request->validate(
+            DocumentService::uploadRules(DocumentType::values()),
+            DocumentService::uploadMessages(),
+        );
 
         $document = $service->store(
             $this->owner($request),

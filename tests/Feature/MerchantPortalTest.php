@@ -239,7 +239,7 @@ class MerchantPortalTest extends TestCase
 
         $this->actingAs($user)->post('/merchants/dashboard/documents', [
             'type' => DocumentType::PanCard->value,
-            'file' => UploadedFile::fake()->create('huge.pdf', 6000, 'application/pdf'),
+            'file' => UploadedFile::fake()->create('huge.pdf', config('kyc.max_file_size_kb') + 1, 'application/pdf'),
         ])->assertSessionHasErrors('file');
 
         $this->assertDatabaseCount('kyc_documents', 0);

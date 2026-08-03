@@ -97,14 +97,10 @@ class MerchantPortalController extends Controller
 
     public function uploadDocument(Request $request, DocumentService $service): RedirectResponse
     {
-        $data = $request->validate([
-            'type' => ['required', 'in:'.implode(',', config('kyc.allowed.merchant'))],
-            'file' => [
-                'required', 'file',
-                'mimes:'.implode(',', config('kyc.allowed_mimes')),
-                'max:'.config('kyc.max_file_size_kb'),
-            ],
-        ]);
+        $data = $request->validate(
+            DocumentService::uploadRules(config('kyc.allowed.merchant')),
+            DocumentService::uploadMessages(),
+        );
 
         $service->store(
             $this->merchant($request),

@@ -108,8 +108,29 @@ Configured in `config/kyc.php`.
 | POST | `/v1/{merchant\|rider}/kyc/submit` | submit for review |
 | PATCH | `/v1/rider/kyc/details` | licence, RC, insurance and bank numbers |
 
-Uploads are **JPG, PNG or PDF up to 5 MB**. Send as `multipart/form-data`, not
+Uploads are **JPG, PNG or PDF up to 10 MB**. Send as `multipart/form-data`, not
 JSON.
+
+### Server limits must stay above the app limit
+
+PHP discards a file larger than `upload_max_filesize` *before* Laravel runs any
+validation, so the size rule never fires and the merchant sees Laravel's
+default `uploaded` message — "The file failed to upload." — which explains
+nothing. Nginx is lower still and answers with a bare `413` page.
+
+Whichever limit is lowest is the one that produces the error, and only ours can
+describe itself. So the server must always sit above `max_file_size_kb`:
+
+| Limit | Where | Value |
+|---|---|---|
+| `max_file_size_kb` | `config/kyc.php` | 10 MB |
+| `upload_max_filesize` | `/etc/php/8.5/fpm/conf.d/99-nexmile.ini` | 12M |
+| `post_max_size` | same file | 16M |
+| `client_max_body_size` | `/etc/nginx/sites-available/nexmile` | 12M |
+
+Ubuntu ships `upload_max_filesize` at **2M**, which rejects an ordinary scanned
+FSSAI certificate. Verify with `php-fpm8.5 -i`, not `php -i` — the CLI reads a
+different ini file and will report the wrong number.
 
 The status response tells the client exactly what to ask for next:
 

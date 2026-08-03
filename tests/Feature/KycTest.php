@@ -147,7 +147,9 @@ class KycTest extends TestCase
 
         $this->postJson('/api/v1/merchant/kyc/documents', [
             'type' => DocumentType::PanCard->value,
-            'file' => UploadedFile::fake()->create('big.pdf', 6000, 'application/pdf'),
+            // Derived from config so raising the limit cannot leave this
+            // assertion quietly passing a file that is now allowed.
+            'file' => UploadedFile::fake()->create('big.pdf', config('kyc.max_file_size_kb') + 1, 'application/pdf'),
         ])->assertStatus(422)->assertJsonValidationErrors('file');
 
         $this->postJson('/api/v1/merchant/kyc/documents', [
