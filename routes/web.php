@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Web\Admin\AdminController;
 use App\Http\Controllers\Web\LanguageController;
+use App\Http\Controllers\Web\MerchantMenuController;
+use App\Http\Controllers\Web\MerchantOrderController;
 use App\Http\Controllers\Web\MerchantPortalController;
 use App\Http\Controllers\Web\PageController;
 use Illuminate\Support\Facades\Route;
@@ -51,6 +53,38 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
         Route::delete('dashboard/documents/{document}', [MerchantPortalController::class, 'destroyDocument'])->name('documents.destroy');
         Route::post('dashboard/submit', [MerchantPortalController::class, 'submitKyc'])->name('kyc.submit');
         Route::post('logout', [MerchantPortalController::class, 'logout'])->name('logout');
+
+        /*
+         * Menu (EP3). A merchant may build their menu before verification —
+         * it only becomes visible to customers once the account is verified,
+         * so there is nothing to gain by making them wait.
+         */
+        Route::prefix('menu')->name('menu.')->group(function () {
+            Route::get('/', [MerchantMenuController::class, 'index'])->name('index');
+
+            Route::post('categories', [MerchantMenuController::class, 'storeCategory'])->name('categories.store');
+            Route::delete('categories/{category}', [MerchantMenuController::class, 'destroyCategory'])->name('categories.destroy');
+
+            // 'create' before '{item}' so the literal path is not swallowed.
+            Route::get('items/create', [MerchantMenuController::class, 'createItem'])->name('items.create');
+            Route::post('items', [MerchantMenuController::class, 'storeItem'])->name('items.store');
+            Route::get('items/{item}/edit', [MerchantMenuController::class, 'editItem'])->name('items.edit');
+            Route::patch('items/{item}', [MerchantMenuController::class, 'updateItem'])->name('items.update');
+            Route::post('items/{item}/toggle', [MerchantMenuController::class, 'toggleItem'])->name('items.toggle');
+            Route::delete('items/{item}', [MerchantMenuController::class, 'destroyItem'])->name('items.destroy');
+        });
+
+        /*
+         * Orders (EP5, EP8).
+         */
+        Route::prefix('orders')->name('orders.')->group(function () {
+            Route::get('/', [MerchantOrderController::class, 'index'])->name('index');
+            Route::get('{order}', [MerchantOrderController::class, 'show'])->name('show');
+            Route::post('{order}/accept', [MerchantOrderController::class, 'accept'])->name('accept');
+            Route::post('{order}/reject', [MerchantOrderController::class, 'reject'])->name('reject');
+            Route::post('{order}/preparing', [MerchantOrderController::class, 'preparing'])->name('preparing');
+            Route::post('{order}/ready', [MerchantOrderController::class, 'ready'])->name('ready');
+        });
     });
 });
 

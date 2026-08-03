@@ -19,20 +19,7 @@
 
 <section class="max-w-5xl mx-auto px-4 sm:px-6 py-12">
 
-    <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-            <h1 class="text-3xl font-extrabold tracking-tight text-white">{{ $merchant->business_name }}</h1>
-            <p class="mt-1 text-sm text-gray-500">
-                {{ __('portal.dashboard.signed_in_as') }} {{ $user->name }}
-            </p>
-        </div>
-        <form method="POST" action="{{ route('merchants.logout') }}">
-            @csrf
-            <button type="submit" class="text-sm font-medium text-gray-400 hover:text-brand-green">
-                {{ __('portal.dashboard.logout') }}
-            </button>
-        </form>
-    </div>
+    @include('merchants.partials.nav')
 
     {{-- KYC status --}}
     <div class="mt-8 rounded-2xl border {{ $border }} {{ $banner }} p-6">

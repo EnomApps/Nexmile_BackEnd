@@ -4,7 +4,10 @@ use App\Http\Controllers\Api\V1\AddressController;
 use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
 use App\Http\Controllers\Api\V1\Merchant\AuthController as MerchantAuthController;
+use App\Http\Controllers\Api\V1\Merchant\CategoryController;
 use App\Http\Controllers\Api\V1\Merchant\KycController as MerchantKycController;
+use App\Http\Controllers\Api\V1\Merchant\MenuItemController;
+use App\Http\Controllers\Api\V1\Merchant\OrderController as MerchantOrderController;
 use App\Http\Controllers\Api\V1\Merchant\ProfileController as MerchantProfileController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
@@ -113,6 +116,42 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 Route::post('documents', [MerchantKycController::class, 'upload'])->name('documents.upload');
                 Route::delete('documents/{document}', [MerchantKycController::class, 'destroy'])->name('documents.destroy');
                 Route::post('submit', [MerchantKycController::class, 'submit'])->name('submit');
+            });
+
+            /*
+            |------------------------------------------------------------------
+            | EP3 — Menu management
+            |------------------------------------------------------------------
+            | Every route resolves its record through the authenticated
+            | merchant, so another merchant's id is a 404, not an edit.
+            */
+            Route::apiResource('categories', CategoryController::class)
+                ->only(['index', 'store', 'update', 'destroy']);
+
+            Route::prefix('menu-items')->name('menu-items.')->group(function () {
+                Route::get('/', [MenuItemController::class, 'index'])->name('index');
+                Route::post('/', [MenuItemController::class, 'store'])->name('store');
+                // Fixed segment first, or 'reorder' is read as an item id.
+                Route::post('reorder', [MenuItemController::class, 'reorder'])->name('reorder');
+                Route::get('{item}', [MenuItemController::class, 'show'])->name('show');
+                Route::post('{item}', [MenuItemController::class, 'update'])->name('update');
+                Route::post('{item}/availability', [MenuItemController::class, 'setAvailability'])->name('availability');
+                Route::delete('{item}/image', [MenuItemController::class, 'destroyImage'])->name('image.destroy');
+                Route::delete('{item}', [MenuItemController::class, 'destroy'])->name('destroy');
+            });
+
+            /*
+            |------------------------------------------------------------------
+            | EP5/EP8 — Orders
+            |------------------------------------------------------------------
+            */
+            Route::prefix('orders')->name('orders.')->group(function () {
+                Route::get('/', [MerchantOrderController::class, 'index'])->name('index');
+                Route::get('{order}', [MerchantOrderController::class, 'show'])->name('show');
+                Route::post('{order}/accept', [MerchantOrderController::class, 'accept'])->name('accept');
+                Route::post('{order}/reject', [MerchantOrderController::class, 'reject'])->name('reject');
+                Route::post('{order}/preparing', [MerchantOrderController::class, 'preparing'])->name('preparing');
+                Route::post('{order}/ready', [MerchantOrderController::class, 'ready'])->name('ready');
             });
         });
     });

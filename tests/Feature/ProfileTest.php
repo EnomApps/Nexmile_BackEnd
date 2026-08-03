@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Enums\KycStatus;
-use App\Enums\RiderStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\Address;
@@ -366,13 +365,36 @@ class ProfileTest extends TestCase
 
     public function test_a_merchant_can_update_their_business_profile(): void
     {
-        Sanctum::actingAs($this->merchantUser());
+        Sanctum::actingAs($user = $this->merchantUser());
 
         $this->patchJson('/api/v1/merchant/profile', [
             'business_name' => 'Saravana Bhavan Madurai',
             'avg_prep_time_minutes' => 22,
             'packaging_fee' => 15.50,
+            'min_order_value' => 99,
+            'supports_pickup' => false,
         ])->assertOk()->assertJsonPath('data.business_name', 'Saravana Bhavan Madurai');
+
+        /*
+         * Asserted against the database, not the response. These fields were
+         * validated and then silently dropped for want of a $fillable entry,
+         * and a 200 with the right business_name hid it completely.
+         */
+        $merchant = $user->merchant->fresh();
+        $this->assertSame(22, $merchant->avg_prep_time_minutes);
+        $this->assertSame('15.50', $merchant->packaging_fee);
+        $this->assertSame('99.00', $merchant->min_order_value);
+        $this->assertFalse($merchant->supports_pickup);
+    }
+
+    public function test_a_merchant_cannot_set_their_own_commission_rate(): void
+    {
+        Sanctum::actingAs($user = $this->merchantUser());
+
+        $this->patchJson('/api/v1/merchant/profile', ['commission_rate' => 0])->assertOk();
+
+        // A contract term, not a preference. Never settable by the account it charges.
+        $this->assertSame('0.00', $user->merchant->fresh()->commission_rate);
     }
 
     public function test_kyc_fields_cannot_be_edited_through_the_profile(): void

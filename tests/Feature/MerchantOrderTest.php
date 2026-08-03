@@ -1,0 +1,266 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\FulfilmentType;
+use App\Enums\KycStatus;
+use App\Enums\OrderStatus;
+use App\Enums\UserRole;
+use App\Enums\UserStatus;
+use App\Models\Merchant;
+use App\Models\Order;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class MerchantOrderTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function user(UserRole $role): User
+    {
+        static $n = 0;
+        $n++;
+
+        return User::create([
+            'name' => 'User '.$n,
+            'phone' => '98780000'.str_pad((string) $n, 2, '0', STR_PAD_LEFT),
+            'email' => "order{$n}@example.in",
+            'password' => 'secret',
+            'role' => $role,
+            'status' => UserStatus::Active,
+        ]);
+    }
+
+    private function merchantUser(): User
+    {
+        $user = $this->user(UserRole::Merchant);
+
+        Merchant::create([
+            'user_id' => $user->id,
+            'business_name' => 'Ponnusamy Hotel',
+            'owner_name' => 'Owner',
+            'address_line1' => '9 Anna Salai',
+            'city' => 'Madurai',
+            'pincode' => '625001',
+            'kyc_status' => KycStatus::Verified,
+            'is_accepting_orders' => true,
+        ]);
+
+        return $user->fresh();
+    }
+
+    private function order(Merchant $merchant, OrderStatus $status = OrderStatus::Placed): Order
+    {
+        static $n = 0;
+        $n++;
+
+        $order = $merchant->orders()->create([
+            'order_number' => 'NX'.str_pad((string) $n, 6, '0', STR_PAD_LEFT),
+            'user_id' => $this->user(UserRole::Customer)->id,
+            'status' => $status,
+            'fulfilment_type' => FulfilmentType::Delivery,
+            'delivery_contact_name' => 'Meena',
+            'delivery_line1' => '4 Gandhi Nagar',
+            'delivery_city' => 'Madurai',
+            'delivery_pincode' => '625020',
+            'items_total' => 300,
+            'grand_total' => 340,
+            'merchant_payout' => 270,
+            'placed_at' => now(),
+        ]);
+
+        $order->items()->create([
+            'name' => 'Chicken 65',
+            'unit_price' => 150,
+            'quantity' => 2,
+            'line_total' => 300,
+        ]);
+
+        return $order->fresh();
+    }
+
+    public function test_the_live_queue_hides_unpaid_orders(): void
+    {
+        Sanctum::actingAs($user = $this->merchantUser());
+        $merchant = $user->merchant;
+
+        $paid = $this->order($merchant);
+        $this->order($merchant, OrderStatus::PendingPayment);
+
+        $response = $this->getJson('/api/v1/merchant/orders')->assertOk();
+
+        // An order the customer has not paid for is not a kitchen ticket.
+        $this->assertSame([$paid->id], array_column($response->json('data'), 'id'));
+    }
+
+    public function test_a_merchant_only_sees_their_own_orders(): void
+    {
+        $victim = $this->merchantUser();
+        $theirs = $this->order($victim->merchant);
+
+        Sanctum::actingAs($this->merchantUser());
+
+        $this->getJson('/api/v1/merchant/orders')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson("/api/v1/merchant/orders/{$theirs->id}")->assertNotFound();
+        $this->postJson("/api/v1/merchant/orders/{$theirs->id}/accept")->assertNotFound();
+
+        $this->assertSame(OrderStatus::Placed, $theirs->fresh()->status);
+    }
+
+    public function test_accepting_records_the_time_history_and_an_estimate(): void
+    {
+        Sanctum::actingAs($user = $this->merchantUser());
+        $order = $this->order($user->merchant);
+
+        $this->postJson("/api/v1/merchant/orders/{$order->id}/accept", ['prep_minutes' => 30])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'accepted');
+
+        $order->refresh();
+        $this->assertSame(30, $order->estimated_prep_minutes);
+        $this->assertNotNull($order->accepted_at);
+
+        $this->assertDatabaseHas('order_status_history', [
+            'order_id' => $order->id,
+            'from_status' => 'placed',
+            'to_status' => 'accepted',
+            'changed_by_user_id' => $user->id,
+        ]);
+    }
+
+    public function test_accepting_without_an_estimate_falls_back_to_the_merchant_average(): void
+    {
+        Sanctum::actingAs($user = $this->merchantUser());
+        $user->merchant->update(['avg_prep_time_minutes' => 45]);
+        $order = $this->order($user->merchant);
+
+        $this->postJson("/api/v1/merchant/orders/{$order->id}/accept")->assertOk();
+
+        // The customer always gets an estimate, even on a bare tap.
+        $this->assertSame(45, $order->fresh()->estimated_prep_minutes);
+    }
+
+    public function test_an_order_cannot_be_accepted_twice(): void
+    {
+        Sanctum::actingAs($user = $this->merchantUser());
+        $order = $this->order($user->merchant, OrderStatus::Accepted);
+
+        $this->postJson("/api/v1/merchant/orders/{$order->id}/accept")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_a_cancelled_order_says_so_rather_than_failing_vaguely(): void
+    {
+        Sanctum::actingAs($user = $this->merchantUser());
+        $order = $this->order($user->merchant, OrderStatus::Cancelled);
+
+        $this->postJson("/api/v1/merchant/orders/{$order->id}/accept")
+            ->assertStatus(422)
+            ->assertJsonPath('errors.status.0', 'This order was cancelled.');
+    }
+
+    public function test_rejecting_needs_a_real_reason_and_charges_the_customer_nothing(): void
+    {
+        Sanctum::actingAs($user = $this->merchantUser());
+        $order = $this->order($user->merchant);
+
+        $this->postJson("/api/v1/merchant/orders/{$order->id}/reject", ['reason' => 'no'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('reason');
+
+        $this->postJson("/api/v1/merchant/orders/{$order->id}/reject", [
+            'reason' => 'Kitchen closed early tonight, sorry.',
+        ])->assertOk();
+
+        $order->refresh();
+        $this->assertSame(OrderStatus::Rejected, $order->status);
+        $this->assertSame('merchant', $order->cancelled_by);
+        $this->assertSame('Kitchen closed early tonight, sorry.', $order->cancellation_reason);
+        // The customer did nothing wrong; a merchant's decision costs them nothing.
+        $this->assertSame('0.00', $order->cancellation_fee);
+    }
+
+    public function test_preparing_only_follows_acceptance(): void
+    {
+        Sanctum::actingAs($user = $this->merchantUser());
+        $order = $this->order($user->merchant);
+
+        $this->postJson("/api/v1/merchant/orders/{$order->id}/preparing")->assertStatus(422);
+
+        $this->postJson("/api/v1/merchant/orders/{$order->id}/accept")->assertOk();
+        $this->postJson("/api/v1/merchant/orders/{$order->id}/preparing")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'preparing');
+    }
+
+    public function test_ready_can_be_reached_from_accepted_or_preparing(): void
+    {
+        Sanctum::actingAs($user = $this->merchantUser());
+
+        // A small kitchen that plates immediately skips the preparing tap.
+        $straight = $this->order($user->merchant, OrderStatus::Accepted);
+        $this->postJson("/api/v1/merchant/orders/{$straight->id}/ready")->assertOk();
+        $this->assertNotNull($straight->fresh()->ready_at);
+
+        $viaPreparing = $this->order($user->merchant, OrderStatus::Preparing);
+        $this->postJson("/api/v1/merchant/orders/{$viaPreparing->id}/ready")->assertOk();
+        $this->assertSame(OrderStatus::ReadyForPickup, $viaPreparing->fresh()->status);
+    }
+
+    public function test_a_merchant_cannot_mark_an_order_delivered(): void
+    {
+        Sanctum::actingAs($user = $this->merchantUser());
+        $order = $this->order($user->merchant, OrderStatus::ReadyForPickup);
+
+        // Delivery is the rider's to confirm — there is no merchant route for it.
+        $this->postJson("/api/v1/merchant/orders/{$order->id}/delivered")->assertNotFound();
+        $this->postJson("/api/v1/merchant/orders/{$order->id}/ready")->assertStatus(422);
+    }
+
+    public function test_history_returns_finished_orders_newest_first(): void
+    {
+        Sanctum::actingAs($user = $this->merchantUser());
+        $merchant = $user->merchant;
+
+        $this->order($merchant);
+        $delivered = $this->order($merchant, OrderStatus::Delivered);
+
+        $response = $this->getJson('/api/v1/merchant/orders?history=1')->assertOk();
+
+        $this->assertSame([$delivered->id], array_column($response->json('data'), 'id'));
+    }
+
+    public function test_the_portal_shows_the_queue_and_accepts_an_order(): void
+    {
+        $user = $this->merchantUser();
+        $order = $this->order($user->merchant);
+
+        $this->actingAs($user)->get('/merchants/orders')
+            ->assertOk()
+            ->assertSee($order->order_number)
+            ->assertSee('Chicken 65');
+
+        $this->actingAs($user)->post("/merchants/orders/{$order->id}/accept", ['prep_minutes' => 20])
+            ->assertRedirect();
+
+        $this->assertSame(OrderStatus::Accepted, $order->fresh()->status);
+    }
+
+    public function test_the_portal_refuses_another_merchants_order(): void
+    {
+        $victim = $this->merchantUser();
+        $order = $this->order($victim->merchant);
+
+        $this->actingAs($this->merchantUser())
+            ->get("/merchants/orders/{$order->id}")
+            ->assertNotFound();
+    }
+
+    public function test_order_endpoints_reject_anonymous_callers(): void
+    {
+        $this->getJson('/api/v1/merchant/orders')->assertUnauthorized();
+    }
+}

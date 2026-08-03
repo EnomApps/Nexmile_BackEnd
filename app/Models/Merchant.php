@@ -38,6 +38,22 @@ class Merchant extends Model
         'kyc_rejection_reason',
         'kyc_verified_at',
         'is_accepting_orders',
+
+        /*
+         * Storefront settings. The profile endpoint has always validated
+         * these; without them here every update was accepted and silently
+         * discarded.
+         *
+         * commission_rate is deliberately absent — it is a contract term, not
+         * a merchant preference, and must never be settable by the account it
+         * charges.
+         */
+        'service_category',
+        'description',
+        'avg_prep_time_minutes',
+        'packaging_fee',
+        'min_order_value',
+        'supports_pickup',
     ];
 
     protected $hidden = [
@@ -51,6 +67,11 @@ class Merchant extends Model
             'kyc_verified_at' => 'datetime',
             'kyc_status' => KycStatus::class,
             'is_accepting_orders' => 'boolean',
+            'supports_pickup' => 'boolean',
+            'avg_prep_time_minutes' => 'integer',
+            'packaging_fee' => 'decimal:2',
+            'min_order_value' => 'decimal:2',
+            'commission_rate' => 'decimal:2',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
         ];
@@ -58,7 +79,7 @@ class Merchant extends Model
 
     public function kycDocuments(): MorphMany
     {
-        return $this->morphMany(KycDocument::class, "documentable");
+        return $this->morphMany(KycDocument::class, 'documentable');
     }
 
     public function user(): BelongsTo

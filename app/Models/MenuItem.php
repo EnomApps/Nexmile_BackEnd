@@ -59,6 +59,11 @@ class MenuItem extends Model
         return $query->where('is_available', true);
     }
 
+    public function scopeOrdered(Builder $query): Builder
+    {
+        return $query->orderBy('sort_order')->orderBy('name');
+    }
+
     /** A Food Rescue deal is only orderable inside its window (EP14). */
     public function scopeSurplusActive(Builder $query): Builder
     {
