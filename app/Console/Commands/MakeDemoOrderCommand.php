@@ -24,16 +24,37 @@ class MakeDemoOrderCommand extends Command
 {
     protected $signature = 'nexmile:demo-order
                             {--merchant= : Merchant id, or the account email}
-                            {--status=placed : Status to create the order in}';
+                            {--status=placed : Status to create the order in}
+                            {--force : Allow this on production (pre-launch only)}
+                            {--clean : Delete every demo order instead of creating one}';
 
     protected $description = 'Create a demo order for testing the merchant order screens';
 
+    /** Demo orders are numbered NXD… so they can be found and removed again. */
+    protected const PREFIX = 'NXD';
+
     public function handle(): int
     {
-        if (app()->environment('production')) {
+        if ($this->option('clean')) {
+            return $this->clean();
+        }
+
+        if (app()->environment('production') && ! $this->option('force')) {
             $this->error('Refusing to run on production — this creates an unpaid order in a live kitchen queue.');
+            $this->line('');
+            $this->line('  Pass --force if this server has no real merchants yet.');
+            $this->line('  Clean up afterwards with: php artisan nexmile:demo-order --clean');
 
             return self::FAILURE;
+        }
+
+        if (app()->environment('production')) {
+            $this->warn('This writes an unpaid order into production and counts toward payout reporting.');
+
+            // Declines under --no-interaction, which is what a deploy script gets.
+            if (! $this->confirm('Create a demo order on production anyway?', false)) {
+                return self::FAILURE;
+            }
         }
 
         $merchant = $this->resolveMerchant();
@@ -58,6 +79,38 @@ class MakeDemoOrderCommand extends Command
         $this->line('  Status:  '.$status->value);
         $this->line('  Total:   ₹'.number_format((float) $order->grand_total, 2));
         $this->line('  Portal:  '.route('merchants.orders.show', $order->id));
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Remove every demo order. Hard delete, not soft: these are fictional, and
+     * a soft-deleted row still sits in the table waiting to confuse a future
+     * payout query that forgets the global scope.
+     */
+    protected function clean(): int
+    {
+        $orders = Order::withTrashed()->where('order_number', 'like', self::PREFIX.'%')->get();
+
+        if ($orders->isEmpty()) {
+            $this->info('No demo orders to remove.');
+
+            return self::SUCCESS;
+        }
+
+        foreach ($orders as $order) {
+            // Items and options cascade; history is keyed on the order too.
+            $order->forceDelete();
+        }
+
+        $this->info("Removed {$orders->count()} demo order(s).");
+
+        $customer = User::where('email', 'demo.customer@nexmile.in')->first();
+
+        if ($customer && $customer->orders()->withTrashed()->doesntExist()) {
+            $customer->forceDelete();
+            $this->line('  Removed the demo customer account.');
+        }
 
         return self::SUCCESS;
     }
@@ -114,7 +167,7 @@ class MakeDemoOrderCommand extends Command
         $commission = round($itemsTotal * ((float) ($merchant->commission_rate ?? 0) / 100), 2);
 
         $order = $merchant->orders()->create([
-            'order_number' => 'NXD'.strtoupper(Str::random(7)),
+            'order_number' => self::PREFIX.strtoupper(Str::random(7)),
             'user_id' => $customer->id,
             'status' => $status,
             'fulfilment_type' => FulfilmentType::Delivery,

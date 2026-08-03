@@ -263,4 +263,44 @@ class MerchantOrderTest extends TestCase
     {
         $this->getJson('/api/v1/merchant/orders')->assertUnauthorized();
     }
+
+    public function test_the_demo_order_command_builds_a_working_order(): void
+    {
+        $merchant = $this->merchantUser()->merchant;
+
+        $this->artisan('nexmile:demo-order', ['--merchant' => $merchant->id])
+            ->assertSuccessful();
+
+        $order = $merchant->orders()->sole();
+        $this->assertSame(OrderStatus::Placed, $order->status);
+        $this->assertTrue($order->items()->exists());
+        $this->assertGreaterThan(0, (float) $order->grand_total);
+    }
+
+    public function test_the_demo_order_command_refuses_production_without_force(): void
+    {
+        $merchant = $this->merchantUser()->merchant;
+        app()['env'] = 'production';
+
+        $this->artisan('nexmile:demo-order', ['--merchant' => $merchant->id])
+            ->expectsOutputToContain('Refusing to run on production')
+            ->assertFailed();
+
+        $this->assertSame(0, $merchant->orders()->count());
+    }
+
+    public function test_cleaning_removes_demo_orders_and_leaves_real_ones(): void
+    {
+        $merchant = $this->merchantUser()->merchant;
+
+        $this->artisan('nexmile:demo-order', ['--merchant' => $merchant->id])->assertSuccessful();
+        $real = $this->order($merchant);
+
+        $this->artisan('nexmile:demo-order', ['--clean' => true])->assertSuccessful();
+
+        // Hard deleted: a soft-deleted fiction still waits to confuse a payout
+        // query that forgets the global scope.
+        $this->assertSame(0, Order::withTrashed()->where('order_number', 'like', 'NXD%')->count());
+        $this->assertNotNull(Order::find($real->id));
+    }
 }

@@ -154,6 +154,29 @@ php artisan nexmile:demo-order --merchant=veera@enom.ai
 php artisan nexmile:demo-order --status=accepted
 ```
 
-It prices the order off the merchant's real menu when they have one. **It
-refuses to run on production** — it writes an order nobody paid for, which
-would land in a real kitchen queue and pollute payout reporting.
+It prices the order off the merchant's real menu when they have one.
+
+**It refuses to run on production** — it writes an order nobody paid for, which
+would land in a real kitchen queue and pollute payout reporting. Before launch,
+when the only merchants are your own test accounts, override it:
+
+```bash
+php artisan nexmile:demo-order --merchant=you@example.com --force
+```
+
+`--force` still asks for confirmation, and declines under `--no-interaction`,
+so a deploy script can never create one by accident.
+
+Remove them again when you are done:
+
+```bash
+php artisan nexmile:demo-order --clean
+```
+
+Demo orders are numbered `NXD…` so they can be found and hard deleted — not
+soft deleted, because a fictional row that still sits in the table is waiting
+to confuse a payout query that forgets the global scope. The demo customer
+account goes with them once it has no orders left.
+
+**Do this before real merchants are live.** Once they are, a demo order in the
+queue is a ticket someone will try to cook.
