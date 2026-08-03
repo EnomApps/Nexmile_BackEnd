@@ -28,6 +28,25 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    /*
+     * Google Maps Platform.
+     *
+     * This is the *server* key and must be IP-restricted to the EC2 elastic
+     * IP. The Flutter apps ship their own keys: a key inside an installed
+     * binary is readable by anyone who wants it, so those are defended by
+     * platform restrictions (Android package + SHA-1, iOS bundle id), never
+     * by secrecy. Sharing one key across server and apps means it can only be
+     * restricted as loosely as the loosest consumer.
+     *
+     * Note that the 1 km radius does NOT come from here — that is Redis GEO,
+     * which is free and sub-millisecond. Google is for geocoding a typed
+     * address and for road distance and ETA, both of which are billed per
+     * call. See docs/MAPS.md.
+     */
+    'google_maps' => [
+        'key' => env('GOOGLE_MAPS_SERVER_KEY'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

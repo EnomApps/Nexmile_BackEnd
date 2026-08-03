@@ -264,6 +264,51 @@ class MerchantOrderTest extends TestCase
         $this->getJson('/api/v1/merchant/orders')->assertUnauthorized();
     }
 
+    public function test_the_handover_panel_appears_once_the_food_is_ready(): void
+    {
+        $user = $this->merchantUser();
+        $waiting = $this->order($user->merchant, OrderStatus::ReadyForPickup);
+        $waiting->update(['pickup_code' => '4821']);
+
+        $page = $this->actingAs($user)->get("/merchants/orders/{$waiting->id}")->assertOk();
+
+        // The code is the proof the right rider took the right order.
+        $page->assertSee('4821')->assertSee('Waiting for a rider');
+    }
+
+    public function test_the_handover_panel_names_the_rider_once_assigned(): void
+    {
+        $user = $this->merchantUser();
+        $riderUser = $this->user(UserRole::Rider);
+        $rider = $riderUser->rider()->create([
+            'full_name' => 'Selvam K',
+            'vehicle_type' => 'motorcycle',
+            'vehicle_number' => 'TN59AB1234',
+        ]);
+
+        $order = $this->order($user->merchant, OrderStatus::PickedUp);
+        $order->update(['rider_id' => $rider->id, 'picked_up_at' => now()]);
+
+        $this->actingAs($user)->get("/merchants/orders/{$order->id}")
+            ->assertOk()
+            ->assertSee('Selvam K')
+            ->assertSee('TN59AB1234')
+            ->assertSee($riderUser->phone);
+    }
+
+    public function test_the_handover_panel_is_hidden_before_the_food_is_ready(): void
+    {
+        $user = $this->merchantUser();
+        $order = $this->order($user->merchant, OrderStatus::Preparing);
+        $order->update(['pickup_code' => '9137']);
+
+        // Showing the code while the kitchen is still cooking invites a rider
+        // to take an order that is not made yet.
+        $this->actingAs($user)->get("/merchants/orders/{$order->id}")
+            ->assertOk()
+            ->assertDontSee('9137');
+    }
+
     public function test_the_demo_order_command_builds_a_working_order(): void
     {
         $merchant = $this->merchantUser()->merchant;

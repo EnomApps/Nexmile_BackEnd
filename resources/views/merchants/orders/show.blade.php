@@ -105,6 +105,52 @@
         </div>
     @endif
 
+    {{-- Handover. Shown from the moment the food is ready: the pickup code is
+         the proof that the right rider took the right order. --}}
+    @if (in_array($order->status, [
+        OrderStatus::ReadyForPickup, OrderStatus::RiderAssigned,
+        OrderStatus::PickedUp, OrderStatus::Delivered,
+    ], true))
+        <div class="mt-8 {{ $card }}">
+            <h2 class="font-bold text-white">{{ __('portal.orders.handover') }}</h2>
+
+            @if ($order->pickup_code)
+                <div class="mt-4">
+                    <p class="text-xs text-gray-500">{{ __('portal.orders.pickup_code') }}</p>
+                    <p class="mt-1 font-mono text-3xl font-extrabold tracking-[0.3em] text-brand-green">
+                        {{ $order->pickup_code }}
+                    </p>
+                    <p class="mt-1.5 text-xs text-gray-600">{{ __('portal.orders.pickup_code_hint') }}</p>
+                </div>
+            @endif
+
+            <div class="mt-5 pt-5 border-t border-white/10">
+                @if ($order->rider)
+                    <dl class="space-y-2">
+                        @foreach ([
+                            __('portal.orders.rider') => $order->rider->full_name,
+                            __('portal.orders.rider_phone') => $order->rider->user?->phone,
+                            __('portal.orders.vehicle') => trim(($order->rider->vehicle_type ?? '').' '.($order->rider->vehicle_number ?? '')),
+                        ] as $label => $value)
+                            <div class="{{ $row }} text-gray-400">
+                                <dt>{{ $label }}</dt>
+                                <dd class="text-gray-200">{{ $value ?: '—' }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+
+                    @if ($order->picked_up_at)
+                        <p class="mt-4 text-sm text-brand-green">
+                            {{ __('portal.orders.picked_up_at') }} {{ $order->picked_up_at->format('g:i a') }}
+                        </p>
+                    @endif
+                @else
+                    <p class="text-sm text-gray-500">{{ __('portal.orders.waiting_for_rider') }}</p>
+                @endif
+            </div>
+        </div>
+    @endif
+
     {{-- Items --}}
     <div class="mt-8 {{ $card }}">
         <h2 class="font-bold text-white">{{ __('portal.orders.items') }}</h2>

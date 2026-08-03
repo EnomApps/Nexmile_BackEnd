@@ -79,6 +79,27 @@ belongs to dispatch and the rider app (EP8, EP10). **A merchant cannot mark an
 order delivered**; they never handle it after pickup, so there is no route for
 it.
 
+### How the merchant knows a rider collected the order
+
+The **pickup code** on the order. It is generated when the order is placed and
+appears on the merchant's screen the moment the food is ready — not before,
+because showing it while the kitchen is still cooking invites a rider to take
+an order that is not made yet.
+
+The merchant reads the code out; the rider confirms it in their app; the order
+moves to `picked_up`. The merchant's handover panel then shows who took it —
+name, mobile, vehicle number — and when.
+
+**The rider half does not exist yet.** `POST /v1/rider/orders/{id}/pickup` is
+EP8/EP10 work. Until it ships, an order sits at `ready_for_pickup` and the
+panel reads "Waiting for a rider to be assigned." Nothing on the merchant side
+needs to change when it lands: the panel already reads `rider_id` and
+`picked_up_at`, so it fills in on its own.
+
+That is also why a code, not a button. A merchant tapping "the rider took it"
+proves nothing — the code is evidence that the right rider collected the right
+order, and it is what a disputed delivery is settled with.
+
 `OrderStatusService` is the only way status changes. A controller setting
 `$order->status` directly would skip the history row, the timestamp and the
 Redis mirror — and those three are what the customer's tracking screen, the
