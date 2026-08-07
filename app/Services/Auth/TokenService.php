@@ -5,6 +5,7 @@ namespace App\Services\Auth;
 use App\Models\RefreshToken;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -142,7 +143,7 @@ class TokenService
     /**
      * Active sessions, for a "where am I signed in" screen.
      *
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
     public function sessions(User $user)
     {

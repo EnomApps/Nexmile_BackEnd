@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\FulfilmentType;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -104,7 +105,7 @@ class Order extends Model
     public function amountPaid(): float
     {
         return (float) $this->payments
-            ->where('status', \App\Enums\PaymentStatus::Paid)
+            ->where('status', PaymentStatus::Paid)
             ->sum('amount');
     }
 }

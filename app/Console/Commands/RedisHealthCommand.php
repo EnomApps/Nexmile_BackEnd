@@ -7,6 +7,7 @@ use App\Services\LiveState\DeliveryTimerService;
 use App\Services\LiveState\DispatchQueueService;
 use App\Services\LiveState\OrderStateService;
 use App\Services\LiveState\RiderLocationService;
+use App\Support\RedisKeys;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Redis;
 use Throwable;
@@ -128,9 +129,9 @@ class RedisHealthCommand extends Command
         $dispatch->remove(self::TEST_ZONE, self::TEST_ORDER);
 
         Redis::connection('live')->del(
-            \App\Support\RedisKeys::orderState(self::TEST_ORDER),
-            \App\Support\RedisKeys::riderState(self::TEST_RIDER),
-            \App\Support\RedisKeys::zoneRiderGeo(self::TEST_ZONE),
+            RedisKeys::orderState(self::TEST_ORDER),
+            RedisKeys::riderState(self::TEST_RIDER),
+            RedisKeys::zoneRiderGeo(self::TEST_ZONE),
         );
     }
 }

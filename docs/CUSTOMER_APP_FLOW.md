@@ -6,9 +6,9 @@ Postman: `docs/postman/Nexmile-Customer.postman_collection.json`
 
 ## Read this first
 
-**About a third of this flow has endpoints today.** Auth, profile and the
-address book are live and stable. Everything from browsing restaurants onward
-is still being built.
+**Half of this flow has endpoints today.** Auth, the address book, restaurant
+discovery and menu browsing are live and stable. Everything from the cart
+onward is still being built.
 
 That is deliberate rather than an oversight — it is the order the backend is
 being written in. Build the app shell, auth and address book against real
@@ -20,8 +20,8 @@ call is a one-line change.
 | 1 | Splash / session restore | **Live** |
 | 2 | Sign in (OTP) | **Live** |
 | 3 | Location + address book | **Live** |
-| 4 | Home — nearby restaurants | Not built (EP4) |
-| 5 | Restaurant menu | Not built (EP3) |
+| 4 | Home — nearby restaurants | **Live** |
+| 5 | Restaurant menu | **Live** |
 | 6 | Cart | Not built (EP5) |
 | 7 | Checkout | Not built (EP5) |
 | 8 | Payment | Not built (EP6) |
@@ -124,31 +124,72 @@ to it. Changing address changes which restaurants exist.
 
 ---
 
-## Not built yet
+## 4. Home — nearby restaurants
 
-Everything below describes intent, not a contract. **The shapes will change.**
-Do not code against them; code against your own interface and swap later.
+```
+GET /restaurants?address_id=3
+GET /restaurants?latitude=9.9195&longitude=78.1193
+```
 
-### 4. Home — nearby restaurants (EP4)
+Send **either** an `address_id` from the customer's address book **or** raw
+`latitude`/`longitude` from GPS. Optional: `service_category`, `search`,
+`per_page`.
 
-A list of merchants within 1 km of the selected address, open now, ranked by
-distance. Needs: name, photo, veg/non-veg, rating, prep time, delivery fee,
-minimum order, open/closed.
+The app does no distance maths. It sends a point and receives a paginated,
+ranked list plus `meta.radius_metres` — useful for "No restaurants within
+1 km of this address" rather than a bare empty state.
 
-Radius matching runs on Redis GEO server-side. The app sends the address id or
-coordinates and receives the list — it does no distance maths itself.
+Ranking is **open first, then nearest**. A closer kitchen that cannot cook is
+worth less than one two hundred metres further that can.
 
-### 5. Restaurant menu (EP3)
+Closed restaurants are **listed, not hidden**, ranked below open ones. A
+customer in a small town at 3pm would otherwise see an empty screen and
+conclude Nexmile does not work there.
 
-Categories with items underneath, in the merchant's own order. Each item has
-name, description, photo, price, `compare_at_price` when discounted, veg flag,
-egg flag, prep time, and option groups (spice level, add-ons) with price deltas.
+Three fields say whether they can order, and they are deliberately separate:
+
+| Field | Meaning |
+|---|---|
+| `is_open` | can order right now — the one to gate the UI on |
+| `is_accepting_orders` | the merchant's own switch |
+| `within_operating_hours` | the clock |
+
+"Closed until 6pm" and "temporarily not taking orders" are different messages,
+and only one of them is worth waiting for.
+
+Also returns `avg_prep_time_minutes`, `min_order_value`, `packaging_fee`,
+`supports_pickup`, `distance_metres`, `logo_url`, `banner_url`.
+
+## 5. Restaurant menu
+
+```
+GET /restaurants/{id}          — storefront + operating hours
+GET /restaurants/{id}/menu     — storefront + full menu
+```
+
+`data.menu` is categories in the merchant's own order, each with its `items`.
+Items with no category come back separately under a top-level `uncategorised`
+array — **render both**, or a shop that never made categories looks empty.
+
+Each item carries name, description, `image_url`, `price`, `compare_at_price`
+when discounted, `is_veg`, `contains_egg`, `prep_time_minutes`, `gst_rate` and
+`option_groups` (spice level, add-ons) with `price_delta` per option.
 
 **`is_available: false` must be visibly out of stock, not hidden.** Merchants
 toggle this mid-service and a dish vanishing confuses people who came for it.
 
-Item photos come back as **signed URLs valid for 24 hours**. Cache the image,
-not the URL.
+Inactive *categories* are already filtered out server-side — that is a merchant
+retiring a section, not a temporary shortage.
+
+Item photos are **signed URLs valid for 24 hours**. Cache the image, not the
+URL.
+
+---
+
+## Not built yet
+
+Everything below describes intent, not a contract. **The shapes will change.**
+Do not code against them; code against your own interface and swap later.
 
 ### 6–7. Cart and checkout (EP5)
 
@@ -209,9 +250,11 @@ recompute a total in the app; display what the server sent.
 ## What to build now
 
 1. App shell, routing, token storage with the refresh mutex
-2. Screens 1–3 against the live endpoints
-3. A `RestaurantRepository` / `MenuRepository` / `CartRepository` interface with
-   fake in-memory implementations, plus the UI on top
+2. **Screens 1–5** against live endpoints — sign in, address book, browse
+   restaurants, open a menu. That is a usable app right up to the point of
+   adding something to a cart.
+3. A `CartRepository` interface with a fake in-memory implementation, plus the
+   cart and checkout UI on top
 
-By the time screens 4–7 are wired the endpoints will exist, and only the
-repository implementations change.
+By the time the cart is wired the endpoints will exist, and only the repository
+implementation changes.

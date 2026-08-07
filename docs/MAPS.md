@@ -2,17 +2,27 @@
 
 ## You probably need fewer Google calls than you think
 
-The **1 km radius is not a Google feature here**. Rider proximity and merchant
-discovery run on **Redis GEO** (`GEOADD` / `GEORADIUS`) — free, sub-millisecond,
-and already built in `RiderLocationService`. Every Google call is billed, so
-anything Redis can answer should not go to Google.
+The **1 km radius is not a Google feature here**, and it is already built.
+
+**Riders** run on Redis GEO (`GEOADD` / `GEORADIUS`) in `RiderLocationService`
+— their position changes every few seconds, which is what that structure is
+for.
+
+**Restaurants and zones** run on SQL plus haversine in `NearbyMerchantService`
+— a bounding box on the indexed `(latitude, longitude)` columns, refined in
+PHP. A merchant's address changes roughly never, so mirroring static rows into
+Redis would buy nothing and add a synchronisation problem.
+
+Every Google call is billed, so anything these two can answer should not go to
+Google.
 
 What Google is actually for:
 
 | Need | Provider | Where |
 |---|---|---|
 | "Riders within 1 km of this shop" | **Redis GEO** | backend, free |
-| "Is this address inside our zone?" | **Redis GEO** | backend, free |
+| "Restaurants within 1 km of this address" | **SQL + haversine** | backend, free |
+| "Is this address inside our zone?" | **SQL + haversine** | backend, free |
 | Address typed by a customer → lat/lng | Geocoding API | backend, billed |
 | Road distance and ETA (not crow-flies) | Distance Matrix / Routes | backend, billed |
 | The map the customer looks at | Maps SDK | Flutter apps, billed |

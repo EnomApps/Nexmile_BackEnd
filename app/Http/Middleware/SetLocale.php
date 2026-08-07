@@ -15,7 +15,7 @@ class SetLocale
      * Falls back to the app default when the session holds nothing, or holds
      * a locale that is no longer supported.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {

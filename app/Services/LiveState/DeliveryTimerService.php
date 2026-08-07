@@ -16,7 +16,9 @@ use Illuminate\Support\Facades\Redis;
 class DeliveryTimerService
 {
     public const PREP = 'prep';
+
     public const ARRIVAL = 'arrival';
+
     public const OFFER = 'offer';
 
     protected function redis(): Connection

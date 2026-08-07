@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnsureApiDocsEnabled;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
+use Dedoc\Scramble\SecurityDocumentation\MiddlewareAuthSecurityStrategy;
 
 return [
     /*
@@ -209,7 +211,7 @@ return [
      */
     'middleware' => [
         'web',
-        \App\Http\Middleware\EnsureApiDocsEnabled::class,
+        EnsureApiDocsEnabled::class,
     ],
 
     'extensions' => [],
@@ -240,5 +242,5 @@ return [
      * Marks routes behind auth:sanctum as requiring a bearer token, and every
      * other route as public, so the docs show which endpoints need signing in.
      */
-    'security_strategy' => \Dedoc\Scramble\SecurityDocumentation\MiddlewareAuthSecurityStrategy::class,
+    'security_strategy' => MiddlewareAuthSecurityStrategy::class,
 ];

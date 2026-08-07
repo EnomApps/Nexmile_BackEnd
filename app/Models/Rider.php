@@ -50,7 +50,7 @@ class Rider extends Model
 
     public function kycDocuments(): MorphMany
     {
-        return $this->morphMany(KycDocument::class, "documentable");
+        return $this->morphMany(KycDocument::class, 'documentable');
     }
 
     public function user(): BelongsTo

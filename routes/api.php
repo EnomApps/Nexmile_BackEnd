@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Merchant\MenuItemController;
 use App\Http\Controllers\Api\V1\Merchant\OrderController as MerchantOrderController;
 use App\Http\Controllers\Api\V1\Merchant\ProfileController as MerchantProfileController;
 use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\RestaurantController;
 use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
 use App\Http\Controllers\Api\V1\Rider\ProfileController as RiderProfileController;
 use Illuminate\Support\Facades\Route;
@@ -58,6 +59,19 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::patch('{address}', [AddressController::class, 'update'])->name('update');
             Route::post('{address}/default', [AddressController::class, 'makeDefault'])->name('default');
             Route::delete('{address}', [AddressController::class, 'destroy'])->name('destroy');
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | Restaurant discovery and menu browsing — EP3, EP4
+        |----------------------------------------------------------------------
+        | Not role-gated. A rider ordering dinner and a merchant ordering from
+        | the shop opposite are both customers here — see docs/ROLES.md.
+        */
+        Route::prefix('restaurants')->name('restaurants.')->group(function () {
+            Route::get('/', [RestaurantController::class, 'index'])->name('index');
+            Route::get('{restaurant}', [RestaurantController::class, 'show'])->name('show');
+            Route::get('{restaurant}/menu', [RestaurantController::class, 'menu'])->name('menu');
         });
     });
 
