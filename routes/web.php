@@ -5,9 +5,11 @@ use App\Http\Controllers\Web\Admin\AdminOrderController;
 use App\Http\Controllers\Web\Admin\DashboardController;
 use App\Http\Controllers\Web\LanguageController;
 use App\Http\Controllers\Web\MerchantMenuController;
+use App\Http\Controllers\Web\MerchantEarningsController;
 use App\Http\Controllers\Web\MerchantOptionController;
 use App\Http\Controllers\Web\MerchantOrderController;
 use App\Http\Controllers\Web\MerchantPortalController;
+use App\Http\Controllers\Web\MerchantProfileController;
 use App\Http\Controllers\Web\MerchantStorefrontController;
 use App\Http\Controllers\Web\PageController;
 use Illuminate\Support\Facades\Route;
@@ -58,6 +60,15 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
         Route::post('dashboard/submit', [MerchantPortalController::class, 'submitKyc'])->name('kyc.submit');
         Route::post('logout', [MerchantPortalController::class, 'logout'])->name('logout');
 
+        // The most-used control a merchant has: stop the queue when swamped.
+        Route::post('accepting-orders', [MerchantPortalController::class, 'setAcceptingOrders'])
+            ->name('accepting-orders');
+
+        Route::get('earnings', [MerchantEarningsController::class, 'index'])->name('earnings');
+
+        Route::get('profile', [MerchantProfileController::class, 'edit'])->name('profile.edit');
+        Route::patch('profile', [MerchantProfileController::class, 'update'])->name('profile.update');
+
         /*
          * Menu (EP3). A merchant may build their menu before verification —
          * it only becomes visible to customers once the account is verified,
@@ -104,6 +115,7 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
             Route::get('{order}', [MerchantOrderController::class, 'show'])->name('show');
             Route::post('{order}/accept', [MerchantOrderController::class, 'accept'])->name('accept');
             Route::post('{order}/reject', [MerchantOrderController::class, 'reject'])->name('reject');
+            Route::post('{order}/cancel', [MerchantOrderController::class, 'cancel'])->name('cancel');
             Route::post('{order}/preparing', [MerchantOrderController::class, 'preparing'])->name('preparing');
             Route::post('{order}/ready', [MerchantOrderController::class, 'ready'])->name('ready');
         });

@@ -21,6 +21,92 @@
 
     @include('merchants.partials.nav')
 
+    {{-- Trading controls. Only meaningful once they can actually take orders,
+         so an applicant still uploading documents does not see a switch that
+         would refuse to move. --}}
+    @if ($merchant->isKycVerified())
+        @php
+            $open = $merchant->isOpenNow();
+            $withinHours = $merchant->isWithinOperatingHours();
+        @endphp
+
+        <div class="mt-8 rounded-2xl border {{ $open ? 'border-brand-green/40 bg-brand-green/[0.07]' : 'border-brand-orange/40 bg-brand-orange/[0.07]' }} p-6">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <p class="text-lg font-bold {{ $open ? 'text-brand-green' : 'text-brand-orange' }}">
+                        {{ $open ? __('portal.storefront.open_now') : __('portal.storefront.closed_now') }}
+                    </p>
+                    <p class="mt-1 text-sm text-gray-400">
+                        @if (! $merchant->is_accepting_orders)
+                            {{ __('portal.storefront.switched_off') }}
+                        @elseif (! $withinHours)
+                            {{ __('portal.storefront.outside_hours') }}
+                        @else
+                            {{ __('portal.storefront.taking_orders') }}
+                        @endif
+                    </p>
+                </div>
+
+                <form method="POST" action="{{ route('merchants.accepting-orders') }}">
+                    @csrf
+                    <input type="hidden" name="is_accepting_orders" value="{{ $merchant->is_accepting_orders ? 0 : 1 }}">
+                    <button type="submit"
+                            class="px-6 py-3 rounded-lg font-bold transition
+                                   {{ $merchant->is_accepting_orders
+                                        ? 'border border-white/20 text-gray-300 hover:border-brand-orange/50 hover:text-brand-orange'
+                                        : 'bg-brand-green text-black hover:bg-lime-400' }}">
+                        {{ $merchant->is_accepting_orders
+                            ? __('portal.storefront.stop_orders')
+                            : __('portal.storefront.start_orders') }}
+                    </button>
+                </form>
+            </div>
+
+            @error('is_accepting_orders')
+                <p class="mt-3 text-sm text-red-300">{{ $message }}</p>
+            @enderror
+
+            @if ($merchant->is_accepting_orders && ! $withinHours)
+                <p class="mt-3 text-xs text-gray-500">
+                    {{ __('portal.storefront.hours_note') }}
+                    <a href="{{ route('merchants.storefront.edit') }}" class="underline hover:text-white">{{ __('portal.nav.storefront') }}</a>
+                </p>
+            @endif
+        </div>
+
+        {{-- Today --}}
+        <div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            @foreach ([
+                [__('portal.earnings.orders_today'), $today['orders'], null],
+                [__('portal.earnings.payout_today'), '₹'.number_format($today['payout'], 2), __('portal.earnings.after_commission')],
+                [__('portal.earnings.average_order'), '₹'.number_format($today['average_order'], 2), null],
+                [__('portal.orders.live'), $liveOrders, __('portal.earnings.needs_you')],
+            ] as [$label, $value, $hint])
+                <div class="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                    <p class="text-xs uppercase tracking-wider text-gray-500">{{ $label }}</p>
+                    <p class="mt-2 text-2xl font-extrabold text-white">{{ $value }}</p>
+                    @if ($hint)
+                        <p class="mt-1 text-xs text-gray-600">{{ $hint }}</p>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+
+        @if ($liveOrders > 0)
+            <a href="{{ route('merchants.orders.index') }}"
+               class="mt-4 block rounded-xl border border-brand-orange/30 bg-brand-orange/10 px-4 py-3 text-sm text-brand-orange hover:bg-brand-orange/15">
+                {{ trans_choice('portal.earnings.waiting', $liveOrders, ['count' => $liveOrders]) }}
+            </a>
+        @endif
+
+        @if ($merchant->latitude === null || $merchant->longitude === null)
+            <p class="mt-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 text-sm">
+                {{ __('portal.profile.no_location_warning') }}
+                <a href="{{ route('merchants.profile.edit') }}" class="underline">{{ __('portal.nav.profile') }}</a>
+            </p>
+        @endif
+    @endif
+
     {{-- KYC status --}}
     <div class="mt-8 rounded-2xl border {{ $border }} {{ $banner }} p-6">
         <div class="flex flex-wrap items-center gap-3">

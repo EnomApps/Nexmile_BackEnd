@@ -74,6 +74,24 @@ class MerchantOrderController extends Controller
         return back()->with('status', __('portal.orders.rejected_message'));
     }
 
+    /**
+     * Cancel an order already accepted — a gas failure, a missing ingredient.
+     * Different act from rejecting, which only applies before accepting.
+     */
+    public function cancel(Request $request, int $order): RedirectResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:255'],
+        ], [
+            'reason.min' => __('portal.orders.cancel_hint'),
+        ]);
+
+        $this->status->cancelByMerchant($this->find($request, $order), $request->user(), $data['reason']);
+
+        return redirect()->route('merchants.orders.index')
+            ->with('status', __('portal.orders.cancelled_message'));
+    }
+
     public function preparing(Request $request, int $order): RedirectResponse
     {
         $this->status->startPreparing($this->find($request, $order), $request->user());

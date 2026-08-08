@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Web;
 
 use App\Actions\RegisterMerchant;
 use App\Enums\DocumentType;
+use App\Enums\OrderStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Merchant\RegisterRequest;
 use App\Services\Kyc\DocumentService;
+use App\Services\Merchant\EarningsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -79,7 +81,7 @@ class MerchantPortalController extends Controller
         return redirect()->intended(route('merchants.dashboard'));
     }
 
-    public function dashboard(Request $request, DocumentService $service): View
+    public function dashboard(Request $request, DocumentService $service, EarningsService $earnings): View
     {
         $merchant = $this->merchant($request);
 
@@ -92,7 +94,45 @@ class MerchantPortalController extends Controller
             'allowed' => config('kyc.allowed.merchant'),
             'required' => config('kyc.required.merchant'),
             'missing' => $service->missingDocuments($merchant, 'merchant'),
+
+            // The daily view only means anything once they can actually trade.
+            'today' => $merchant->isKycVerified()
+                ? $earnings->summary($merchant, now(), now())
+                : null,
+            'liveOrders' => $merchant->isKycVerified()
+                ? $merchant->orders()->active()->where('status', '!=', OrderStatus::PendingPayment->value)->count()
+                : 0,
         ]);
+    }
+
+    /**
+     * Open or close the storefront.
+     *
+     * The most-used control a merchant has and it had no home in the portal —
+     * a kitchen that is suddenly swamped could not stop the queue without
+     * calling someone.
+     */
+    public function setAcceptingOrders(Request $request): RedirectResponse
+    {
+        $merchant = $this->merchant($request);
+        $open = $request->boolean('is_accepting_orders');
+
+        if ($open) {
+            if (! $merchant->isKycVerified()) {
+                return back()->withErrors(['is_accepting_orders' => __('portal.storefront.not_verified')]);
+            }
+
+            // An expired food licence is a legal problem, not a warning.
+            if (! $merchant->hasValidFssai()) {
+                return back()->withErrors(['is_accepting_orders' => __('portal.storefront.fssai_expired')]);
+            }
+        }
+
+        $merchant->update(['is_accepting_orders' => $open]);
+
+        return back()->with('status', $open
+            ? __('portal.storefront.now_open')
+            : __('portal.storefront.now_closed'));
     }
 
     public function uploadDocument(Request $request, DocumentService $service): RedirectResponse

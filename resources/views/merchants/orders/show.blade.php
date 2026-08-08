@@ -102,6 +102,31 @@
                     <p class="text-xs text-gray-600">{{ __('portal.orders.reject_hint') }}</p>
                 </form>
             @endif
+
+            {{-- After accepting, "reject" no longer fits: the kitchen said yes
+                 and then something went wrong. Gone once a rider holds it,
+                 because at that point cancelling is a phone call. --}}
+            @if (in_array($order->status, [OrderStatus::Accepted, OrderStatus::Preparing, OrderStatus::ReadyForPickup], true)
+                 && $order->rider_id === null)
+                <form method="POST" action="{{ route('merchants.orders.cancel', $order->id) }}"
+                      class="pt-4 border-t border-white/10 space-y-2"
+                      onsubmit="return confirm('{{ __('portal.orders.cancel_confirm') }}')">
+                    @csrf
+                    <label for="cancel_reason" class="block text-xs font-medium text-gray-400">
+                        {{ __('portal.orders.cancel_reason') }}
+                    </label>
+                    <div class="flex flex-wrap gap-2">
+                        <input id="cancel_reason" name="reason" required minlength="10" maxlength="255"
+                               placeholder="{{ __('portal.orders.cancel_example') }}"
+                               class="flex-1 min-w-[14rem] rounded-lg bg-white/[0.03] border border-white/15 px-3 py-2 text-sm text-white
+                                      focus:border-red-400 focus:ring-1 focus:ring-red-400 outline-none">
+                        <button type="submit" class="px-4 py-2 rounded-lg border border-red-400/40 text-red-300 font-bold text-sm hover:bg-red-500/10 transition">
+                            {{ __('portal.orders.cancel') }}
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-600">{{ __('portal.orders.cancel_hint') }}</p>
+                </form>
+            @endif
         </div>
     @endif
 
