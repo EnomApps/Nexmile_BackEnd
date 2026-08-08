@@ -90,3 +90,14 @@ php docs/postman/build-collections.php
 - `docs/RIDER_APP_FLOW.md`
 - `docs/MENU_AND_ORDERS.md` — merchant behaviour and rules
 - Interactive reference: **https://api.nexmile.in/docs/api**
+
+## Downloading without repo access
+
+The collections are also served over HTTP, so an app developer who has not
+cloned the repo can still get them:
+
+**https://api.nexmile.in/docs/postman**
+
+Three download links, one per app. Behind the same `API_DOCS_ENABLED` switch as
+`/docs/api`, and allowlisted by name — the rest of `docs/` stays private,
+because DEPLOYMENT.md and MAPS.md describe the infrastructure.

@@ -4,15 +4,17 @@ use App\Http\Controllers\Web\Admin\AdminController;
 use App\Http\Controllers\Web\Admin\AdminOrderController;
 use App\Http\Controllers\Web\Admin\DashboardController;
 use App\Http\Controllers\Web\LanguageController;
-use App\Http\Controllers\Web\MerchantMenuController;
 use App\Http\Controllers\Web\MerchantEarningsController;
+use App\Http\Controllers\Web\MerchantMenuController;
 use App\Http\Controllers\Web\MerchantOptionController;
 use App\Http\Controllers\Web\MerchantOrderController;
 use App\Http\Controllers\Web\MerchantPortalController;
 use App\Http\Controllers\Web\MerchantProfileController;
-use App\Http\Controllers\Web\MerchantSurplusController;
 use App\Http\Controllers\Web\MerchantStorefrontController;
+use App\Http\Controllers\Web\MerchantSurplusController;
 use App\Http\Controllers\Web\PageController;
+use App\Http\Controllers\Web\PostmanController;
+use App\Http\Middleware\EnsureApiDocsEnabled;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -182,6 +184,22 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('{type}/{id}/status', [AdminController::class, 'setStatus'])
             ->whereIn('type', ['merchants', 'riders'])->name('status');
     });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Postman collections
+|--------------------------------------------------------------------------
+| They live outside the web root, so without this there is no URL for an app
+| developer who does not have repo access. Behind the same switch as the API
+| docs, and allowlisted by name — serving the docs directory would also serve
+| DEPLOYMENT.md and MAPS.md.
+*/
+Route::middleware(EnsureApiDocsEnabled::class)->group(function () {
+    Route::get('docs/postman', [PostmanController::class, 'index'])->name('postman.index');
+    Route::get('docs/postman/{app}', [PostmanController::class, 'download'])
+        ->whereIn('app', ['customer', 'rider', 'merchant'])
+        ->name('postman.download');
 });
 
 Route::get('language/{locale}', [LanguageController::class, 'switch'])->name('language.switch');
