@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AddressController;
 use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
+use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\Merchant\AuthController as MerchantAuthController;
 use App\Http\Controllers\Api\V1\Merchant\CategoryController;
 use App\Http\Controllers\Api\V1\Merchant\KycController as MerchantKycController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Api\V1\Merchant\OptionGroupController;
 use App\Http\Controllers\Api\V1\Merchant\OrderController as MerchantOrderController;
 use App\Http\Controllers\Api\V1\Merchant\ProfileController as MerchantProfileController;
 use App\Http\Controllers\Api\V1\Merchant\StorefrontController;
+use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RestaurantController;
 use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
@@ -74,6 +76,33 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/', [RestaurantController::class, 'index'])->name('index');
             Route::get('{restaurant}', [RestaurantController::class, 'show'])->name('show');
             Route::get('{restaurant}/menu', [RestaurantController::class, 'menu'])->name('menu');
+
+            /*
+             * One cart per restaurant. Glancing at another shop does not empty
+             * the basket you already started.
+             */
+            Route::prefix('{restaurant}/cart')->name('cart.')->group(function () {
+                Route::get('/', [CartController::class, 'show'])->name('show');
+                Route::post('items', [CartController::class, 'store'])->name('items.store');
+                Route::patch('items/{item}', [CartController::class, 'updateItem'])->name('items.update');
+                Route::delete('items/{item}', [CartController::class, 'destroyItem'])->name('items.destroy');
+                Route::delete('/', [CartController::class, 'clear'])->name('clear');
+                Route::post('checkout', [CartController::class, 'checkout'])->name('checkout');
+            });
+        });
+
+        Route::get('carts', [CartController::class, 'index'])->name('carts.index');
+
+        /*
+        |----------------------------------------------------------------------
+        | The customer's own orders — EP5, EP9
+        |----------------------------------------------------------------------
+        */
+        Route::prefix('orders')->name('orders.')->group(function () {
+            Route::get('/', [OrderController::class, 'index'])->name('index');
+            Route::get('{order}', [OrderController::class, 'show'])->name('show');
+            Route::get('{order}/track', [OrderController::class, 'track'])->name('track');
+            Route::post('{order}/cancel', [OrderController::class, 'cancel'])->name('cancel');
         });
     });
 
