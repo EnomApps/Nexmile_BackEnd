@@ -6,9 +6,10 @@ Postman: `docs/postman/Nexmile-Rider.postman_collection.json`
 
 ## Read this first
 
-The split here is the opposite of the customer app. **Onboarding is complete
-and is the larger half of the work.** Everything about actually working a shift
-— receiving offers, pickup, delivery — is still being built.
+**The whole shift is live.** Onboarding, going on duty, taking an order,
+collecting it and delivering it all have real endpoints today.
+
+Only **earnings** is unbuilt, and riders can be paid manually until it lands.
 
 | # | Screen | Status |
 |---|---|---|
@@ -19,14 +20,22 @@ and is the larger half of the work.** Everything about actually working a shift
 | 5 | Onboarding wizard — 6 uploads | **Live** |
 | 6 | Submit + waiting for verification | **Live** |
 | 7 | Duty toggle (go online / offline) | **Live** |
-| 8 | Location ping while on duty | Not built (EP9) |
-| 9 | Incoming order offer, accept/decline | Not built (EP8) |
-| 10 | Pickup — confirm the code | Not built (EP8) |
-| 11 | Delivery — confirm handover | Not built (EP10) |
+| 8 | Location ping while on duty | **Live** |
+| 9 | Order board — accept a job | **Live** |
+| 10 | Pickup — confirm the code | **Live** |
+| 11 | Delivery — confirm handover | **Live** |
 | 12 | Earnings and history | Not built (EP13) |
 
-Screens 1–7 can be built against real endpoints today, and that is genuinely
-most of the app's screens. Stub 8–12 behind an interface.
+### One thing that is not built and changes how you design screen 9
+
+**There are no push notifications yet.** A rider only sees a new order while
+the app is open and polling. Build screen 9 as a board the rider watches, not
+as an alert that arrives — and poll `/rider/orders/available` every 10–15
+seconds while it is foregrounded.
+
+That is workable for a pilot with a few riders. It stops working the moment a
+phone goes in a pocket, so push is coming; the board does not change when it
+does.
 
 ---
 
@@ -187,43 +196,117 @@ Gate the whole working UI on `can_accept_orders` from `GET /rider/profile`.
 
 ---
 
-## Not built yet
+## 8. Location ping
 
-Intent, not a contract. **These shapes will change** — code against your own
-interface.
+```
+POST /rider/location   { "latitude": 9.9195, "longitude": 78.1193 }
+```
 
-### 8. Location ping (EP9)
+Send every few seconds while on duty. Positions go to Redis, which is what
+dispatch searches.
 
-While `available` or `on_order`, push GPS every few seconds. The server keeps
-it in Redis GEO, which is what dispatch searches to find riders within 1 km.
+**This doubles as a heartbeat.** Stop pinging and the rider drops out of
+dispatch once the TTL lapses — which is the correct behaviour for a killed app,
+but means a rider who is genuinely working must keep pinging.
 
-Battery matters more here than in the other app — this runs for a whole shift.
-Expect a coarse interval when idle and a fine one when on an order.
+An offline rider gets `200` with `data.tracking: false`, not an error. Just
+stop the timer.
 
-### 9. Order offer (EP8)
+Battery matters more here than anywhere in the customer app — this runs for a
+whole shift. A coarse interval when idle and a fine one while carrying an order
+is the right shape.
 
-Dispatch pushes an offer with pickup and drop points, distance and payout. The
-rider accepts or declines against a countdown; declining passes it on.
+## 9. Order board
 
-A rider is **never offered an order they placed themselves** — that guard is on
-the server, so the app does not need to check.
+```
+GET /rider/orders/available
+```
 
-### 10. Pickup (EP8)
+Ready orders near the rider, **nearest restaurant first**. Poll every 10–15
+seconds while the screen is open.
 
-At the restaurant the merchant reads out a **pickup code**. The rider enters it
-to confirm collection, which moves the order to `picked_up`.
+```json
+{
+  "data": [ {
+    "id": 41, "order_number": "NX260808ABCD", "status": "ready_for_pickup",
+    "pickup": { "name": "Ponnusamy Hotel", "address": "1 Main Road, Madurai",
+                "phone": "9876500000", "latitude": 9.9195, "longitude": 78.1193,
+                "distance_metres": 240 },
+    "delivery_distance_metres": 620,
+    "item_count": 3, "order_value": 430, "delivery_fee": 25, "collect_cash": 430
+  } ],
+  "meta": { "can_accept": true }
+}
+```
 
-The code is the proof that the right rider took the right order — it is what a
-disputed delivery is settled with, so there is no "I collected it" button
-without it.
+**`dropoff` is absent until the rider accepts.** A board every on-duty rider can
+poll must not double as a list of where customers live. Do not build the map
+screen expecting it before acceptance.
 
-### 11. Delivery (EP10)
+**`collect_cash` is what to collect at the door** — the full total for a COD
+order, `0` for a prepaid one. Show it prominently; getting it wrong costs the
+rider money out of their own pocket.
 
-Confirm handover to the customer. Order becomes `delivered`.
+The board is **empty**, not an error, when the rider is offline, unverified,
+already carrying an order, or has never sent a position. `meta.can_accept`
+tells you which — use it to show the right empty state rather than "no orders
+nearby" when the real reason is an expired licence.
 
-### 12. Earnings (EP13)
+A rider is **never shown an order they placed themselves**. The guard is on the
+server; the app does not need to check.
 
-Per-shift and per-order payouts, settlement history.
+### Accepting
+
+```
+POST /rider/orders/{id}/accept
+```
+
+First to accept wins. A **422 with `errors.order`** meaning *"Another rider took
+this order"* is expected on a shared board — refresh the list and move on, do
+not show it as a failure.
+
+Other 422s worth handling by message: *"Finish your current delivery first"*,
+*"Go online before accepting orders"*, *"Your licence or insurance has
+expired"*.
+
+## 10. Pickup
+
+```
+POST /rider/orders/{id}/pickup   { "pickup_code": "4821" }
+```
+
+The merchant reads out four digits. A wrong code is a 422 on `pickup_code` —
+let the rider retype it rather than bouncing them out of the screen.
+
+There is no "I collected it" button without the code. It is the evidence that
+the right rider took the right order, and it is what a disputed delivery is
+settled with.
+
+## 11. Delivery
+
+```
+POST /rider/orders/{id}/deliver
+```
+
+Closes the order, sets the rider back to `available` and increments
+`completed_deliveries`. Return them to the board.
+
+## The job in hand
+
+```
+GET /rider/orders?active=1     the current delivery
+GET /rider/orders              history, newest first
+GET /rider/orders/{id}         one order
+```
+
+`?active=1` is what a working screen polls after a restart — never resume from
+local state, because a rider changes devices and a shift outlives an app
+process.
+
+## 12. Earnings — not built
+
+Per-shift and per-order payouts and settlement history are EP13. Riders are
+paid manually until then.
 
 ---
 
@@ -249,10 +332,28 @@ will not read English comfortably.
 
 ## What to build now
 
-1. App shell, token storage with the refresh mutex
-2. Screens 1–7 against live endpoints — that is most of the app
-3. `DispatchRepository` / `DeliveryRepository` interfaces with fakes, plus the
-   offer, pickup and delivery UI on top
+**All eleven screens, against real endpoints.** Nothing needs stubbing.
 
-Onboarding is fully testable today: sign up, fill the wizard, submit, and ask
-the backend to approve you in the admin portal.
+1. App shell, token storage with the refresh mutex
+2. Screens 1–6 — sign in and the onboarding wizard
+3. Screen 7 — duty toggle, gated on `can_accept_orders`
+4. Screens 8–11 — the working shift: ping, board, accept, pickup, deliver
+
+Only earnings is left, and it changes nothing you build now.
+
+## Testing the whole thing yourself
+
+The loop is testable end to end without anyone else:
+
+1. Sign up as a rider, complete the wizard, submit
+2. Ask the backend to verify you in the admin portal
+3. Go on duty and send one location ping
+4. From the **customer** Postman collection, place an order at a nearby
+   restaurant
+5. In the **merchant portal**, accept it and mark it ready
+6. Back in the rider app: it appears on the board — accept, take the pickup
+   code from the merchant screen, deliver
+
+A rider account can place customer orders with the same login, so you do not
+need a second phone number to test — but you will not be offered your own
+order, so use a separate customer account for step 4.
