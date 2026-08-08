@@ -1,54 +1,9 @@
 {
     "info": {
-        "name": "Nexmile — Rider App",
-        "description": "Rider authentication and onboarding for the Flutter app.\n\n**Authentication is identical to the customer app**, with one difference: send `\"intended_role\": \"rider\"` when requesting the first code. That is the only auth difference between the two apps.\n\n**A rider is not active after signing in.** The account is created as `pending` and stays that way until an admin verifies their documents. Onboarding is therefore a wizard, not a single screen:\n\n1. Sign in by OTP\n2. Fill in profile and document numbers\n3. Upload six documents\n4. Submit for verification\n5. Wait for an admin decision\n6. Only then can the rider go on duty\n\nBuild for the case where the rider closes the app halfway through — `GET /rider/kyc` returns exactly what is still missing, so the wizard can resume from the right step.",
+        "name": "Nexmile — Rider app",
+        "description": "Everything the **rider app** needs. Customer and merchant endpoints live in their own collections.\n\n**Auth is the same as the customer app except `intended_role: \"rider\"`.** There is no separate registration endpoint — the account is created on first verification, and comes back `pending` until an admin approves the documents.\n\n**There are no push notifications yet.** A rider only sees a new order while the app is open and polling, so build the board as something they watch — poll `/rider/orders/available` every 10–15 seconds while it is foregrounded.\n\nFull walkthrough: `docs/RIDER_APP_FLOW.md`",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
-    "variable": [
-        {
-            "key": "base_url",
-            "value": "https://api.nexmile.in/api/v1",
-            "type": "string"
-        },
-        {
-            "key": "email",
-            "value": "rider@example.in",
-            "type": "string"
-        },
-        {
-            "key": "phone",
-            "value": "9445566778",
-            "type": "string"
-        },
-        {
-            "key": "otp_code",
-            "value": "",
-            "type": "string"
-        },
-        {
-            "key": "access_token",
-            "value": "",
-            "type": "string"
-        },
-        {
-            "key": "refresh_token",
-            "value": "",
-            "type": "string"
-        },
-        {
-            "key": "document_id",
-            "value": "",
-            "type": "string"
-        },
-        {
-            "key": "order_id",
-            "value": ""
-        },
-        {
-            "key": "pickup_code",
-            "value": ""
-        }
-    ],
     "auth": {
         "type": "bearer",
         "bearer": [
@@ -59,52 +14,25 @@
             }
         ]
     },
-    "event": [
-        {
-            "listen": "prerequest",
-            "script": {
-                "type": "text/javascript",
-                "exec": [
-                    "pm.request.headers.upsert({ key: 'Accept', value: 'application/json' });"
-                ]
-            }
-        }
-    ],
     "item": [
         {
             "name": "1. Authentication",
+            "description": "Identical to the customer app except `intended_role`. **Refuse non-riders**: if `role !== \"rider\"`, sign them out with \"This number is not registered as a delivery partner.\"",
             "item": [
                 {
-                    "name": "Request OTP (rider)",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "type": "text/javascript",
-                                "exec": [
-                                    "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                                    "const d = pm.response.json().data;",
-                                    "if (d.debug_code) { pm.collectionVariables.set('otp_code', d.debug_code); }",
-                                    "console.log('Code sent to', d.identifier);"
-                                ]
-                            }
-                        }
-                    ],
+                    "name": "Request OTP",
                     "request": {
-                        "auth": {
-                            "type": "noauth"
-                        },
                         "method": "POST",
                         "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
                             }
                         ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"{{email}}\",\n  \"intended_role\": \"rider\"\n}"
-                        },
                         "url": {
                             "raw": "{{base_url}}/auth/otp/request",
                             "host": [
@@ -116,45 +44,33 @@
                                 "request"
                             ]
                         },
-                        "description": "`intended_role: \"rider\"` only matters the first time this identifier signs in — it decides what kind of account gets created. Sending it on later sign-ins is harmless.\n\nSwap `email` for `phone` once SMS is live."
-                    }
-                },
-                {
-                    "name": "Verify OTP → sign in",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "type": "text/javascript",
-                                "exec": [
-                                    "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                                    "const d = pm.response.json().data;",
-                                    "pm.collectionVariables.set('access_token', d.access_token);",
-                                    "pm.collectionVariables.set('refresh_token', d.refresh_token);",
-                                    "pm.test('rider starts pending, not active', () => {",
-                                    "  pm.expect(d.user.role).to.eql('rider');",
-                                    "  pm.expect(d.user.status).to.eql('pending');",
-                                    "});",
-                                    "console.log('Signed in · status', d.user.status, '— KYC required before going on duty');"
-                                ]
+                        "description": "The only difference from the customer app.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{email}}\",\n    \"intended_role\": \"rider\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
                             }
                         }
-                    ],
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Verify OTP",
                     "request": {
-                        "auth": {
-                            "type": "noauth"
-                        },
                         "method": "POST",
                         "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
                             }
                         ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"{{email}}\",\n  \"code\": \"{{otp_code}}\",\n  \"device_name\": \"rider-pixel-8\"\n}"
-                        },
                         "url": {
                             "raw": "{{base_url}}/auth/otp/verify",
                             "host": [
@@ -166,39 +82,48 @@
                                 "verify"
                             ]
                         },
-                        "description": "Returns `user.status = \"pending\"`. Unlike a customer, the rider **cannot work yet** — route them into the onboarding wizard, not the home screen."
-                    }
-                },
-                {
-                    "name": "Refresh tokens",
+                        "description": "The account comes back **`pending`** and that is correct — send them into the onboarding wizard, not a home screen.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{email}}\",\n    \"code\": \"{{otp_code}}\",\n    \"device_name\": \"Redmi 12\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
                     "event": [
                         {
                             "listen": "test",
                             "script": {
                                 "type": "text/javascript",
                                 "exec": [
-                                    "const d = pm.response.json().data;",
-                                    "pm.collectionVariables.set('access_token', d.access_token);",
-                                    "pm.collectionVariables.set('refresh_token', d.refresh_token);"
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.access_token) {",
+                                    "    pm.collectionVariables.set(\"access_token\", body.data.access_token);",
+                                    "    pm.collectionVariables.set(\"refresh_token\", body.data.refresh_token);",
+                                    "}"
                                 ]
                             }
                         }
-                    ],
+                    ]
+                },
+                {
+                    "name": "Refresh tokens",
                     "request": {
-                        "auth": {
-                            "type": "noauth"
-                        },
                         "method": "POST",
                         "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
                             }
                         ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
-                        },
                         "url": {
                             "raw": "{{base_url}}/auth/refresh",
                             "host": [
@@ -209,14 +134,44 @@
                                 "refresh"
                             ]
                         },
-                        "description": "Serialise refreshes behind one lock. Concurrent refreshes are treated as a stolen token and revoke every session."
-                    }
+                        "description": "One at a time. A rider signed out mid-shift loses an active delivery.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"refresh_token\": \"{{refresh_token}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.access_token) {",
+                                    "    pm.collectionVariables.set(\"access_token\", body.data.access_token);",
+                                    "    pm.collectionVariables.set(\"refresh_token\", body.data.refresh_token);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
                 },
                 {
                     "name": "Sign out",
                     "request": {
                         "method": "POST",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/auth/logout",
                             "host": [
@@ -226,31 +181,27 @@
                                 "auth",
                                 "logout"
                             ]
-                        }
-                    }
+                        },
+                        "description": "Ends this session."
+                    },
+                    "response": []
                 }
             ]
         },
         {
-            "name": "2. Onboarding — KYC",
+            "name": "2. Onboarding wizard",
+            "description": "**Drive every step from `GET /rider/kyc`** — never from local state. Riders change devices, and an admin can reject a document *after* submission.",
             "item": [
                 {
-                    "name": "KYC status (drives the wizard)",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "type": "text/javascript",
-                                "exec": [
-                                    "const d = pm.response.json().data;",
-                                    "console.log('KYC:', d.status, '· missing:', d.missing_documents.join(', ') || 'nothing', '· can submit:', d.can_submit);"
-                                ]
-                            }
-                        }
-                    ],
+                    "name": "KYC status",
                     "request": {
                         "method": "GET",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/rider/kyc",
                             "host": [
@@ -261,23 +212,61 @@
                                 "kyc"
                             ]
                         },
-                        "description": "**Call this on every app launch and after every upload.** It returns:\n\n- `status` — `pending`, `submitted`, `verified` or `rejected`\n- `missing_documents` — exactly what still needs uploading\n- `can_submit` — whether the Submit button should be enabled\n- `documents[]` — each with its own `status` and `rejection_reason`\n- `rejection_reason` — set when an admin rejected the whole account\n\nDrive the wizard entirely from this response rather than tracking progress locally: the rider may switch devices, and an admin may reject a document after submission."
-                    }
+                        "description": "Returns `missing_documents`, `can_submit` and a per-document `rejection_reason`. Render the wizard from this and enable Submit on `can_submit`.\n\nRejection is a **normal path**, not an error — blurred photos are the most common outcome. Show the reason per document and reopen the wizard for exactly those."
+                    },
+                    "response": []
                 },
                 {
-                    "name": "Save document numbers",
+                    "name": "Profile details",
                     "request": {
                         "method": "PATCH",
                         "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
                             }
                         ],
+                        "url": {
+                            "raw": "{{base_url}}/rider/profile",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "rider",
+                                "profile"
+                            ]
+                        },
+                        "description": "`vehicle_type` is `bicycle`, `motorcycle`, `scooter` or `ev`.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"aadhaar_number\": \"123456789012\",\n  \"pan\": \"ABCDE1234F\",\n  \"driving_licence_no\": \"TN5820210001234\",\n  \"driving_licence_expiry\": \"2030-06-30\",\n  \"vehicle_number\": \"TN59AB1234\",\n  \"rc_number\": \"RC123456789\",\n  \"insurance_number\": \"INS987654321\",\n  \"insurance_expiry\": \"2027-03-31\",\n  \"bank_account_name\": \"Meena Lakshmi\",\n  \"bank_account_number\": \"50100123456789\",\n  \"bank_ifsc\": \"HDFC0001234\"\n}"
-                        },
+                            "raw": "{\n    \"full_name\": \"Selvam K\",\n    \"date_of_birth\": \"1996-04-12\",\n    \"vehicle_type\": \"motorcycle\",\n    \"vehicle_number\": \"TN59AB1234\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Document numbers",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/rider/kyc/details",
                             "host": [
@@ -289,43 +278,29 @@
                                 "details"
                             ]
                         },
-                        "description": "The numbers printed on the documents. All fields optional — send whichever the rider has filled in so far.\n\nValidation: Aadhaar 12 digits, PAN `ABCDE1234F`, IFSC `HDFC0001234`, and both expiry dates must be in the future.\n\n**Returns 422 once KYC is verified.** An approved rider cannot swap in a different licence, so lock these fields in the UI when `status` is `verified`."
-                    }
-                },
-                {
-                    "name": "Upload document",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "type": "text/javascript",
-                                "exec": [
-                                    "pm.test('201 Created', () => pm.response.to.have.status(201));",
-                                    "pm.collectionVariables.set('document_id', pm.response.json().data.id);"
-                                ]
+                        "description": "All optional — send what you have. Licence and insurance expiry **must be in the future**; surface that inline on the field.\n\nAadhaar and the bank account number are never returned once saved, so do not expect to read them back to prefill.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"aadhaar_number\": \"123456789012\",\n    \"pan\": \"ABCDE1234F\",\n    \"driving_licence_no\": \"TN5920190001234\",\n    \"driving_licence_expiry\": \"2030-04-12\",\n    \"vehicle_number\": \"TN59AB1234\",\n    \"rc_number\": \"RC123456\",\n    \"insurance_number\": \"INS987654\",\n    \"insurance_expiry\": \"2027-03-31\",\n    \"bank_account_name\": \"Selvam K\",\n    \"bank_account_number\": \"123456789012\",\n    \"bank_ifsc\": \"SBIN0001234\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
                             }
                         }
-                    ],
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Upload a document",
                     "request": {
                         "method": "POST",
-                        "header": [],
-                        "body": {
-                            "mode": "formdata",
-                            "formdata": [
-                                {
-                                    "key": "type",
-                                    "value": "aadhaar_front",
-                                    "type": "text",
-                                    "description": "aadhaar_front | aadhaar_back | pan_card | driving_licence | vehicle_rc | vehicle_insurance | bank_proof | profile_photo"
-                                },
-                                {
-                                    "key": "file",
-                                    "type": "file",
-                                    "src": [],
-                                    "description": "JPG, PNG or PDF, up to 5 MB"
-                                }
-                            ]
-                        },
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/rider/kyc/documents",
                             "host": [
@@ -337,14 +312,36 @@
                                 "documents"
                             ]
                         },
-                        "description": "**`multipart/form-data`, not JSON.** Do not set a Content-Type header by hand — the HTTP client sets the boundary.\n\nSix types are required:\n`aadhaar_front`, `aadhaar_back`, `pan_card`, `driving_licence`, `vehicle_rc`, `vehicle_insurance`.\n\nOptional: `bank_proof`, `profile_photo`.\n\nRe-uploading a type replaces the previous file, so \"retake photo\" needs no delete first.\n\nReturns 422 if that type was already **approved** — approved documents are locked.\n\nCompress camera images before upload: a modern phone photo can exceed the 5 MB limit."
-                    }
+                        "description": "**multipart/form-data.** JPG, PNG or PDF up to 10 MB — compress camera photos, a modern phone image exceeds that.\n\nRe-uploading a type replaces the previous file. Approved documents cannot be replaced.",
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "type",
+                                    "value": "aadhaar_front",
+                                    "type": "text",
+                                    "description": "aadhaar_front | aadhaar_back | pan_card | driving_licence | vehicle_rc | vehicle_insurance"
+                                },
+                                {
+                                    "key": "file",
+                                    "type": "file",
+                                    "src": []
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
                 },
                 {
-                    "name": "Delete document",
+                    "name": "Remove a document",
                     "request": {
                         "method": "DELETE",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/rider/kyc/documents/{{document_id}}",
                             "host": [
@@ -357,14 +354,20 @@
                                 "{{document_id}}"
                             ]
                         },
-                        "description": "Only while pending or rejected. Approved documents return 422."
-                    }
+                        "description": "Pending or rejected only."
+                    },
+                    "response": []
                 },
                 {
                     "name": "Submit for verification",
                     "request": {
                         "method": "POST",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/rider/kyc/submit",
                             "host": [
@@ -376,8 +379,9 @@
                                 "submit"
                             ]
                         },
-                        "description": "Moves the account to `submitted`.\n\nReturns 422 listing what is missing if any required document is absent — check `can_submit` first and keep the button disabled until it is true.\n\nAfter this, show a waiting screen. Verification is a manual admin decision, usually within two working days."
-                    }
+                        "description": "Once `can_submit` is true. Then a waiting screen — verification is a manual decision, usually within two working days."
+                    },
+                    "response": []
                 }
             ]
         },
@@ -385,37 +389,15 @@
             "name": "3. Profile and duty",
             "item": [
                 {
-                    "name": "Rider profile",
+                    "name": "My profile",
                     "request": {
                         "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "{{base_url}}/rider/profile",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "rider",
-                                "profile"
-                            ]
-                        },
-                        "description": "Includes `can_accept_orders` — the single flag to gate the whole working UI on. It is true only when KYC is verified, documents are unexpired, and the rider is on duty.\n\nAlso returns `documents_expired`, so the app can warn before a licence lapses."
-                    }
-                },
-                {
-                    "name": "Update profile",
-                    "request": {
-                        "method": "PATCH",
                         "header": [
                             {
-                                "key": "Content-Type",
+                                "key": "Accept",
                                 "value": "application/json"
                             }
                         ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"full_name\": \"Meena Lakshmi\",\n  \"date_of_birth\": \"2000-04-15\",\n  \"vehicle_type\": \"motorcycle\",\n  \"vehicle_number\": \"TN59AB1234\"\n}"
-                        },
                         "url": {
                             "raw": "{{base_url}}/rider/profile",
                             "host": [
@@ -426,8 +408,9 @@
                                 "profile"
                             ]
                         },
-                        "description": "`vehicle_type` is `bicycle`, `motorcycle`, `scooter` or `ev`.\n\nRiders must be at least 18 — an earlier date of birth returns 422."
-                    }
+                        "description": "Gate the whole working UI on **`can_accept_orders`**.\n\n`kyc.documents_expired` and the two expiry dates are how you warn a rider a week ahead — otherwise they find out at 8pm when a shift starts."
+                    },
+                    "response": []
                 },
                 {
                     "name": "Go on duty",
@@ -435,41 +418,14 @@
                         "method": "POST",
                         "header": [
                             {
-                                "key": "Content-Type",
+                                "key": "Accept",
                                 "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"duty_status\": \"available\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/rider/duty-status",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "rider",
-                                "duty-status"
-                            ]
-                        },
-                        "description": "Accepts `available`, `offline` or `on_break`.\n\n`on_order` is set by dispatch and is rejected here.\n\n**Returns 403 if KYC is not verified, or if the licence or insurance has expired.** The message explains which — show it rather than a generic error, since the rider can act on it.\n\nGoing offline always works, whatever the KYC state."
-                    }
-                },
-                {
-                    "name": "Go off duty",
-                    "request": {
-                        "method": "POST",
-                        "header": [
+                            },
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
                             }
                         ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"duty_status\": \"offline\"\n}"
-                        },
                         "url": {
                             "raw": "{{base_url}}/rider/duty-status",
                             "host": [
@@ -479,28 +435,66 @@
                                 "rider",
                                 "duty-status"
                             ]
+                        },
+                        "description": "Accepts `offline`, `available`, `on_break` only. `on_order` is set by dispatch — a rider cannot declare themselves busy to skip the queue.\n\n403 with a specific reason when not eligible: documents unverified, or licence/insurance expired. Show the message.\n\n422 while carrying an order — finish or hand it back first.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"duty_status\": \"available\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
                         }
-                    }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Go offline",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/rider/duty-status",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "rider",
+                                "duty-status"
+                            ]
+                        },
+                        "description": "Refused while an order is in hand.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"duty_status\": \"offline\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
                 }
             ]
         },
         {
             "name": "4. Working a shift",
-            "description": "EP8/EP9/EP10. Ready orders sit on a board nearby on-duty riders poll; first to accept wins. No push notifications yet, so the app must poll while foregrounded.",
+            "description": "Ready orders sit on a board that nearby on-duty riders poll, and the first to accept wins.",
             "item": [
                 {
                     "name": "Send location",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "POST",
                         "header": [
                             {
@@ -522,10 +516,15 @@
                                 "location"
                             ]
                         },
-                        "description": "Every few seconds while on duty. Doubles as a heartbeat — stop pinging and the rider drops out of dispatch. An offline rider gets 200 with tracking:false, not an error.",
+                        "description": "Every few seconds while on duty. **Doubles as a heartbeat** — stop pinging and the rider drops out of dispatch once the TTL lapses.\n\nAn offline rider gets 200 with `tracking: false`, not an error. Just stop the timer.\n\nBattery matters: coarse interval when idle, fine while carrying an order.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"latitude\": 9.9195,\n    \"longitude\": 78.1193\n}"
+                            "raw": "{\n    \"latitude\": 9.9195,\n    \"longitude\": 78.1193\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
                         }
                     },
                     "response": []
@@ -533,16 +532,6 @@
                 {
                     "name": "Order board",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -561,7 +550,7 @@
                                 "available"
                             ]
                         },
-                        "description": "Nearest restaurant first. dropoff is absent until you accept — the board must not double as a list of where customers live. Empty (not an error) when offline, unverified, already carrying an order, or no position sent; meta.can_accept tells you which."
+                        "description": "Nearest restaurant first. Poll every 10–15 seconds while the screen is open.\n\n**`dropoff` is absent until you accept** — a board every on-duty rider can poll must not double as a list of where customers live.\n\n**`collect_cash`** is what to collect at the door: the full total for COD, `0` if prepaid. Getting it wrong costs the rider their own money.\n\nAn empty board is **not an error** — offline, unverified, already carrying an order, or no position sent. `meta.can_accept` says which, so you can show the right empty state."
                     },
                     "response": [],
                     "event": [
@@ -582,16 +571,6 @@
                 {
                     "name": "Accept an order",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "POST",
                         "header": [
                             {
@@ -611,23 +590,13 @@
                                 "accept"
                             ]
                         },
-                        "description": "First to accept wins. A 422 saying \"Another rider took this order\" is expected on a shared board — refresh the list, do not show it as a failure."
+                        "description": "First to accept wins. A 422 saying **\"Another rider took this order\"** is expected on a shared board — refresh the list and move on, do not show it as a failure."
                     },
                     "response": []
                 },
                 {
                     "name": "Confirm pickup",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "POST",
                         "header": [
                             {
@@ -651,10 +620,54 @@
                                 "pickup"
                             ]
                         },
-                        "description": "The merchant reads out four digits. A wrong code is a 422 on pickup_code — let the rider retype rather than bouncing them out. There is no collected button without it.",
+                        "description": "The merchant reads out four digits. A wrong code is a 422 on `pickup_code` — let the rider retype rather than bouncing them out.\n\nThere is no \"I collected it\" button without the code: it is the evidence a disputed delivery is settled with.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"pickup_code\": \"{{pickup_code}}\"\n}"
+                            "raw": "{\n    \"pickup_code\": \"{{pickup_code}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Hand the order back",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/rider/orders/{{order_id}}/release",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "rider",
+                                "orders",
+                                "{{order_id}}",
+                                "release"
+                            ]
+                        },
+                        "description": "Puts it back on the board for another rider. **Only before collection** — once the food is in the bag it has to be delivered.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"reason\": \"Puncture\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
                         }
                     },
                     "response": []
@@ -662,16 +675,6 @@
                 {
                     "name": "Confirm delivery",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "POST",
                         "header": [
                             {
@@ -691,23 +694,13 @@
                                 "deliver"
                             ]
                         },
-                        "description": "Closes the order, sets the rider back to available and increments completed_deliveries."
+                        "description": "Closes the order, sets the rider back to `available` and increments `completed_deliveries`."
                     },
                     "response": []
                 },
                 {
                     "name": "My current delivery",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -731,23 +724,13 @@
                                 }
                             ]
                         },
-                        "description": "?active=1 is what the working screen polls after a restart — never resume from local state, a shift outlives an app process."
+                        "description": "`?active=1` is what the working screen polls after a restart — never resume from local state, a shift outlives an app process."
                     },
                     "response": []
                 },
                 {
                     "name": "Order details",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -766,11 +749,45 @@
                                 "{{order_id}}"
                             ]
                         },
-                        "description": "Full order with pickup and dropoff. 404 if it is assigned to another rider."
+                        "description": "Full order with pickup and dropoff. 404 if it belongs to another rider."
                     },
                     "response": []
                 }
             ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "https://api.nexmile.in/api/v1"
+        },
+        {
+            "key": "email",
+            "value": "rider@example.in"
+        },
+        {
+            "key": "otp_code",
+            "value": ""
+        },
+        {
+            "key": "access_token",
+            "value": ""
+        },
+        {
+            "key": "refresh_token",
+            "value": ""
+        },
+        {
+            "key": "document_id",
+            "value": ""
+        },
+        {
+            "key": "order_id",
+            "value": ""
+        },
+        {
+            "key": "pickup_code",
+            "value": ""
         }
     ]
 }

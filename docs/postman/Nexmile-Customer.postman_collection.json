@@ -1,62 +1,9 @@
 {
     "info": {
-        "name": "Nexmile — Customer App",
-        "description": "Customer authentication and profile for the Flutter app.\n\n**There is no separate registration endpoint.** Sign-up and sign-in are the same two calls: request a code, then verify it. The account is created automatically the first time a code is verified for an unknown identifier.\n\n**Channel follows the identifier.** Send `email` and the code is emailed; send `phone` and it is texted. Email is live now; SMS is waiting on DLT registration. Never send both.\n\nRun the requests in order — `Verify OTP` stores the tokens into collection variables, so everything after it is already authenticated.\n\nWhile no mail transport is configured, the code is written to `storage/logs/laravel.log` on the server. Ask the backend team, or use a value set in `OTP_FIXED_CODE` on a non-production environment.",
+        "name": "Nexmile — Customer app",
+        "description": "Everything the **customer app** needs. Rider and merchant endpoints live in their own collections.\n\n**Order to run:** Authentication → Addresses → Restaurants → Cart → Checkout. The OTP verify request stores the tokens, and later requests capture restaurant, cart-line and order ids as they go, so the whole flow runs top to bottom without editing anything.\n\n**Money is a JSON number** and loses its zero fraction: ₹430.00 arrives as `430`. Read it as `num`, never `double`.\n\n**Refresh must be serialised behind one lock.** Two concurrent refreshes with the same token are treated as a stolen token and sign the user out everywhere.\n\nFull walkthrough: `docs/CUSTOMER_APP_FLOW.md`",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
-    "variable": [
-        {
-            "key": "base_url",
-            "value": "https://api.nexmile.in/api/v1",
-            "type": "string"
-        },
-        {
-            "key": "email",
-            "value": "customer@example.in",
-            "type": "string"
-        },
-        {
-            "key": "phone",
-            "value": "9876543210",
-            "type": "string"
-        },
-        {
-            "key": "otp_code",
-            "value": "",
-            "type": "string"
-        },
-        {
-            "key": "access_token",
-            "value": "",
-            "type": "string"
-        },
-        {
-            "key": "refresh_token",
-            "value": "",
-            "type": "string"
-        },
-        {
-            "key": "address_id",
-            "value": "",
-            "type": "string"
-        },
-        {
-            "key": "restaurant_id",
-            "value": ""
-        },
-        {
-            "key": "menu_item_id",
-            "value": ""
-        },
-        {
-            "key": "cart_item_id",
-            "value": ""
-        },
-        {
-            "key": "order_id",
-            "value": ""
-        }
-    ],
     "auth": {
         "type": "bearer",
         "bearer": [
@@ -67,57 +14,25 @@
             }
         ]
     },
-    "event": [
-        {
-            "listen": "prerequest",
-            "script": {
-                "type": "text/javascript",
-                "exec": [
-                    "// Without this, validation failures come back as an HTML redirect",
-                    "// instead of a 422 with the field errors.",
-                    "pm.request.headers.upsert({ key: 'Accept', value: 'application/json' });"
-                ]
-            }
-        }
-    ],
     "item": [
         {
             "name": "1. Authentication",
+            "description": "No separate registration endpoint — the account is created on first successful verification. Email OTP today; when SMS clears DLT you send `phone` instead of `email` on the same endpoint.",
             "item": [
                 {
-                    "name": "Request OTP (email)",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "type": "text/javascript",
-                                "exec": [
-                                    "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                                    "const d = pm.response.json().data;",
-                                    "pm.test('channel is email', () => pm.expect(d.channel).to.eql('email'));",
-                                    "// Only present outside production, so the app can be built",
-                                    "// before a mail transport exists.",
-                                    "if (d.debug_code) { pm.collectionVariables.set('otp_code', d.debug_code); }",
-                                    "console.log('Code sent to', d.identifier, '· expires in', d.expires_in, 'seconds');"
-                                ]
-                            }
-                        }
-                    ],
+                    "name": "Request OTP",
                     "request": {
-                        "auth": {
-                            "type": "noauth"
-                        },
                         "method": "POST",
                         "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
                             }
                         ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"{{email}}\",\n  \"intended_role\": \"customer\"\n}"
-                        },
                         "url": {
                             "raw": "{{base_url}}/auth/otp/request",
                             "host": [
@@ -129,77 +44,33 @@
                                 "request"
                             ]
                         },
-                        "description": "Sends a 6-digit code.\n\nWorks for an unknown address — the account is created when the code is verified, so this doubles as registration.\n\n`intended_role` is `customer` or `rider` only, and applies only on first sign-in. Merchant and admin accounts cannot be created this way.\n\nLimits: 5 minutes validity, 60 seconds between requests, 5 codes per identifier per hour, 20 requests per IP per hour."
-                    }
-                },
-                {
-                    "name": "Request OTP (phone) — after DLT",
-                    "request": {
-                        "auth": {
-                            "type": "noauth"
-                        },
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
+                        "description": "Send `email` **or** `phone`, never both. `intended_role` only matters when the account does not exist yet — an existing user keeps the role they have.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"intended_role\": \"customer\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/auth/otp/request",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "auth",
-                                "otp",
-                                "request"
-                            ]
-                        },
-                        "description": "Identical call with a mobile number instead of an email. This is the only change needed when SMS goes live — no other endpoint or field changes.\n\nWill fail to deliver until DLT registration is complete."
-                    }
-                },
-                {
-                    "name": "Verify OTP → sign in",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "type": "text/javascript",
-                                "exec": [
-                                    "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                                    "const d = pm.response.json().data;",
-                                    "pm.collectionVariables.set('access_token', d.access_token);",
-                                    "pm.collectionVariables.set('refresh_token', d.refresh_token);",
-                                    "pm.test('returns a token pair', () => {",
-                                    "  pm.expect(d.access_token).to.be.a('string');",
-                                    "  pm.expect(d.refresh_token).to.be.a('string');",
-                                    "  pm.expect(d.token_type).to.eql('Bearer');",
-                                    "});",
-                                    "console.log('Signed in as', d.user.email || d.user.phone, '· role', d.user.role);"
-                                ]
+                            "raw": "{\n    \"email\": \"{{email}}\",\n    \"intended_role\": \"customer\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
                             }
                         }
-                    ],
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Verify OTP",
                     "request": {
-                        "auth": {
-                            "type": "noauth"
-                        },
                         "method": "POST",
                         "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
                             }
                         ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"{{email}}\",\n  \"code\": \"{{otp_code}}\",\n  \"device_name\": \"pixel-8\"\n}"
-                        },
                         "url": {
                             "raw": "{{base_url}}/auth/otp/verify",
                             "host": [
@@ -211,41 +82,48 @@
                                 "verify"
                             ]
                         },
-                        "description": "Exchanges the code for tokens, creating the account if the identifier is new.\n\nSend the **same identifier** used to request the code.\n\nReturns an access token valid 60 minutes and a refresh token valid 30 days.\n\nFive wrong attempts burn the code — the correct one stops working too, and a new code must be requested.\n\n`device_name` appears in the user's session list; send something recognisable like the device model.\n\n**Store the refresh token in Keychain / EncryptedSharedPreferences.** It is as sensitive as a password."
-                    }
-                },
-                {
-                    "name": "Refresh tokens",
+                        "description": "Returns the user plus an access/refresh pair, and stores both in collection variables. A customer comes back `active` immediately — no waiting.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{email}}\",\n    \"code\": \"{{otp_code}}\",\n    \"device_name\": \"Pixel 8\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
                     "event": [
                         {
                             "listen": "test",
                             "script": {
                                 "type": "text/javascript",
                                 "exec": [
-                                    "pm.test('200 OK', () => pm.response.to.have.status(200));",
-                                    "const d = pm.response.json().data;",
-                                    "pm.collectionVariables.set('access_token', d.access_token);",
-                                    "pm.collectionVariables.set('refresh_token', d.refresh_token);",
-                                    "console.log('Rotated. Old tokens are now dead.');"
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.access_token) {",
+                                    "    pm.collectionVariables.set(\"access_token\", body.data.access_token);",
+                                    "    pm.collectionVariables.set(\"refresh_token\", body.data.refresh_token);",
+                                    "}"
                                 ]
                             }
                         }
-                    ],
+                    ]
+                },
+                {
+                    "name": "Refresh tokens",
                     "request": {
-                        "auth": {
-                            "type": "noauth"
-                        },
                         "method": "POST",
                         "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
                             }
                         ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
-                        },
                         "url": {
                             "raw": "{{base_url}}/auth/refresh",
                             "host": [
@@ -256,14 +134,44 @@
                                 "refresh"
                             ]
                         },
-                        "description": "Call this **once** after a 401, then retry the original request.\n\nBoth tokens are replaced; the old pair stops working immediately.\n\n**Serialise refreshes behind a single lock.** Two concurrent refreshes look like a stolen token to the server, and every session for that user is revoked."
-                    }
+                        "description": "Call once on a 401, then retry the original request. **One at a time** — parallel refreshes are treated as a stolen token.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"refresh_token\": \"{{refresh_token}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.access_token) {",
+                                    "    pm.collectionVariables.set(\"access_token\", body.data.access_token);",
+                                    "    pm.collectionVariables.set(\"refresh_token\", body.data.refresh_token);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
                 },
                 {
-                    "name": "Current user",
+                    "name": "Who am I",
                     "request": {
                         "method": "GET",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/auth/me",
                             "host": [
@@ -274,14 +182,20 @@
                                 "me"
                             ]
                         },
-                        "description": "Returns 401 when the access token has expired — the signal to refresh."
-                    }
+                        "description": "The signed-in user, their role and status."
+                    },
+                    "response": []
                 },
                 {
                     "name": "Active sessions",
                     "request": {
                         "method": "GET",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/auth/sessions",
                             "host": [
@@ -292,14 +206,45 @@
                                 "sessions"
                             ]
                         },
-                        "description": "Every device currently signed in, for a \"where am I signed in\" screen."
-                    }
+                        "description": "Every device holding a live refresh token."
+                    },
+                    "response": []
                 },
                 {
-                    "name": "Sign out (this device)",
+                    "name": "Revoke one session",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/sessions/{{session_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "sessions",
+                                "{{session_id}}"
+                            ]
+                        },
+                        "description": "Sign one device out."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Sign out",
                     "request": {
                         "method": "POST",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/auth/logout",
                             "host": [
@@ -310,14 +255,20 @@
                                 "logout"
                             ]
                         },
-                        "description": "Revokes the token used for this request and its refresh token. Other devices stay signed in."
-                    }
+                        "description": "Ends this session only."
+                    },
+                    "response": []
                 },
                 {
                     "name": "Sign out everywhere",
                     "request": {
                         "method": "POST",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/auth/logout-all",
                             "host": [
@@ -327,19 +278,27 @@
                                 "auth",
                                 "logout-all"
                             ]
-                        }
-                    }
+                        },
+                        "description": "Ends every session on every device."
+                    },
+                    "response": []
                 }
             ]
         },
         {
             "name": "2. Profile",
+            "description": "Shared by every role.",
             "item": [
                 {
-                    "name": "Get profile",
+                    "name": "My profile",
                     "request": {
                         "method": "GET",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/profile",
                             "host": [
@@ -348,8 +307,10 @@
                             "path": [
                                 "profile"
                             ]
-                        }
-                    }
+                        },
+                        "description": "Name, phone, email, preferred language."
+                    },
+                    "response": []
                 },
                 {
                     "name": "Update profile",
@@ -357,31 +318,46 @@
                         "method": "PATCH",
                         "header": [
                             {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
                                 "key": "Content-Type",
                                 "value": "application/json"
                             }
                         ],
+                        "url": {
+                            "raw": "{{base_url}}/profile",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "profile"
+                            ]
+                        },
+                        "description": "New accounts are named \"Nexmile user\" until this is called — prompt for a real name on first run. `preferred_locale` is `en`, `ta` or `hi`.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"name\": \"Karthik Raja\",\n  \"preferred_locale\": \"ta\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/profile",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "profile"
-                            ]
-                        },
-                        "description": "Editable: `name`, `email`, `phone`, `preferred_locale` (`en`, `ta`, `hi`).\n\n`role` and `status` are ignored — a user cannot promote themselves or lift a suspension.\n\nChanging a verified email or phone clears that verification, so the user must confirm the new one."
-                    }
+                            "raw": "{\n    \"name\": \"Meena R\",\n    \"preferred_locale\": \"ta\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
                 },
                 {
-                    "name": "Close account",
+                    "name": "Delete my account",
                     "request": {
                         "method": "DELETE",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/profile",
                             "host": [
@@ -391,19 +367,26 @@
                                 "profile"
                             ]
                         },
-                        "description": "Soft delete — past orders and invoices are retained for tax purposes. All sessions are revoked."
-                    }
+                        "description": "Irreversible."
+                    },
+                    "response": []
                 }
             ]
         },
         {
             "name": "3. Delivery addresses",
+            "description": "**latitude and longitude are required.** Delivery is capped at 1 km and matching is done on coordinates — an address without a pin cannot be matched to any restaurant.",
             "item": [
                 {
-                    "name": "List addresses",
+                    "name": "My addresses",
                     "request": {
                         "method": "GET",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/addresses",
                             "host": [
@@ -413,35 +396,38 @@
                                 "addresses"
                             ]
                         },
-                        "description": "Default address first, then most recently added."
-                    }
-                },
-                {
-                    "name": "Add address",
+                        "description": "Newest first. The default one is flagged."
+                    },
+                    "response": [],
                     "event": [
                         {
                             "listen": "test",
                             "script": {
                                 "type": "text/javascript",
                                 "exec": [
-                                    "pm.test('201 Created', () => pm.response.to.have.status(201));",
-                                    "pm.collectionVariables.set('address_id', pm.response.json().data.id);"
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.length) {",
+                                    "    pm.collectionVariables.set(\"address_id\", body.data[0].id);",
+                                    "}"
                                 ]
                             }
                         }
-                    ],
+                    ]
+                },
+                {
+                    "name": "Add address",
                     "request": {
                         "method": "POST",
                         "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
                             {
                                 "key": "Content-Type",
                                 "value": "application/json"
                             }
                         ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"label\": \"home\",\n  \"line1\": \"12 West Masi Street\",\n  \"line2\": \"Near Meenakshi Temple\",\n  \"landmark\": \"Opposite the bus stand\",\n  \"city\": \"Madurai\",\n  \"state\": \"Tamil Nadu\",\n  \"pincode\": \"625001\",\n  \"latitude\": 9.9252007,\n  \"longitude\": 78.1197754,\n  \"contact_name\": \"Karthik\",\n  \"contact_phone\": \"9876543210\"\n}"
-                        },
                         "url": {
                             "raw": "{{base_url}}/addresses",
                             "host": [
@@ -451,23 +437,43 @@
                                 "addresses"
                             ]
                         },
-                        "description": "`latitude` and `longitude` are **required** — the 1 km discovery cannot match a merchant without them. Take them from the device GPS or a map picker, not by geocoding the typed address.\n\n`label` is `home`, `work` or `other`.\n\nThe first address saved becomes the default automatically."
-                    }
+                        "description": "`label` is `home`, `work` or `other`. Prefill coordinates from GPS and let the user drag a pin.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"label\": \"home\",\n    \"contact_name\": \"Meena\",\n    \"contact_phone\": \"9876543210\",\n    \"line1\": \"12 Anna Salai\",\n    \"line2\": null,\n    \"landmark\": \"Opposite the bus stand\",\n    \"city\": \"Madurai\",\n    \"pincode\": \"625001\",\n    \"latitude\": 9.9252,\n    \"longitude\": 78.1198\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.id) {",
+                                    "    pm.collectionVariables.set(\"address_id\", body.data.id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
                 },
                 {
-                    "name": "Update address",
+                    "name": "One address",
                     "request": {
-                        "method": "PATCH",
+                        "method": "GET",
                         "header": [
                             {
-                                "key": "Content-Type",
+                                "key": "Accept",
                                 "value": "application/json"
                             }
                         ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"landmark\": \"Next to the pharmacy\"\n}"
-                        },
                         "url": {
                             "raw": "{{base_url}}/addresses/{{address_id}}",
                             "host": [
@@ -477,14 +483,58 @@
                                 "addresses",
                                 "{{address_id}}"
                             ]
+                        },
+                        "description": "A single address."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update address",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/addresses/{{address_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "addresses",
+                                "{{address_id}}"
+                            ]
+                        },
+                        "description": "Send only the fields being changed.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"landmark\": \"Next to the temple\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
                         }
-                    }
+                    },
+                    "response": []
                 },
                 {
                     "name": "Set as default",
                     "request": {
                         "method": "POST",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/addresses/{{address_id}}/default",
                             "host": [
@@ -496,14 +546,20 @@
                                 "default"
                             ]
                         },
-                        "description": "Only one address is default at a time; the previous one is demoted automatically."
-                    }
+                        "description": "The one checkout preselects."
+                    },
+                    "response": []
                 },
                 {
                     "name": "Delete address",
                     "request": {
                         "method": "DELETE",
-                        "header": [],
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
                         "url": {
                             "raw": "{{base_url}}/addresses/{{address_id}}",
                             "host": [
@@ -514,28 +570,19 @@
                                 "{{address_id}}"
                             ]
                         },
-                        "description": "If the default is deleted, the next most recent address is promoted, so the customer is never left without one."
-                    }
+                        "description": "Past orders keep their own copy of the address."
+                    },
+                    "response": []
                 }
             ]
         },
         {
             "name": "4. Restaurants",
-            "description": "Discovery and menu browsing (EP3, EP4). Not role-gated: a rider ordering dinner is a customer here.",
+            "description": "Ranked open first, then nearest. Closed shops are listed below open ones rather than hidden — an empty screen at 3pm reads as \"Nexmile does not work here\".",
             "item": [
                 {
-                    "name": "Nearby restaurants (by address)",
+                    "name": "Nearby (by saved address)",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -558,7 +605,7 @@
                                 }
                             ]
                         },
-                        "description": "Ranked open-first then nearest. Closed shops are listed below open ones, not hidden. meta.radius_metres tells you the radius that was applied."
+                        "description": "Gate the UI on `is_open`. `is_accepting_orders` and `within_operating_hours` say **why** it is shut — \"closed until 6pm\" and \"not taking orders\" are different messages."
                     },
                     "response": [],
                     "event": [
@@ -577,18 +624,8 @@
                     ]
                 },
                 {
-                    "name": "Nearby restaurants (by GPS)",
+                    "name": "Nearby (by GPS)",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -617,26 +654,51 @@
                                     "key": "search",
                                     "value": "",
                                     "disabled": true
+                                },
+                                {
+                                    "key": "service_category",
+                                    "value": "food",
+                                    "disabled": true
                                 }
                             ]
                         },
-                        "description": "Same endpoint using raw device coordinates instead of a saved address."
+                        "description": "Same endpoint using raw device coordinates."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Food Rescue deals nearby",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/restaurants/deals",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "restaurants",
+                                "deals"
+                            ],
+                            "query": [
+                                {
+                                    "key": "address_id",
+                                    "value": "{{address_id}}"
+                                }
+                            ]
+                        },
+                        "description": "Surplus food at a discount, soonest to expire first. Only deals orderable **right now** appear, so the screen never advertises something checkout would refuse. Show the countdown and `portions_left` — a rescue deal is a race."
                     },
                     "response": []
                 },
                 {
                     "name": "Restaurant details",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -652,26 +714,15 @@
                             "path": [
                                 "restaurants",
                                 "{{restaurant_id}}"
-                            ],
-                            "query": []
+                            ]
                         },
-                        "description": "Storefront plus operating hours. is_open / is_accepting_orders / within_operating_hours are separate on purpose."
+                        "description": "Storefront plus the weekly opening hours."
                     },
                     "response": []
                 },
                 {
                     "name": "Restaurant menu",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -688,32 +739,37 @@
                                 "restaurants",
                                 "{{restaurant_id}}",
                                 "menu"
-                            ],
-                            "query": []
+                            ]
                         },
-                        "description": "Categories with items, plus a top-level uncategorised array. Render both. Out-of-stock items are returned, not hidden."
+                        "description": "`data.menu` is categories with items; items with no category come back separately under **`uncategorised`** — render both, or a shop that never made categories looks empty.\n\nOut-of-stock items are returned, not hidden. Show them struck through."
                     },
-                    "response": []
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "const cat = (body.data.menu || []).flatMap(c => c.items || []);",
+                                    "const all = cat.concat(body.uncategorised || []);",
+                                    "if (all.length) {",
+                                    "    pm.collectionVariables.set(\"menu_item_id\", all[0].id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
                 }
             ]
         },
         {
             "name": "5. Cart",
-            "description": "One cart per restaurant, priced server-side. Never compute a total in the app.",
+            "description": "One cart per restaurant, and they persist. Glancing at another shop does not empty the basket you started. Every response comes back fully priced — never compute a total in the app.",
             "item": [
                 {
-                    "name": "Add item to cart",
+                    "name": "Add item",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "POST",
                         "header": [
                             {
@@ -737,10 +793,15 @@
                                 "items"
                             ]
                         },
-                        "description": "Required option groups are enforced here. A 422 on option_ids means open the customisation sheet.",
+                        "description": "Required choices are enforced **here**, not at checkout — a 422 on `option_ids` means open the customisation sheet.\n\nIdentical lines merge; different options stay separate.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"menu_item_id\": \"{{menu_item_id}}\",\n    \"quantity\": 2,\n    \"option_ids\": [],\n    \"notes\": null\n}"
+                            "raw": "{\n    \"menu_item_id\": \"{{menu_item_id}}\",\n    \"quantity\": 2,\n    \"option_ids\": [],\n    \"notes\": \"less oil\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
                         }
                     },
                     "response": [],
@@ -762,16 +823,6 @@
                 {
                     "name": "View cart",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -793,27 +844,17 @@
                                 {
                                     "key": "fulfilment_type",
                                     "value": "delivery",
-                                    "description": "delivery | pickup"
+                                    "description": "delivery | pickup — pickup previews the price with no delivery fee"
                                 }
                             ]
                         },
-                        "description": "Fully priced. Gate your checkout button on can_checkout — it already accounts for the minimum, sold-out items and the restaurant being closed."
+                        "description": "Gate the checkout button on **`can_checkout`** — it already accounts for the minimum, sold-out items, an empty cart and the restaurant being closed.\n\n`unavailable_items` names dishes that sold out while the cart sat there. Leave them in place and show them struck through; a basket that quietly shrinks is worse than one that explains itself."
                     },
                     "response": []
                 },
                 {
                     "name": "Change quantity",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "PATCH",
                         "header": [
                             {
@@ -838,10 +879,15 @@
                                 "{{cart_item_id}}"
                             ]
                         },
-                        "description": "Quantity 0 removes the line, so the minus button needs no special case.",
+                        "description": "`quantity: 0` removes the line, so the minus button needs no special case at the boundary.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"quantity\": 3\n}"
+                            "raw": "{\n    \"quantity\": 3\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
                         }
                     },
                     "response": []
@@ -849,16 +895,6 @@
                 {
                     "name": "Remove a line",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "DELETE",
                         "header": [
                             {
@@ -886,16 +922,6 @@
                 {
                     "name": "Empty the cart",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "DELETE",
                         "header": [
                             {
@@ -921,16 +947,6 @@
                 {
                     "name": "All open carts",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -947,7 +963,7 @@
                                 "carts"
                             ]
                         },
-                        "description": "Every restaurant the customer has an unfinished basket with — reads a \"you have an unfinished order\" banner."
+                        "description": "Every restaurant with an unfinished basket — reads a \"you have an unfinished order\" banner."
                     },
                     "response": []
                 }
@@ -960,16 +976,6 @@
                 {
                     "name": "Place order (delivery)",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "POST",
                         "header": [
                             {
@@ -993,10 +999,15 @@
                                 "checkout"
                             ]
                         },
-                        "description": "Everything is re-checked here: availability, opening hours, the 1 km radius, the minimum. Show errors.<field>[0] verbatim. The cart is emptied on success.",
+                        "description": "Everything is re-checked here — availability, opening hours, the 1 km radius, the minimum. Expect 422s even when the cart looked fine, and show `errors.<field>[0]` verbatim:\n\n- `cart` — empty, below the minimum, or an item sold out\n- `merchant` — closed or not taking orders\n- `address_id` — outside the radius, or no pin\n- `payment_method` — not available yet\n\nThe cart is emptied on success, so tapping back cannot place it twice.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"fulfilment_type\": \"delivery\",\n    \"payment_method\": \"cod\",\n    \"address_id\": \"{{address_id}}\",\n    \"note\": \"Ring the bell twice\"\n}"
+                            "raw": "{\n    \"fulfilment_type\": \"delivery\",\n    \"payment_method\": \"cod\",\n    \"address_id\": \"{{address_id}}\",\n    \"note\": \"Ring the bell twice\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
                         }
                     },
                     "response": [],
@@ -1018,16 +1029,6 @@
                 {
                     "name": "Place order (self-pickup)",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "POST",
                         "header": [
                             {
@@ -1054,7 +1055,12 @@
                         "description": "No address needed and no delivery fee charged.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"fulfilment_type\": \"pickup\",\n    \"payment_method\": \"cod\"\n}"
+                            "raw": "{\n    \"fulfilment_type\": \"pickup\",\n    \"payment_method\": \"cod\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
                         }
                     },
                     "response": []
@@ -1062,16 +1068,6 @@
                 {
                     "name": "Track order",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -1090,23 +1086,13 @@
                                 "track"
                             ]
                         },
-                        "description": "Small and cheap — poll every few seconds while in flight. Reads Redis, falls back to MySQL."
+                        "description": "Small and cheap — poll every few seconds while in flight. Returns the status, the estimate, the pickup code, and the rider's name, phone and **live position** while they are carrying it.\n\n`cancellation_reason` is written by the merchant for the customer — show it verbatim."
                     },
                     "response": []
                 },
                 {
                     "name": "Order history",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -1138,16 +1124,6 @@
                 {
                     "name": "Order details",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "GET",
                         "header": [
                             {
@@ -1165,23 +1141,38 @@
                                 "{{order_id}}"
                             ]
                         },
-                        "description": "Full order with items, options and status timeline."
+                        "description": "Full order with items, options and the status timeline."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Tax invoice",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/orders/{{order_id}}/invoice",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "orders",
+                                "{{order_id}}",
+                                "invoice"
+                            ]
+                        },
+                        "description": "Returns a **printable HTML page**, not JSON — open it in a webview or the system browser."
                     },
                     "response": []
                 },
                 {
                     "name": "Cancel order",
                     "request": {
-                        "auth": {
-                            "type": "bearer",
-                            "bearer": [
-                                {
-                                    "key": "token",
-                                    "value": "{{access_token}}",
-                                    "type": "string"
-                                }
-                            ]
-                        },
                         "method": "POST",
                         "header": [
                             {
@@ -1204,15 +1195,66 @@
                                 "cancel"
                             ]
                         },
-                        "description": "Only while status is `placed`. After the restaurant accepts this returns 422 — hide the button once the status moves on.",
+                        "description": "Only while the status is `placed`. Once the restaurant accepts, this returns 422 — hide the button as soon as the status moves on.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"reason\": \"Ordered by mistake\"\n}"
+                            "raw": "{\n    \"reason\": \"Ordered by mistake\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
                         }
                     },
                     "response": []
                 }
             ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "https://api.nexmile.in/api/v1"
+        },
+        {
+            "key": "email",
+            "value": "customer@example.in"
+        },
+        {
+            "key": "otp_code",
+            "value": ""
+        },
+        {
+            "key": "access_token",
+            "value": ""
+        },
+        {
+            "key": "refresh_token",
+            "value": ""
+        },
+        {
+            "key": "session_id",
+            "value": ""
+        },
+        {
+            "key": "address_id",
+            "value": ""
+        },
+        {
+            "key": "restaurant_id",
+            "value": ""
+        },
+        {
+            "key": "menu_item_id",
+            "value": ""
+        },
+        {
+            "key": "cart_item_id",
+            "value": ""
+        },
+        {
+            "key": "order_id",
+            "value": ""
         }
     ]
 }

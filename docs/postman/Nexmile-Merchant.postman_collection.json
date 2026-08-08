@@ -1,0 +1,1535 @@
+{
+    "info": {
+        "name": "Nexmile — Merchant",
+        "description": "Everything a **merchant** can do over the API.\n\n**Merchants sign in with a password, not an OTP** — unlike customers and riders. Registration happens on the website at `nexmile.in/merchants/register`; the API endpoint exists for completeness.\n\nRestaurants use the web portal at `nexmile.in/merchants` today, so this collection is mainly for a future merchant app and for testing. Everything here has a portal equivalent.\n\n**Update is POST, not PATCH, on menu items** — PHP does not parse multipart bodies on PATCH, so a PATCH upload arrives with an empty `$_FILES`.\n\nFull reference: `docs/MENU_AND_ORDERS.md`",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{access_token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "item": [
+        {
+            "name": "1. Authentication",
+            "description": "Password-based. Registration is on the website, not in the app.",
+            "item": [
+                {
+                    "name": "Register",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/register",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "register"
+                            ]
+                        },
+                        "description": "Creates the account as `pending`. In practice merchants register on `nexmile.in/merchants/register`.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"owner_name\": \"Veeraiyan\",\n    \"phone\": \"9876500111\",\n    \"email\": \"{{email}}\",\n    \"password\": \"{{password}}\",\n    \"password_confirmation\": \"{{password}}\",\n    \"business_name\": \"Ponnusamy Hotel\",\n    \"business_phone\": \"9876500222\",\n    \"address_line1\": \"1 Main Road\",\n    \"city\": \"Madurai\",\n    \"pincode\": \"625001\",\n    \"latitude\": 9.9195,\n    \"longitude\": 78.1193\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.access_token) {",
+                                    "    pm.collectionVariables.set(\"access_token\", body.data.access_token);",
+                                    "    pm.collectionVariables.set(\"refresh_token\", body.data.refresh_token);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Sign in",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "login"
+                            ]
+                        },
+                        "description": "`identifier` accepts the registered email **or** the 10-digit mobile number.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"identifier\": \"{{email}}\",\n    \"password\": \"{{password}}\",\n    \"device_name\": \"Counter tablet\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.access_token) {",
+                                    "    pm.collectionVariables.set(\"access_token\", body.data.access_token);",
+                                    "    pm.collectionVariables.set(\"refresh_token\", body.data.refresh_token);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Who am I",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/me",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "me"
+                            ]
+                        },
+                        "description": "The signed-in merchant account."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Sign out",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "logout"
+                            ]
+                        },
+                        "description": "Ends this session."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "2. Profile and storefront",
+            "description": "What a customer sees, and whether the shop is open.",
+            "item": [
+                {
+                    "name": "Business profile",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/profile",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "profile"
+                            ]
+                        },
+                        "description": "KYC fields are read-only here."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update profile",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/profile",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "profile"
+                            ]
+                        },
+                        "description": "**Coordinates matter more than anything else here.** A merchant without them is invisible to every customer.\n\n`commission_rate` is deliberately **not** settable — it is a contract term, changed only by Nexmile.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"business_name\": \"Ponnusamy Hotel\",\n    \"description\": \"Chettinad since 1982\",\n    \"business_phone\": \"9876500222\",\n    \"latitude\": 9.9195,\n    \"longitude\": 78.1193,\n    \"avg_prep_time_minutes\": 20,\n    \"packaging_fee\": 10,\n    \"min_order_value\": 99,\n    \"supports_pickup\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Open or close the shop",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/accepting-orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "accepting-orders"
+                            ]
+                        },
+                        "description": "The most-used control a merchant has. Refuses to open with 403 until KYC is verified and the FSSAI licence is current.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"is_accepting_orders\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Opening hours",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/storefront/hours",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "storefront",
+                                "hours"
+                            ]
+                        },
+                        "description": "Plus `is_open_now` and `within_operating_hours`."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Set opening hours",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/storefront/hours",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "storefront",
+                                "hours"
+                            ]
+                        },
+                        "description": "**Replaces the whole week**, never merges — a partial write could leave the shop open on a day just closed. `day_of_week` is 0 Sunday to 6 Saturday; days omitted are closed.\n\nA closing time earlier than the opening time means past midnight: 18:00–01:00 is open all evening.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"hours\": [\n        {\n            \"day_of_week\": 1,\n            \"opens_at\": \"11:00\",\n            \"closes_at\": \"22:00\"\n        },\n        {\n            \"day_of_week\": 2,\n            \"is_closed\": true\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Upload logo or banner",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/storefront/image",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "storefront",
+                                "image"
+                            ]
+                        },
+                        "description": "multipart. JPG, PNG or WebP up to 4 MB. The logo is the first thing a customer sees.",
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "type",
+                                    "value": "logo",
+                                    "type": "text",
+                                    "description": "logo | banner"
+                                },
+                                {
+                                    "key": "file",
+                                    "type": "file",
+                                    "src": []
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove logo or banner",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/storefront/image/logo",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "storefront",
+                                "image",
+                                "logo"
+                            ]
+                        },
+                        "description": "Path segment is `logo` or `banner`."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "3. Verification (KYC)",
+            "description": "FSSAI certificate, PAN and bank proof are required before a merchant can trade.",
+            "item": [
+                {
+                    "name": "KYC status",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/kyc",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "kyc"
+                            ]
+                        },
+                        "description": "What is uploaded, what is missing, and whether it can be submitted."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Upload a document",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/kyc/documents",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "kyc",
+                                "documents"
+                            ]
+                        },
+                        "description": "multipart. JPG, PNG or PDF up to 10 MB.",
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "type",
+                                    "value": "fssai_certificate",
+                                    "type": "text",
+                                    "description": "fssai_certificate | pan_card | bank_proof | gst_certificate | shopfront_photo"
+                                },
+                                {
+                                    "key": "file",
+                                    "type": "file",
+                                    "src": []
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove a document",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/kyc/documents/{{document_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "kyc",
+                                "documents",
+                                "{{document_id}}"
+                            ]
+                        },
+                        "description": "Pending or rejected only."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Submit for verification",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/kyc/submit",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "kyc",
+                                "submit"
+                            ]
+                        },
+                        "description": "Usually reviewed within two working days."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "4. Menu — categories",
+            "description": "Deleting a category keeps its items and clears their grouping.",
+            "item": [
+                {
+                    "name": "List categories",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/categories",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "categories"
+                            ]
+                        },
+                        "description": "With item counts."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.length) {",
+                                    "    pm.collectionVariables.set(\"category_id\", body.data[0].id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create category",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/categories",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "categories"
+                            ]
+                        },
+                        "description": "Inactive categories are hidden from customers.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Biryani\",\n    \"sort_order\": 0,\n    \"is_active\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.id) {",
+                                    "    pm.collectionVariables.set(\"category_id\", body.data.id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Update category",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/categories/{{category_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "categories",
+                                "{{category_id}}"
+                            ]
+                        },
+                        "description": "Send only what changes.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Biryani and rice\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete category",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/categories/{{category_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "categories",
+                                "{{category_id}}"
+                            ]
+                        },
+                        "description": "Items survive and become uncategorised."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "5. Menu — items",
+            "item": [
+                {
+                    "name": "List items",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/menu-items",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "menu-items"
+                            ],
+                            "query": [
+                                {
+                                    "key": "category_id",
+                                    "value": "{{category_id}}",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "is_available",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "search",
+                                    "value": "biryani",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Filterable."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.length) {",
+                                    "    pm.collectionVariables.set(\"menu_item_id\", body.data[0].id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Create item",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/menu-items",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "menu-items"
+                            ]
+                        },
+                        "description": "multipart so the photo goes with the item in one call. GST is restricted to statutory rates.",
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "name",
+                                    "value": "Chicken Biryani",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "description",
+                                    "value": "Seeraga samba rice",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "category_id",
+                                    "value": "{{category_id}}",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "price",
+                                    "value": "200",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "compare_at_price",
+                                    "value": "",
+                                    "type": "text",
+                                    "description": "struck-through \"was\" price"
+                                },
+                                {
+                                    "key": "gst_rate",
+                                    "value": "5",
+                                    "type": "text",
+                                    "description": "5 | 12 | 18"
+                                },
+                                {
+                                    "key": "is_veg",
+                                    "value": "0",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "contains_egg",
+                                    "value": "0",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "is_available",
+                                    "value": "1",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "prep_time_minutes",
+                                    "value": "20",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "image",
+                                    "type": "file",
+                                    "src": []
+                                }
+                            ]
+                        }
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.id) {",
+                                    "    pm.collectionVariables.set(\"menu_item_id\", body.data.id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "One item",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/menu-items/{{menu_item_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "menu-items",
+                                "{{menu_item_id}}"
+                            ]
+                        },
+                        "description": "With its option groups."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update item",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/menu-items/{{menu_item_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "menu-items",
+                                "{{menu_item_id}}"
+                            ]
+                        },
+                        "description": "**POST, not PATCH** — PHP does not parse multipart bodies on PATCH.",
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "price",
+                                    "value": "210",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "image",
+                                    "type": "file",
+                                    "src": []
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Out of stock / back on",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/menu-items/{{menu_item_id}}/availability",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "menu-items",
+                                "{{menu_item_id}}",
+                                "availability"
+                            ]
+                        },
+                        "description": "Its own endpoint because it is the one action performed mid-service, on a phone.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"is_available\": false\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove photo",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/menu-items/{{menu_item_id}}/image",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "menu-items",
+                                "{{menu_item_id}}",
+                                "image"
+                            ]
+                        },
+                        "description": "Leaves the item in place."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete item",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/menu-items/{{menu_item_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "menu-items",
+                                "{{menu_item_id}}"
+                            ]
+                        },
+                        "description": "Soft delete — past orders keep resolving."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Reorder the menu",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/menu-items/reorder",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "menu-items",
+                                "reorder"
+                            ]
+                        },
+                        "description": "The whole ordered list in one call, so the menu cannot be left half-reordered.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"ids\": [\n        3,\n        1,\n        2\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "6. Menu — choices",
+            "description": "\"Spice level\", \"Add-ons\", \"Choose your rice\". Without these half a menu cannot be expressed.",
+            "item": [
+                {
+                    "name": "List an item's groups",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/menu-items/{{menu_item_id}}/option-groups",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "menu-items",
+                                "{{menu_item_id}}",
+                                "option-groups"
+                            ]
+                        },
+                        "description": "With their options."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create a group",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/menu-items/{{menu_item_id}}/option-groups",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "menu-items",
+                                "{{menu_item_id}}",
+                                "option-groups"
+                            ]
+                        },
+                        "description": "**Options are sent with the group**, never separately — a group with no choices is a dead end at checkout.\n\nRefused if a customer could never satisfy it: min above max, min above the number of choices, single-choice with max above 1, or required with min 0.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Spice level\",\n    \"selection\": \"single\",\n    \"is_required\": true,\n    \"options\": [\n        {\n            \"name\": \"Mild\",\n            \"price_delta\": 0\n        },\n        {\n            \"name\": \"Medium\",\n            \"price_delta\": 0\n        },\n        {\n            \"name\": \"Extra spicy\",\n            \"price_delta\": 20\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.id) {",
+                                    "    pm.collectionVariables.set(\"option_group_id\", body.data.id);",
+                                    "    if (body.data.options && body.data.options.length) {",
+                                    "        pm.collectionVariables.set(\"option_id\", body.data.options[0].id);",
+                                    "    }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Update a group",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/option-groups/{{option_group_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "option-groups",
+                                "{{option_group_id}}"
+                            ]
+                        },
+                        "description": "Sending `options` reconciles the list: entries with an `id` are updated in place, new ones created, anything absent removed. Keeping ids matters — historical order lines reference them.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Spice level\",\n    \"options\": [\n        {\n            \"id\": \"{{option_id}}\",\n            \"name\": \"Mild\",\n            \"price_delta\": 0\n        },\n        {\n            \"name\": \"Fiery\",\n            \"price_delta\": 25\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Delete a group",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/option-groups/{{option_group_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "option-groups",
+                                "{{option_group_id}}"
+                            ]
+                        },
+                        "description": "Removes the group and its choices."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "One choice out of stock",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/options/{{option_id}}/availability",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "options",
+                                "{{option_id}}",
+                                "availability"
+                            ]
+                        },
+                        "description": "The kitchen runs out of paneer, not of the whole \"choose your filling\" group.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"is_available\": false\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "7. Orders",
+            "description": "Unpaid orders never appear — `pending_payment` is filtered out of every list.",
+            "item": [
+                {
+                    "name": "Live queue",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "orders"
+                            ],
+                            "query": [
+                                {
+                                    "key": "history",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "status",
+                                    "value": "placed",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "25",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Oldest first: the ticket waiting longest needs attention. `?history=1` for completed ones, newest first."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.length) {",
+                                    "    pm.collectionVariables.set(\"order_id\", body.data[0].id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Order details",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/orders/{{order_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "orders",
+                                "{{order_id}}"
+                            ]
+                        },
+                        "description": "Items, options, customer, timeline and the pickup code."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Accept",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/orders/{{order_id}}/accept",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "orders",
+                                "{{order_id}}",
+                                "accept"
+                            ]
+                        },
+                        "description": "Optional `prep_minutes` — without it the merchant's configured average is used, so the customer always gets an estimate.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"prep_minutes\": 25\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Reject",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/orders/{{order_id}}/reject",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "orders",
+                                "{{order_id}}",
+                                "reject"
+                            ]
+                        },
+                        "description": "Only before accepting. Reason required, minimum 10 characters — the customer reads it. No cancellation fee.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"reason\": \"Kitchen closed early tonight, sorry.\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Start preparing",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/orders/{{order_id}}/preparing",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "orders",
+                                "{{order_id}}",
+                                "preparing"
+                            ]
+                        },
+                        "description": "From `accepted`."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Ready for pickup",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/orders/{{order_id}}/ready",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "orders",
+                                "{{order_id}}",
+                                "ready"
+                            ]
+                        },
+                        "description": "Puts a delivery order onto the rider board. The pickup code becomes visible at this point."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Cancel after accepting",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/merchant/orders/{{order_id}}/cancel",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "merchant",
+                                "orders",
+                                "{{order_id}}",
+                                "cancel"
+                            ]
+                        },
+                        "description": "Different act from rejecting: the kitchen said yes and then something went wrong. Refused once a rider holds the order — at that point cancelling is a phone call.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"reason\": \"Gas cylinder ran out, sorry.\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "https://api.nexmile.in/api/v1"
+        },
+        {
+            "key": "email",
+            "value": "merchant@example.in"
+        },
+        {
+            "key": "password",
+            "value": "secret123"
+        },
+        {
+            "key": "access_token",
+            "value": ""
+        },
+        {
+            "key": "refresh_token",
+            "value": ""
+        },
+        {
+            "key": "document_id",
+            "value": ""
+        },
+        {
+            "key": "category_id",
+            "value": ""
+        },
+        {
+            "key": "menu_item_id",
+            "value": ""
+        },
+        {
+            "key": "option_group_id",
+            "value": ""
+        },
+        {
+            "key": "option_id",
+            "value": ""
+        },
+        {
+            "key": "order_id",
+            "value": ""
+        }
+    ]
+}
