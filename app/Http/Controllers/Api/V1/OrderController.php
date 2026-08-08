@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Models\Order;
 use App\Services\LiveState\OrderStateService;
+use App\Services\LiveState\RiderLocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -51,7 +52,7 @@ class OrderController extends Controller
     {
         return response()->json([
             'data' => new OrderResource($this->find($request, $order, [
-                'items.options', 'merchant', 'statusHistory', 'rider',
+                'items.options', 'merchant', 'statusHistory', 'rider.user',
             ])),
         ]);
     }
@@ -88,6 +89,13 @@ class OrderController extends Controller
                 'rider' => $model->rider_id ? [
                     'name' => $model->rider?->full_name,
                     'vehicle_number' => $model->rider?->vehicle_number,
+                    'phone' => $model->rider?->user?->phone,
+                    /*
+                     * Live position, and only while the rider is actually
+                     * carrying this order. Once it is delivered their movements
+                     * are their own business, not the customer's.
+                     */
+                    'location' => $this->riderPosition($model),
                 ] : null,
             ],
         ]);
@@ -143,6 +151,39 @@ class OrderController extends Controller
             'message' => 'Order cancelled.',
             'data' => new OrderResource($model->fresh('items')),
         ]);
+    }
+
+    /**
+     * Where the rider is, if they are still carrying this order.
+     *
+     * @return array{latitude: float, longitude: float, updated_at: string|null}|null
+     */
+    protected function riderPosition(Order $order): ?array
+    {
+        $inFlight = in_array($order->status, [
+            OrderStatus::RiderAssigned,
+            OrderStatus::PickedUp,
+        ], true);
+
+        if (! $inFlight || $order->rider_id === null) {
+            return null;
+        }
+
+        $state = rescue(
+            fn () => app(RiderLocationService::class)->state($order->rider_id),
+            [],
+            report: false,
+        );
+
+        if (! isset($state['latitude'], $state['longitude'])) {
+            return null;
+        }
+
+        return [
+            'latitude' => (float) $state['latitude'],
+            'longitude' => (float) $state['longitude'],
+            'updated_at' => $state['updated_at'] ?? null,
+        ];
     }
 
     /**

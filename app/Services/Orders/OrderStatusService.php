@@ -35,6 +35,22 @@ class OrderStatusService
         'ready' => [OrderStatus::Accepted->value, OrderStatus::Preparing->value],
     ];
 
+    /**
+     * What a rider may do (EP8, EP10).
+     *
+     * The other half of the same machine. A rider cannot accept an order that
+     * is not ready, cannot collect one they have not been assigned, and cannot
+     * deliver one they have not collected — each of those would leave the
+     * customer's tracking screen describing something that did not happen.
+     *
+     * @var array<string, list<string>>
+     */
+    protected const RIDER_TRANSITIONS = [
+        'assign' => [OrderStatus::ReadyForPickup->value],
+        'pickup' => [OrderStatus::RiderAssigned->value],
+        'deliver' => [OrderStatus::PickedUp->value],
+    ];
+
     public function __construct(protected OrderStateService $liveState) {}
 
     /**
@@ -95,11 +111,66 @@ class OrderStatusService
     }
 
     /**
+     * Mark an order collected from the restaurant.
+     *
+     * The pickup code is the proof that the right rider took the right order,
+     * which is what a disputed delivery is settled with. Without it this is
+     * just a button a rider can press from anywhere.
+     *
      * @throws ValidationException
      */
-    protected function guard(Order $order, string $action): void
+    public function markPickedUp(Order $order, User $actor, string $pickupCode): Order
     {
-        $allowed = self::MERCHANT_TRANSITIONS[$action];
+        $this->guard($order, 'pickup', self::RIDER_TRANSITIONS);
+
+        // hash_equals rather than !==: the code is short and guessable by
+        // timing otherwise, and it costs nothing to compare properly.
+        if (! hash_equals((string) $order->pickup_code, trim($pickupCode))) {
+            throw ValidationException::withMessages([
+                'pickup_code' => 'That code does not match. Ask the restaurant to read it again.',
+            ]);
+        }
+
+        return $this->transition($order, OrderStatus::PickedUp, $actor, attributes: [
+            'picked_up_at' => now(),
+        ]);
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    public function markDelivered(Order $order, User $actor): Order
+    {
+        $this->guard($order, 'deliver', self::RIDER_TRANSITIONS);
+
+        return $this->transition($order, OrderStatus::Delivered, $actor, attributes: [
+            'delivered_at' => now(),
+        ]);
+    }
+
+    /**
+     * Record that a rider took the job. The assignment itself is written by
+     * DispatchService, which claims it atomically; this only moves the status.
+     *
+     * @throws ValidationException
+     */
+    public function markAssigned(Order $order, User $actor): Order
+    {
+        $this->guard($order, 'assign', self::RIDER_TRANSITIONS);
+
+        return $this->transition($order, OrderStatus::RiderAssigned, $actor, attributes: [
+            'assigned_at' => now(),
+        ]);
+    }
+
+    /**
+     * @param  array<string, list<string>>  $map
+     *
+     * @throws ValidationException
+     */
+    protected function guard(Order $order, string $action, ?array $map = null): void
+    {
+        $allowed = ($map ?? self::MERCHANT_TRANSITIONS)[$action];
 
         if (! in_array($order->status->value, $allowed, true)) {
             throw ValidationException::withMessages([

@@ -16,6 +16,8 @@ use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RestaurantController;
 use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
+use App\Http\Controllers\Api\V1\Rider\LocationController as RiderLocationController;
+use App\Http\Controllers\Api\V1\Rider\OrderController as RiderOrderController;
 use App\Http\Controllers\Api\V1\Rider\ProfileController as RiderProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -122,6 +124,23 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('documents', [RiderKycController::class, 'upload'])->name('documents.upload');
             Route::delete('documents/{document}', [RiderKycController::class, 'destroy'])->name('documents.destroy');
             Route::post('submit', [RiderKycController::class, 'submit'])->name('submit');
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | Working a shift — EP8, EP9, EP10
+        |----------------------------------------------------------------------
+        */
+        Route::post('location', [RiderLocationController::class, 'store'])->name('location');
+
+        Route::prefix('orders')->name('orders.')->group(function () {
+            // Fixed segment first, or 'available' is read as an order id.
+            Route::get('available', [RiderOrderController::class, 'available'])->name('available');
+            Route::get('/', [RiderOrderController::class, 'index'])->name('index');
+            Route::get('{order}', [RiderOrderController::class, 'show'])->name('show');
+            Route::post('{order}/accept', [RiderOrderController::class, 'accept'])->name('accept');
+            Route::post('{order}/pickup', [RiderOrderController::class, 'pickup'])->name('pickup');
+            Route::post('{order}/deliver', [RiderOrderController::class, 'deliver'])->name('deliver');
         });
     });
 

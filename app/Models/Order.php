@@ -108,4 +108,23 @@ class Order extends Model
             ->where('status', PaymentStatus::Paid)
             ->sum('amount');
     }
+
+    /**
+     * What the rider collects at the door.
+     *
+     * Anything already captured online is deducted, so this is the whole total
+     * for a cash order and zero for a prepaid one.
+     *
+     * Queried rather than read off a loaded relation: getting this wrong costs
+     * the rider money out of their own pocket, so it must not depend on what a
+     * caller remembered to eager load.
+     */
+    public function cashToCollect(): float
+    {
+        $captured = (float) $this->payments()
+            ->where('status', PaymentStatus::Paid->value)
+            ->sum('amount');
+
+        return round(max(0, (float) $this->grand_total - $captured), 2);
+    }
 }
