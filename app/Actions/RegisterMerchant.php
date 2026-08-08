@@ -32,7 +32,7 @@ class RegisterMerchant
                 'preferred_locale' => $data['preferred_locale'] ?? 'en',
             ]);
 
-            Merchant::create([
+            $merchant = Merchant::create([
                 'user_id' => $user->id,
                 'business_name' => $data['business_name'],
                 'owner_name' => $data['owner_name'],
@@ -50,6 +50,19 @@ class RegisterMerchant
                 'gstin' => $data['gstin'] ?? null,
                 'pan' => $data['pan'] ?? null,
             ]);
+
+            /*
+             * forceFill because commission is not mass-assignable — a merchant
+             * must never set the rate that charges them, not even by posting a
+             * field during registration.
+             *
+             * Stamped here rather than left at the column default of 0, which
+             * would mean the platform earning nothing on every order until an
+             * admin remembered to set it one merchant at a time.
+             */
+            $merchant->forceFill([
+                'commission_rate' => (float) config('checkout.default_commission_rate'),
+            ])->save();
 
             return $user->load('merchant');
         });

@@ -145,6 +145,50 @@
         </dl>
     </div>
 
+    {{-- Commercial terms. Merchants only, and admin only: commission is a
+         contract term, not a preference, so it is deliberately absent from the
+         merchant's own profile endpoint. --}}
+    @if ($isMerchant)
+        <div class="mt-8 rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+            <h2 class="font-semibold text-white">Commercial terms</h2>
+            <p class="mt-1 text-sm text-gray-500">
+                Taken from food and packaging on each delivered order. The delivery fee is not
+                commissionable — it pays the rider.
+            </p>
+
+            @if ((float) $owner->commission_rate === 0.0)
+                <p class="mt-4 rounded-lg bg-brand-orange/10 border border-brand-orange/30 text-brand-orange px-4 py-3 text-sm">
+                    This restaurant is on 0% — every order it takes earns Nexmile nothing.
+                </p>
+            @endif
+
+            <form method="POST" action="{{ route('admin.merchants.terms', $owner->id) }}"
+                  class="mt-5 flex flex-wrap items-end gap-3">
+                @csrf
+                <div>
+                    <label for="commission_rate" class="block text-xs text-gray-500 mb-1.5">Commission rate</label>
+                    <div class="flex items-center gap-2">
+                        <input id="commission_rate" name="commission_rate" type="number" step="0.01"
+                               min="0" max="{{ config('checkout.max_commission_rate') }}" required
+                               value="{{ old('commission_rate', (float) $owner->commission_rate) }}"
+                               class="rounded-lg bg-white/[0.03] border border-white/15 px-3 py-2.5 text-sm text-white w-32
+                                      focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none">
+                        <span class="text-sm text-gray-500">%</span>
+                    </div>
+                </div>
+
+                <button class="px-5 py-2.5 rounded-lg bg-brand-orange text-black text-sm font-bold hover:bg-orange-400">
+                    Save rate
+                </button>
+
+                <p class="w-full text-xs text-gray-600">
+                    Applies to new orders only — orders already placed keep the commission they were priced with,
+                    because those figures are on invoices and payout statements.
+                </p>
+            </form>
+        </div>
+    @endif
+
     {{-- Decisions --}}
     <div class="mt-8 rounded-2xl border border-white/10 bg-white/[0.02] p-6">
         <h2 class="font-semibold text-white">Decision</h2>

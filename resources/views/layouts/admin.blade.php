@@ -34,14 +34,14 @@
             <div class="flex items-center gap-4 text-sm">
                 <nav class="flex items-center gap-4">
                     @foreach ([
-                        'admin.index' => 'Verification',
-                        'admin.orders.index' => 'Orders',
-                    ] as $route => $label)
-                        <a href="{{ route($route) }}"
+                        ['route' => 'admin.dashboard', 'pattern' => 'admin.dashboard', 'label' => 'Dashboard'],
+                        ['route' => 'admin.index', 'pattern' => 'admin.index', 'label' => 'Verification'],
+                        ['route' => 'admin.orders.index', 'pattern' => 'admin.orders.*', 'label' => 'Orders'],
+                    ] as $tab)
+                        <a href="{{ route($tab['route']) }}"
                            class="font-medium transition
-                                  {{ request()->routeIs($route === 'admin.index' ? 'admin.index' : 'admin.orders.*')
-                                        ? 'text-white' : 'text-gray-500 hover:text-gray-300' }}">
-                            {{ $label }}
+                                  {{ request()->routeIs($tab['pattern']) ? 'text-white' : 'text-gray-500 hover:text-gray-300' }}">
+                            {{ $tab['label'] }}
                         </a>
                     @endforeach
                 </nav>

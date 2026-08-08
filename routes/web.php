@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Web\Admin\AdminController;
 use App\Http\Controllers\Web\Admin\AdminOrderController;
+use App\Http\Controllers\Web\Admin\DashboardController;
 use App\Http\Controllers\Web\LanguageController;
 use App\Http\Controllers\Web\MerchantMenuController;
 use App\Http\Controllers\Web\MerchantOptionController;
@@ -130,6 +131,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
          * Order visibility for support. Registered before the {type}/{id}
          * catch-all, or 'orders' is read as an account type.
          */
+        Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+        // Commercial terms: admin-only, never on the merchant's own profile.
+        Route::post('merchants/{id}/terms', [AdminController::class, 'updateTerms'])->name('merchants.terms');
+
         Route::prefix('orders')->name('orders.')->group(function () {
             Route::get('/', [AdminOrderController::class, 'index'])->name('index');
             Route::get('{order}', [AdminOrderController::class, 'show'])->name('show');

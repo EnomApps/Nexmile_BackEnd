@@ -72,6 +72,35 @@ class AdminController extends Controller
     }
 
     /** Review queue, filtered by KYC state. */
+    /**
+     * Commercial terms, which only an admin may change.
+     *
+     * Kept off the merchant's own profile endpoint deliberately: commission is
+     * a contract term, not a preference, and must never be settable by the
+     * account it charges.
+     */
+    public function updateTerms(Request $request, int $id): RedirectResponse
+    {
+        $data = $request->validate([
+            'commission_rate' => ['required', 'numeric', 'between:0,'.config('checkout.max_commission_rate')],
+        ], [
+            'commission_rate.between' => 'Commission must be between 0 and '
+                .config('checkout.max_commission_rate').'%. A higher rate would take more than the order is worth.',
+        ]);
+
+        $merchant = Merchant::findOrFail($id);
+
+        // forceFill: not mass-assignable anywhere, by design.
+        $merchant->forceFill(['commission_rate' => (float) $data['commission_rate']])->save();
+
+        /*
+         * Existing orders keep the commission they were placed with. Those
+         * figures are already on invoices and payout statements, and a rate
+         * change is not retrospective.
+         */
+        return back()->with('status', 'Commission set to '.$data['commission_rate'].'%. Existing orders are unchanged.');
+    }
+
     public function index(Request $request): View
     {
         $status = $request->string('status', KycStatus::Submitted->value)->toString();
