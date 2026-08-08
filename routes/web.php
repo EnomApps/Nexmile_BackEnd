@@ -79,6 +79,9 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
 
             Route::post('categories', [MerchantMenuController::class, 'storeCategory'])->name('categories.store');
             Route::delete('categories/{category}', [MerchantMenuController::class, 'destroyCategory'])->name('categories.destroy');
+            // Category 0 is the uncategorised group, which is still part of the menu.
+            Route::post('categories/{category}/availability', [MerchantMenuController::class, 'toggleCategory'])
+                ->whereNumber('category')->name('categories.availability');
 
             // 'create' before '{item}' so the literal path is not swallowed.
             Route::get('items/create', [MerchantMenuController::class, 'createItem'])->name('items.create');

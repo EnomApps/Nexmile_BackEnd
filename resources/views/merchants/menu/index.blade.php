@@ -93,9 +93,25 @@
             @continue ($group->isEmpty())
 
             <div class="mt-8">
-                <h3 class="text-sm font-bold uppercase tracking-widest text-gray-500">
-                    {{ $category?->name ?? __('portal.menu.uncategorised') }}
-                </h3>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="text-sm font-bold uppercase tracking-widest text-gray-500">
+                        {{ $category?->name ?? __('portal.menu.uncategorised') }}
+                    </h3>
+
+                    {{-- "No biryani today" is one decision, not one click per dish. --}}
+                    @php $anyAvailable = $group->contains(fn ($i) => $i->is_available); @endphp
+                    <form method="POST" action="{{ route('merchants.menu.categories.availability', $category?->id ?? 0) }}">
+                        @csrf
+                        <input type="hidden" name="is_available" value="{{ $anyAvailable ? 0 : 1 }}">
+                        <button type="submit"
+                                class="px-3 py-1 rounded-lg border border-white/10 text-xs font-semibold transition
+                                       {{ $anyAvailable
+                                            ? 'text-gray-500 hover:text-brand-orange hover:border-brand-orange/40'
+                                            : 'text-brand-green border-brand-green/30 hover:bg-brand-green/10' }}">
+                            {{ $anyAvailable ? __('portal.menu.all_unavailable') : __('portal.menu.all_available') }}
+                        </button>
+                    </form>
+                </div>
 
                 <div class="mt-3 space-y-3">
                     @foreach ($group as $item)

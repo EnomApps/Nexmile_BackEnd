@@ -104,6 +104,44 @@ class MerchantMenuController extends Controller
             : __('portal.menu.item_unavailable'));
     }
 
+    /**
+     * Turn a whole section on or off in one go.
+     *
+     * "No biryani today" is a single decision a cook makes, and making them
+     * click through every biryani to express it is how a menu ends up wrong
+     * during the busiest hour.
+     *
+     * `$category` of 0 means the uncategorised group, which is a real part of
+     * the menu and would otherwise have no way to be switched off.
+     */
+    public function toggleCategory(Request $request, int $category): RedirectResponse
+    {
+        $data = $request->validate([
+            'is_available' => ['required', 'boolean'],
+        ]);
+
+        $merchant = $this->merchant($request);
+
+        $items = $merchant->menuItems();
+
+        if ($category === 0) {
+            $items->whereNull('category_id');
+        } else {
+            // Resolved through the merchant, so another merchant's category id
+            // matches nothing rather than emptying their menu.
+            $merchant->categories()->findOrFail($category);
+            $items->where('category_id', $category);
+        }
+
+        $changed = $items->update(['is_available' => $data['is_available']]);
+
+        return back()->with('status', trans_choice(
+            $data['is_available'] ? 'portal.menu.bulk_available' : 'portal.menu.bulk_unavailable',
+            $changed,
+            ['count' => $changed],
+        ));
+    }
+
     public function destroyItem(Request $request, int $item): RedirectResponse
     {
         $this->merchant($request)->menuItems()->findOrFail($item)->delete();

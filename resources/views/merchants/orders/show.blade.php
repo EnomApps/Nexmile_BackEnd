@@ -45,6 +45,30 @@
         </div>
     @endif
 
+    {{-- Contact. Shown only while the order is live: once it is delivered the
+         merchant has no reason to hold a customer's number, and a history page
+         that keeps every phone number is a list nobody meant to build. --}}
+    @unless ($order->status->isTerminal())
+        @php
+            $customerPhone = $order->delivery_contact_phone ?? $order->customer?->phone;
+            $customerName = $order->delivery_contact_name ?? $order->customer?->name;
+        @endphp
+
+        @if ($customerPhone)
+            <div class="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs text-gray-500">{{ __('portal.orders.customer') }}</p>
+                    <p class="mt-0.5 font-medium text-white">{{ $customerName ?: '—' }}</p>
+                </div>
+
+                <a href="tel:{{ $customerPhone }}"
+                   class="px-4 py-2.5 rounded-lg bg-white/10 text-sm font-bold text-white hover:bg-white/20 transition">
+                    {{ __('portal.orders.call_customer') }} {{ $customerPhone }}
+                </a>
+            </div>
+        @endif
+    @endunless
+
     {{-- Actions --}}
     @if (! $order->status->isTerminal())
         <div class="mt-8 {{ $card }} space-y-4">
