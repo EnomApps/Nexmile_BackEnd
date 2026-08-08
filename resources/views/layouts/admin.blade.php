@@ -32,7 +32,20 @@
                 <span class="text-xs font-semibold tracking-widest uppercase text-gray-500 border-l border-white/15 pl-2.5">Admin</span>
             </a>
             <div class="flex items-center gap-4 text-sm">
-                <span class="hidden sm:inline text-gray-500">{{ auth()->user()->email }}</span>
+                <nav class="flex items-center gap-4">
+                    @foreach ([
+                        'admin.index' => 'Verification',
+                        'admin.orders.index' => 'Orders',
+                    ] as $route => $label)
+                        <a href="{{ route($route) }}"
+                           class="font-medium transition
+                                  {{ request()->routeIs($route === 'admin.index' ? 'admin.index' : 'admin.orders.*')
+                                        ? 'text-white' : 'text-gray-500 hover:text-gray-300' }}">
+                            {{ $label }}
+                        </a>
+                    @endforeach
+                </nav>
+                <span class="hidden sm:inline text-gray-500 border-l border-white/15 pl-4">{{ auth()->user()->email }}</span>
                 <form method="POST" action="{{ route('admin.logout') }}">
                     @csrf
                     <button type="submit" class="font-medium text-gray-400 hover:text-brand-orange">Sign out</button>

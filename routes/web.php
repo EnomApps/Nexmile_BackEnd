@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Web\Admin\AdminController;
+use App\Http\Controllers\Web\Admin\AdminOrderController;
 use App\Http\Controllers\Web\LanguageController;
 use App\Http\Controllers\Web\MerchantMenuController;
 use App\Http\Controllers\Web\MerchantOptionController;
@@ -124,6 +125,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::middleware(['auth', 'role:admin'])->group(function () {
         Route::get('/', [AdminController::class, 'index'])->name('index');
         Route::post('logout', [AdminController::class, 'logout'])->name('logout');
+
+        /*
+         * Order visibility for support. Registered before the {type}/{id}
+         * catch-all, or 'orders' is read as an account type.
+         */
+        Route::prefix('orders')->name('orders.')->group(function () {
+            Route::get('/', [AdminOrderController::class, 'index'])->name('index');
+            Route::get('{order}', [AdminOrderController::class, 'show'])->name('show');
+            Route::post('{order}/cancel', [AdminOrderController::class, 'cancel'])->name('cancel');
+        });
 
         Route::get('{type}/{id}', [AdminController::class, 'show'])
             ->whereIn('type', ['merchants', 'riders'])->name('show');

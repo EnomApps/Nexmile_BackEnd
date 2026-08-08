@@ -33,6 +33,21 @@ class OrderStatusService
         'reject' => [OrderStatus::Placed->value],
         'preparing' => [OrderStatus::Accepted->value],
         'ready' => [OrderStatus::Accepted->value, OrderStatus::Preparing->value],
+
+        /*
+         * Cancelling *after* accepting is a different act from rejecting. A
+         * gas cylinder runs out, a key ingredient is gone — without this the
+         * kitchen has no way out and the order sits until someone rings a
+         * support line that does not exist.
+         *
+         * Not available once a rider is carrying it; at that point the food
+         * exists and is somebody's problem to deliver or hand back.
+         */
+        'cancel' => [
+            OrderStatus::Accepted->value,
+            OrderStatus::Preparing->value,
+            OrderStatus::ReadyForPickup->value,
+        ],
     ];
 
     /**
@@ -49,6 +64,13 @@ class OrderStatusService
         'assign' => [OrderStatus::ReadyForPickup->value],
         'pickup' => [OrderStatus::RiderAssigned->value],
         'deliver' => [OrderStatus::PickedUp->value],
+
+        /*
+         * Hand the job back — a breakdown, a wrong turn, a shift ending.
+         * Only before collection: once the food is in the bag it cannot be
+         * returned to a board, and a human has to be involved.
+         */
+        'release' => [OrderStatus::RiderAssigned->value],
     ];
 
     public function __construct(protected OrderStateService $liveState) {}
@@ -108,6 +130,63 @@ class OrderStatusService
         return $this->transition($order, OrderStatus::ReadyForPickup, $actor, attributes: [
             'ready_at' => now(),
         ]);
+    }
+
+    /**
+     * Cancel an order the merchant already accepted.
+     *
+     * @throws ValidationException
+     */
+    public function cancelByMerchant(Order $order, User $actor, string $reason): Order
+    {
+        // A rider taking the order moves it straight to rider_assigned, which
+        // is not a cancellable state — so the guard covers that case and
+        // refusal() explains it in terms the merchant can act on.
+        $this->guard($order, 'cancel');
+
+        return $this->transition($order, OrderStatus::Cancelled, $actor, note: $reason, attributes: [
+            'cancelled_at' => now(),
+            'cancelled_by' => 'merchant',
+            'cancellation_reason' => $reason,
+            // The customer did nothing wrong.
+            'cancellation_fee' => 0,
+        ]);
+    }
+
+    /**
+     * Cancel anything still in flight. The escape hatch for an order no rider
+     * ever took, or one stuck behind a problem nobody else can resolve.
+     *
+     * @throws ValidationException
+     */
+    public function cancelByAdmin(Order $order, User $actor, string $reason): Order
+    {
+        if ($order->status->isTerminal()) {
+            throw ValidationException::withMessages([
+                'status' => 'This order is already '.str_replace('_', ' ', $order->status->value).'.',
+            ]);
+        }
+
+        return $this->transition($order, OrderStatus::Cancelled, $actor, note: $reason, attributes: [
+            'cancelled_at' => now(),
+            'cancelled_by' => 'admin',
+            'cancellation_reason' => $reason,
+            'cancellation_fee' => 0,
+        ]);
+    }
+
+    /**
+     * Put an accepted-but-not-collected order back on the board.
+     *
+     * @throws ValidationException
+     */
+    public function releaseByRider(Order $order, User $actor, ?string $reason = null): Order
+    {
+        $this->guard($order, 'release', self::RIDER_TRANSITIONS);
+
+        $order->forceFill(['rider_id' => null])->save();
+
+        return $this->transition($order, OrderStatus::ReadyForPickup, $actor, note: $reason ?? 'Returned to the board by the rider.');
     }
 
     /**
@@ -185,10 +264,21 @@ class OrderStatusService
      */
     protected function refusal(OrderStatus $current, string $action): string
     {
+        $withRider = in_array($current, [
+            OrderStatus::RiderAssigned,
+            OrderStatus::PickedUp,
+        ], true);
+
         return match (true) {
             $current === OrderStatus::Cancelled => 'This order was cancelled.',
             $current === OrderStatus::Rejected => 'You already rejected this order.',
             $current === OrderStatus::PendingPayment => 'This order is not paid for yet.',
+            /*
+             * Once a rider has it, cancelling is a conversation rather than a
+             * button — somebody is standing at a counter or already riding.
+             */
+            $action === 'cancel' && $withRider => 'A rider is already collecting this order. Call them before cancelling.',
+            $action === 'cancel' && $current === OrderStatus::Delivered => 'This order was already delivered.',
             $action === 'accept' && $current !== OrderStatus::Placed => 'This order has already been accepted.',
             default => 'This order is already '.str_replace('_', ' ', $current->value).'.',
         };

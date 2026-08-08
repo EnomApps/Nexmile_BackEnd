@@ -130,6 +130,26 @@ class DispatchService
     }
 
     /**
+     * Hand an order back to the board.
+     *
+     * Only before collection — `release` is not a transition from picked_up,
+     * so food already in a bag cannot be abandoned this way.
+     *
+     * @throws ValidationException
+     */
+    public function release(Rider $rider, Order $order, ?string $reason = null): Order
+    {
+        $this->guardAssignment($rider, $order);
+
+        $released = $this->status->releaseByRider($order, $rider->user, $reason);
+
+        $rider->update(['duty_status' => RiderStatus::Available]);
+        rescue(fn () => $this->locations->setDutyStatus($rider->id, RiderStatus::Available->value), report: true);
+
+        return $released;
+    }
+
+    /**
      * @throws ValidationException
      */
     public function deliver(Rider $rider, Order $order): Order

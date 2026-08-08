@@ -86,6 +86,20 @@ class ProfileController extends Controller
             }
         }
 
+        /*
+         * A rider carrying an order cannot simply clock off. The order would
+         * keep their rider_id, sit in flight, and nobody would be accountable
+         * for food that is already in a bag.
+         *
+         * Before collection they can hand it back to the board; after, it has
+         * to be delivered or a human has to get involved.
+         */
+        if ($requested !== RiderStatus::Available && $rider->orders()->active()->exists()) {
+            return response()->json([
+                'message' => 'Finish your delivery first, or hand it back before you have collected it.',
+            ], 422);
+        }
+
         // on_order is set by dispatch, never by the rider.
         $rider->update(['duty_status' => $requested]);
 

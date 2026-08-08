@@ -114,6 +114,26 @@ class OrderController extends Controller
     }
 
     /**
+     * Cancel an order already accepted
+     *
+     * Different act from rejecting: the kitchen said yes and then something
+     * went wrong. Without it there is no way out of an order that cannot be
+     * cooked.
+     */
+    public function cancel(Request $request, int $order): JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:255'],
+        ], [
+            'reason.min' => 'Tell the customer why — they see this message.',
+        ]);
+
+        $model = $this->status->cancelByMerchant($this->find($request, $order), $request->user(), $data['reason']);
+
+        return $this->respond($model, 'Order cancelled. The customer has been told why.');
+    }
+
+    /**
      * Start preparing an order
      */
     public function preparing(Request $request, int $order): JsonResponse

@@ -144,3 +144,63 @@ remembered to eager load.
 - **Push notifications.** A rider currently has to be looking at the board to
   see a new order. This is the biggest remaining gap in the product, and it is
   not in any epic yet.
+
+## Ways out when something goes wrong
+
+Every one of these existed as a hole rather than a feature. Without them a
+kitchen with a gas failure, a rider with a puncture and a support agent taking
+a phone call all had nothing to do but wait.
+
+### A rider cannot clock off carrying an order
+
+`POST /v1/rider/duty-status` refuses `offline` and `on_break` while the rider
+has an active order. Otherwise the order keeps their `rider_id`, sits in
+flight, and nobody is accountable for food already in a bag.
+
+### A rider can hand an order back — before collecting it
+
+```
+POST /v1/rider/orders/{id}/release   { "reason": "Puncture" }
+```
+
+Clears `rider_id`, returns the order to `ready_for_pickup`, and puts it back on
+the board for someone else. The rider goes back to `available`.
+
+**Only before pickup.** `release` is not a transition from `picked_up`, so food
+already in a bag cannot be abandoned this way — at that point a human has to be
+involved.
+
+### A merchant can cancel after accepting
+
+```
+POST /v1/merchant/orders/{id}/cancel   { "reason": "Gas cylinder ran out, sorry." }
+```
+
+A different act from rejecting: the kitchen said yes and then something went
+wrong. Reason is required and shown to the customer; no cancellation fee.
+
+Refused once a rider holds the order — *"A rider is already collecting this
+order. Call them before cancelling."* At that point somebody is standing at a
+counter, and cancelling is a conversation rather than a button.
+
+### Admin can see and cancel anything
+
+`/admin/orders` — three views:
+
+| View | Shows |
+|---|---|
+| In flight | everything not yet delivered or cancelled |
+| **Needs attention** | ready for over 10 minutes with **no rider assigned** |
+| All | everything, searchable by order number or phone |
+
+The stale view is the answer to "an order nobody accepted sits at
+`ready_for_pickup` forever". At 1 km a rider is minutes away, so ten minutes
+already means something is wrong. The tab carries a count so it is visible
+without looking.
+
+The detail page shows both parties, the rider, the full money breakdown, the
+items with their options, and the status timeline with **who** made each change
+and when. That last part is what makes "who cancelled this and why" answerable.
+
+Admin cancel works from any non-terminal status — the escape hatch for an order
+no rider ever took, or one stuck behind a problem nobody else can resolve.

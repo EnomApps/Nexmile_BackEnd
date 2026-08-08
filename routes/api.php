@@ -140,6 +140,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('{order}', [RiderOrderController::class, 'show'])->name('show');
             Route::post('{order}/accept', [RiderOrderController::class, 'accept'])->name('accept');
             Route::post('{order}/pickup', [RiderOrderController::class, 'pickup'])->name('pickup');
+            Route::post('{order}/release', [RiderOrderController::class, 'release'])->name('release');
             Route::post('{order}/deliver', [RiderOrderController::class, 'deliver'])->name('deliver');
         });
     });
@@ -232,6 +233,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 Route::get('{order}', [MerchantOrderController::class, 'show'])->name('show');
                 Route::post('{order}/accept', [MerchantOrderController::class, 'accept'])->name('accept');
                 Route::post('{order}/reject', [MerchantOrderController::class, 'reject'])->name('reject');
+                // Cancelling after accepting is a different act from rejecting.
+                Route::post('{order}/cancel', [MerchantOrderController::class, 'cancel'])->name('cancel');
                 Route::post('{order}/preparing', [MerchantOrderController::class, 'preparing'])->name('preparing');
                 Route::post('{order}/ready', [MerchantOrderController::class, 'ready'])->name('ready');
             });

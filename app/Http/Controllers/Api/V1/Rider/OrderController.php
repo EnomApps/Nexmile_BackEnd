@@ -112,6 +112,28 @@ class OrderController extends Controller
     }
 
     /**
+     * Hand an order back
+     *
+     * Puts it back on the board for another rider. Only before collection —
+     * once the food is in the bag it has to be delivered.
+     */
+    public function release(Request $request, int $order): JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        $rider = $this->rider($request);
+
+        $model = $this->dispatch->release($rider, $this->assigned($request, $order), $data['reason'] ?? null);
+
+        return response()->json([
+            'message' => 'Order handed back. It is available to other riders again.',
+            'data' => new RiderOrderResource($model->load('merchant', 'items')),
+        ]);
+    }
+
+    /**
      * Confirm delivery
      */
     public function deliver(Request $request, int $order): JsonResponse
