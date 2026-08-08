@@ -2,7 +2,7 @@
 
 namespace App\Http\Resources;
 
-use App\Services\Menu\MenuImageService;
+use App\Services\Media\ImageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,7 +22,7 @@ class MenuItemResource extends JsonResource
             'description' => $this->description,
 
             // Signed and expiring; fetch the item again for a fresh link.
-            'image_url' => app(MenuImageService::class)->url($this->image_path),
+            'image_url' => app(ImageService::class)->url($this->image_path),
 
             'price' => (float) $this->price,
             'compare_at_price' => $this->compare_at_price !== null ? (float) $this->compare_at_price : null,

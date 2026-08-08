@@ -23,7 +23,7 @@ class MerchantMenuTest extends TestCase
         parent::setUp();
 
         Storage::fake('s3');
-        config(['menu.image_disk' => 's3']);
+        config(['media.disk' => 's3']);
     }
 
     private function merchantUser(array $attributes = []): User

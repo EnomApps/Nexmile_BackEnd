@@ -143,6 +143,14 @@
                                     </button>
                                 </form>
 
+                                <a href="{{ route('merchants.menu.items.options.index', $item->id) }}"
+                                   class="{{ $pill }} border border-white/15 text-gray-300 hover:text-white hover:border-white/30">
+                                    {{ __('portal.options.manage') }}
+                                    @if ($item->option_groups_count)
+                                        <span class="ml-1 text-gray-600">{{ $item->option_groups_count }}</span>
+                                    @endif
+                                </a>
+
                                 <a href="{{ route('merchants.menu.items.edit', $item->id) }}"
                                    class="{{ $pill }} border border-white/15 text-gray-300 hover:text-white hover:border-white/30">
                                     {{ __('portal.menu.edit_item') }}

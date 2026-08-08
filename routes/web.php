@@ -3,8 +3,10 @@
 use App\Http\Controllers\Web\Admin\AdminController;
 use App\Http\Controllers\Web\LanguageController;
 use App\Http\Controllers\Web\MerchantMenuController;
+use App\Http\Controllers\Web\MerchantOptionController;
 use App\Http\Controllers\Web\MerchantOrderController;
 use App\Http\Controllers\Web\MerchantPortalController;
+use App\Http\Controllers\Web\MerchantStorefrontController;
 use App\Http\Controllers\Web\PageController;
 use Illuminate\Support\Facades\Route;
 
@@ -72,6 +74,24 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
             Route::patch('items/{item}', [MerchantMenuController::class, 'updateItem'])->name('items.update');
             Route::post('items/{item}/toggle', [MerchantMenuController::class, 'toggleItem'])->name('items.toggle');
             Route::delete('items/{item}', [MerchantMenuController::class, 'destroyItem'])->name('items.destroy');
+
+            // Customisation: "Spice level", "Add-ons", "Choose your rice".
+            Route::get('items/{item}/options', [MerchantOptionController::class, 'index'])->name('items.options.index');
+            Route::post('items/{item}/options', [MerchantOptionController::class, 'store'])->name('items.options.store');
+            Route::patch('option-groups/{group}', [MerchantOptionController::class, 'update'])->name('options.update');
+            Route::delete('option-groups/{group}', [MerchantOptionController::class, 'destroy'])->name('options.destroy');
+        });
+
+        /*
+         * Storefront presentation and opening hours (EP3, feeds EP4). Both
+         * decide what a customer sees: the logo is the first thing on the home
+         * screen, and the hours decide whether the shop appears open at all.
+         */
+        Route::prefix('storefront')->name('storefront.')->group(function () {
+            Route::get('/', [MerchantStorefrontController::class, 'edit'])->name('edit');
+            Route::post('image', [MerchantStorefrontController::class, 'uploadImage'])->name('image.upload');
+            Route::delete('image/{type}', [MerchantStorefrontController::class, 'destroyImage'])->name('image.destroy');
+            Route::post('hours', [MerchantStorefrontController::class, 'saveHours'])->name('hours');
         });
 
         /*

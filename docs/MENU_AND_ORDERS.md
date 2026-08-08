@@ -201,3 +201,73 @@ account goes with them once it has no orders left.
 
 **Do this before real merchants are live.** Once they are, a demo order in the
 queue is a ticket someone will try to cook.
+
+## Item choices (option groups)
+
+"Spice level", "Choose your rice", "Add extra cheese +₹20". Without these half
+a menu cannot be expressed — a dosa with no filling choice and a biryani with
+no portion size are different products sold under one price.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/v1/merchant/menu-items/{item}/option-groups` | list |
+| POST | `/v1/merchant/menu-items/{item}/option-groups` | create, **with its options** |
+| PATCH | `/v1/merchant/option-groups/{group}` | update, syncing options |
+| DELETE | `/v1/merchant/option-groups/{group}` | remove |
+| POST | `/v1/merchant/options/{option}/availability` | one choice on or off |
+
+**Options are written with their group, never separately.** A group with no
+choices is a dead end at checkout, so a two-call create would leave a window
+where the item cannot be ordered at all.
+
+On update, `options` is reconciled rather than replaced: entries carrying an
+`id` are updated in place, new entries are created, and anything absent is
+deleted. Recreating survivors would break the link from historical order lines
+— those snapshot the name and price, so an order stays readable either way,
+but "how often was extra cheese ordered" stops being answerable.
+
+An id belonging to another group is ignored rather than adopted, so a
+mistyped id cannot silently move a competitor's option.
+
+### Combinations that are refused
+
+Each of these describes a group a customer could never satisfy, which would
+make checkout reject every order containing the item — with the merchant
+having no idea why:
+
+- minimum above maximum
+- minimum above the number of choices offered
+- a single-choice group with a maximum above 1
+- a required group with a minimum of 0
+
+Marking a group required implies a minimum of at least 1, so the portal infers
+it rather than making the merchant reason about two fields that must agree.
+
+## Storefront presentation and opening hours
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/v1/merchant/storefront/image` | upload (`type`: logo or banner) |
+| DELETE | `/v1/merchant/storefront/image/{type}` | remove |
+| GET | `/v1/merchant/storefront/hours` | current schedule |
+| PUT | `/v1/merchant/storefront/hours` | replace the week |
+
+The logo is the first thing a customer sees on the home screen, and the hours
+decide whether the shop appears open at all. Both were readable through the
+customer API long before anything could set them — `logo_url` was permanently
+null and every merchant was permanently open.
+
+**The schedule is replaced as a unit**, never merged. A partial write could
+leave a shop open on a day the merchant had just closed. `day_of_week` is 0 for
+Sunday through 6 for Saturday, matching Carbon. Days omitted are closed.
+
+Times are kept on a closed day so reopening it restores what the merchant last
+used rather than blanks.
+
+A closing time earlier than the opening time means the kitchen closes after
+midnight: 18:00–01:00 is open all evening. Comparing the two naively would
+call it shut during its busiest hours.
+
+A merchant with **no hours configured at all is treated as open**. Defaulting
+to closed would hide everyone who has not filled in a schedule, which looks
+like a broken platform rather than a missing setting.

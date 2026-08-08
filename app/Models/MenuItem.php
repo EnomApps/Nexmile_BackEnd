@@ -72,6 +72,15 @@ class MenuItem extends Model
             ->where(fn ($q) => $q->whereNull('surplus_available_until')->orWhere('surplus_available_until', '>=', now()));
     }
 
+    /**
+     * Where this item's photo lives. Defined once here so the API and the
+     * portal cannot file the same merchant's photos under different prefixes.
+     */
+    public function photoDirectory(): string
+    {
+        return 'menu/'.$this->merchant_id;
+    }
+
     public function isDiscounted(): bool
     {
         return $this->compare_at_price !== null && $this->compare_at_price > $this->price;

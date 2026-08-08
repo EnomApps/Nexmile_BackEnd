@@ -6,7 +6,7 @@ use App\Http\Controllers\Api\V1\Concerns\ResolvesMerchant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Merchant\MenuItemRequest;
 use App\Http\Resources\MenuItemResource;
-use App\Services\Menu\MenuImageService;
+use App\Services\Media\ImageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,7 +20,7 @@ class MenuItemController extends Controller
 {
     use ResolvesMerchant;
 
-    public function __construct(protected MenuImageService $images) {}
+    public function __construct(protected ImageService $images) {}
 
     /**
      * List menu items
@@ -68,7 +68,7 @@ class MenuItemController extends Controller
         $item = $this->merchant($request)->menuItems()->create($data);
 
         if ($request->hasFile('image')) {
-            $this->images->attach($item, $request->file('image'));
+            $this->images->attach($item, 'image_path', $item->photoDirectory(), $request->file('image'));
         }
 
         return response()->json([
@@ -90,7 +90,7 @@ class MenuItemController extends Controller
         $model->update($data);
 
         if ($request->hasFile('image')) {
-            $this->images->attach($model, $request->file('image'));
+            $this->images->attach($model, 'image_path', $model->photoDirectory(), $request->file('image'));
         }
 
         return response()->json([
@@ -128,7 +128,7 @@ class MenuItemController extends Controller
     {
         $model = $this->merchant($request)->menuItems()->findOrFail($item);
 
-        $this->images->detach($model);
+        $this->images->detach($model, 'image_path');
 
         return response()->json([
             'message' => 'Photo removed.',

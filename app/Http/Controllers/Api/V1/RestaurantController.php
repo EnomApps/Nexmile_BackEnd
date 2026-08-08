@@ -95,9 +95,15 @@ class RestaurantController extends Controller
 
         return response()->json([
             'data' => new RestaurantResource($merchant),
-            // Items with no category still have to be orderable.
+            // Items with no category still have to be orderable — including
+            // their customisation, which is loaded here as well as on the
+            // categorised branch above.
             'uncategorised' => MenuItemResource::collection(
-                $merchant->menuItems()->whereNull('category_id')->ordered()->get(),
+                $merchant->menuItems()
+                    ->whereNull('category_id')
+                    ->with('optionGroups.options')
+                    ->ordered()
+                    ->get(),
             ),
         ]);
     }

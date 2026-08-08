@@ -2,7 +2,7 @@
 
 namespace App\Http\Resources;
 
-use App\Services\Menu\MenuImageService;
+use App\Services\Media\ImageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,7 +20,7 @@ class RestaurantResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $images = app(MenuImageService::class);
+        $images = app(ImageService::class);
 
         return [
             'id' => $this->id,

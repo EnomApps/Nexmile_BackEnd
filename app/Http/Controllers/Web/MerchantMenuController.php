@@ -7,7 +7,7 @@ use App\Http\Requests\Merchant\CategoryRequest;
 use App\Http\Requests\Merchant\MenuItemRequest;
 use App\Models\MenuItem;
 use App\Models\Merchant;
-use App\Services\Menu\MenuImageService;
+use App\Services\Media\ImageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -20,7 +20,7 @@ use Illuminate\View\View;
  */
 class MerchantMenuController extends Controller
 {
-    public function __construct(protected MenuImageService $images) {}
+    public function __construct(protected ImageService $images) {}
 
     public function index(Request $request): View
     {
@@ -30,7 +30,7 @@ class MerchantMenuController extends Controller
             'merchant' => $merchant,
             'categories' => $merchant->categories()->withCount('menuItems')->ordered()->get(),
             // Grouped in the view; a single query keeps the page flat.
-            'items' => $merchant->menuItems()->with('category')->ordered()->get(),
+            'items' => $merchant->menuItems()->with('category')->withCount('optionGroups')->ordered()->get(),
             'images' => $this->images,
         ]);
     }
@@ -68,7 +68,7 @@ class MerchantMenuController extends Controller
         $item = $this->merchant($request)->menuItems()->create($data);
 
         if ($request->hasFile('image')) {
-            $this->images->attach($item, $request->file('image'));
+            $this->images->attach($item, 'image_path', $item->photoDirectory(), $request->file('image'));
         }
 
         return redirect()->route('merchants.menu.index')->with('status', __('portal.menu.item_created'));
@@ -84,7 +84,7 @@ class MerchantMenuController extends Controller
         $model->update($data);
 
         if ($request->hasFile('image')) {
-            $this->images->attach($model, $request->file('image'));
+            $this->images->attach($model, 'image_path', $model->photoDirectory(), $request->file('image'));
         }
 
         return redirect()->route('merchants.menu.index')->with('status', __('portal.menu.item_saved'));

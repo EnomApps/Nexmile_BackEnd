@@ -59,8 +59,8 @@ class MenuItemRequest extends FormRequest
 
             'image' => [
                 'sometimes', 'nullable', 'file',
-                'mimes:'.implode(',', config('menu.image_mimes')),
-                'max:'.config('menu.image_max_size_kb'),
+                'mimes:'.implode(',', config('media.mimes')),
+                'max:'.config('media.max_size_kb'),
             ],
         ];
     }
@@ -70,7 +70,7 @@ class MenuItemRequest extends FormRequest
      */
     public function messages(): array
     {
-        $mb = round(config('menu.image_max_size_kb') / 1024, 1);
+        $mb = round(config('media.max_size_kb') / 1024, 1);
 
         return [
             'category_id.exists' => 'That category does not belong to your menu.',

@@ -7,8 +7,10 @@ use App\Http\Controllers\Api\V1\Merchant\AuthController as MerchantAuthControlle
 use App\Http\Controllers\Api\V1\Merchant\CategoryController;
 use App\Http\Controllers\Api\V1\Merchant\KycController as MerchantKycController;
 use App\Http\Controllers\Api\V1\Merchant\MenuItemController;
+use App\Http\Controllers\Api\V1\Merchant\OptionGroupController;
 use App\Http\Controllers\Api\V1\Merchant\OrderController as MerchantOrderController;
 use App\Http\Controllers\Api\V1\Merchant\ProfileController as MerchantProfileController;
+use App\Http\Controllers\Api\V1\Merchant\StorefrontController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RestaurantController;
 use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
@@ -125,6 +127,16 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::patch('profile', [MerchantProfileController::class, 'update'])->name('profile.update');
             Route::post('accepting-orders', [MerchantProfileController::class, 'setAcceptingOrders'])->name('accepting-orders');
 
+            /*
+            |------------------------------------------------------------------
+            | Storefront presentation and opening hours — EP3, feeds EP4
+            |------------------------------------------------------------------
+            */
+            Route::post('storefront/image', [StorefrontController::class, 'uploadImage'])->name('storefront.image.upload');
+            Route::delete('storefront/image/{type}', [StorefrontController::class, 'destroyImage'])->name('storefront.image.destroy');
+            Route::get('storefront/hours', [StorefrontController::class, 'hours'])->name('storefront.hours.show');
+            Route::put('storefront/hours', [StorefrontController::class, 'setHours'])->name('storefront.hours.update');
+
             Route::prefix('kyc')->name('kyc.')->group(function () {
                 Route::get('/', [MerchantKycController::class, 'show'])->name('show');
                 Route::post('documents', [MerchantKycController::class, 'upload'])->name('documents.upload');
@@ -152,7 +164,15 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 Route::post('{item}/availability', [MenuItemController::class, 'setAvailability'])->name('availability');
                 Route::delete('{item}/image', [MenuItemController::class, 'destroyImage'])->name('image.destroy');
                 Route::delete('{item}', [MenuItemController::class, 'destroy'])->name('destroy');
+
+                // Customisation: "Spice level", "Add-ons", "Choose your rice".
+                Route::get('{item}/option-groups', [OptionGroupController::class, 'index'])->name('option-groups.index');
+                Route::post('{item}/option-groups', [OptionGroupController::class, 'store'])->name('option-groups.store');
             });
+
+            Route::patch('option-groups/{group}', [OptionGroupController::class, 'update'])->name('option-groups.update');
+            Route::delete('option-groups/{group}', [OptionGroupController::class, 'destroy'])->name('option-groups.destroy');
+            Route::post('options/{option}/availability', [OptionGroupController::class, 'setOptionAvailability'])->name('options.availability');
 
             /*
             |------------------------------------------------------------------
