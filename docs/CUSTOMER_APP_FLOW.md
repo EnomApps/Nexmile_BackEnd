@@ -6,14 +6,12 @@ Postman: `docs/postman/Nexmile-Customer.postman_collection.json`
 
 ## Read this first
 
-**Half of this flow has endpoints today.** Auth, the address book, restaurant
-discovery and menu browsing are live and stable. Everything from the cart
-onward is still being built.
+**The whole ordering journey is live.** A customer can sign in, find a
+restaurant, build a basket, place an order, watch it being cooked and see it in
+their history — all against real endpoints today.
 
-That is deliberate rather than an oversight — it is the order the backend is
-being written in. Build the app shell, auth and address book against real
-endpoints now, and stub the rest behind an interface so swapping in the real
-call is a one-line change.
+Two things are not built: **online payment** (cash on delivery only for now)
+and **ratings**. Neither blocks the app.
 
 | # | Screen | Status |
 |---|---|---|
@@ -22,11 +20,11 @@ call is a one-line change.
 | 3 | Location + address book | **Live** |
 | 4 | Home — nearby restaurants | **Live** |
 | 5 | Restaurant menu | **Live** |
-| 6 | Cart | Not built (EP5) |
-| 7 | Checkout | Not built (EP5) |
-| 8 | Payment | Not built (EP6) |
-| 9 | Live order tracking | Not built (EP9) |
-| 10 | Order history + rating | Not built (EP12) |
+| 6 | Cart | **Live** |
+| 7 | Checkout | **Live** |
+| 8 | Payment | **COD only** — no gateway yet |
+| 9 | Live order tracking | **Live** |
+| 10 | Order history | **Live** · rating not built |
 
 ---
 
@@ -186,42 +184,143 @@ URL.
 
 ---
 
-## Not built yet
+## 6. Cart
 
-Everything below describes intent, not a contract. **The shapes will change.**
-Do not code against them; code against your own interface and swap later.
+**One cart per restaurant**, and they persist. Glancing at another shop does
+not empty the basket you already started — `GET /carts` returns every open one,
+which is what a "you have an unfinished order" banner reads.
 
-### 6–7. Cart and checkout (EP5)
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/carts` | all open carts |
+| GET | `/restaurants/{id}/cart` | one cart, priced |
+| POST | `/restaurants/{id}/cart/items` | add |
+| PATCH | `/restaurants/{id}/cart/items/{item}` | change quantity |
+| DELETE | `/restaurants/{id}/cart/items/{item}` | remove a line |
+| DELETE | `/restaurants/{id}/cart` | empty it |
 
-One cart per merchant. A cart is priced server-side at checkout — never trust
-totals computed in the app. The backend returns items total, packaging fee,
-delivery fee, discount, tax and grand total as separate lines, because an
-invoice has to be rebuildable exactly.
+```json
+POST /restaurants/7/cart/items
+{ "menu_item_id": 42, "quantity": 2, "option_ids": [3, 9], "notes": "less oil" }
+```
 
-Fulfilment is `delivery` or `pickup`.
+Every cart response comes back **fully priced** — you never compute a total:
 
-### 8. Payment (EP6)
+```json
+{
+  "items": [ { "cart_item_id": 5, "name": "Chicken Biryani", "quantity": 2,
+               "unit_price": 200, "options_total": 20, "line_total": 440,
+               "options": [ { "group_name": "Spice level", "name": "Extra spicy",
+                              "price_delta": 20 } ] } ],
+  "totals": { "items_total": 440, "packaging_fee": 10, "delivery_fee": 0,
+              "discount_total": 0, "tax_total": 22, "grand_total": 472 },
+  "free_delivery_applied": true,
+  "minimum_order_value": 0,
+  "meets_minimum": true,
+  "unavailable_items": [],
+  "can_checkout": true
+}
+```
 
-Order is created as `pending_payment` and only becomes visible to the merchant
-once paid. Provider not yet chosen.
+**`quantity: 0` removes the line** — the minus button needs no special case at
+the boundary.
 
-### 9. Live tracking (EP9)
+**Identical lines merge.** Same dish, same options, same note becomes quantity
+2. Different options stay separate lines.
 
-Poll order state. The lifecycle the customer sees:
+**Required choices are enforced when adding**, so a 422 on `option_ids` means
+open the customisation sheet. Do not wait for checkout to find out.
+
+**`unavailable_items` names dishes that sold out** while the cart sat there.
+They stay in the cart and `can_checkout` goes false — show them struck through
+with a Remove button. Do not silently drop them.
+
+Pass `?fulfilment_type=pickup` when reading a cart to preview pickup pricing;
+the delivery fee disappears, which changes what the customer is deciding on.
+
+**Gate the checkout button on `can_checkout`.** It already accounts for the
+minimum, sold-out items, an empty cart and the restaurant being closed.
+
+## 7. Checkout
+
+```json
+POST /restaurants/7/cart/checkout
+{ "fulfilment_type": "delivery", "payment_method": "cod",
+  "address_id": 3, "note": "Ring the bell twice" }
+```
+
+Returns the created order. **The cart is emptied** — tapping back cannot place
+it twice.
+
+`address_id` is required for `delivery` and ignored for `pickup`.
+
+Everything is re-checked at this point, so expect 422s here even when the cart
+looked fine a moment ago. Show `errors.<field>[0]` verbatim:
+
+| Field | Means |
+|---|---|
+| `cart` | empty, below the minimum, or an item sold out |
+| `merchant` | closed, or stopped taking orders |
+| `address_id` | outside the 1 km radius, or has no pin |
+| `payment_method` | not available yet |
+
+## 8. Payment
+
+**Cash on delivery only.** `payment_method` must be `"cod"`; anything else is
+refused. There is no gateway yet, and offering a method that cannot complete
+would lose the basket at the final step.
+
+A COD order is created at **`placed`**, so it reaches the restaurant
+immediately — there is no payment screen to build yet. When a gateway lands,
+those orders will start at `pending_payment` and you will need one.
+
+## 9. Live tracking
+
+```
+GET /orders/{id}/track
+```
+
+Deliberately small and cheap — poll it every few seconds while an order is in
+flight. It reads Redis and falls back to MySQL.
 
 ```
 placed → accepted → preparing → ready_for_pickup
        → rider_assigned → picked_up → delivered
 ```
 
-Plus `rejected` and `cancelled`, both of which carry a reason string meant to
-be shown verbatim — the merchant wrote it for the customer.
+Plus `rejected` and `cancelled`. Both carry `cancellation_reason` meant to be
+shown **verbatim** — the merchant wrote it for the customer.
 
-Rider location is served from Redis, so polling every few seconds is fine.
+Returns `estimated_prep_minutes` once accepted, the lifecycle timestamps, the
+`pickup_code`, and rider name and vehicle number once one is assigned.
 
-### 10. History and rating (EP12)
+**Rider assignment and live rider location are not built yet** (EP8/EP9), so
+`rider` stays null and an order currently stops at `ready_for_pickup`. Nothing
+in your tracking screen needs to change when that lands.
 
-Past orders with their full price breakdown, reorder, and a rating per order.
+### Cancelling
+
+```
+POST /orders/{id}/cancel   { "reason": "Ordered by mistake" }
+```
+
+**Only while `placed`.** Once the restaurant accepts, the kitchen may have
+started and the call returns 422 with "The restaurant has already started your
+order." Hide the cancel button as soon as the status leaves `placed`.
+
+## 10. Order history
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/orders` | newest first, paginated |
+| GET | `/orders?active=1` | in-flight only — for a home-screen banner |
+| GET | `/orders/{id}` | full order, items, timeline |
+
+Every order keeps its **own** price breakdown and item names, snapshotted when
+it was placed. A restaurant renaming a dish or changing its price does not
+alter what a past order says.
+
+**Ratings are not built** (EP12).
 
 ---
 
@@ -244,17 +343,34 @@ guessed from a status code.
 **Language.** Send `Accept-Language: ta`, `hi` or `en`. Server messages come
 back translated. Persist the choice with `PATCH /profile` → `preferred_locale`.
 
-**Money.** All amounts are decimals in rupees, sent as JSON numbers. Never
-recompute a total in the app; display what the server sent.
+**Money.** Amounts are rupees sent as JSON **numbers**, and a whole-rupee value
+loses its zero fraction: ₹430.00 arrives as `430`, ₹92.50 as `92.5`.
+
+**Read money as `num`, never `double`.** `data['grand_total'] as double` throws
+on a ₹430 order and succeeds on a ₹92.50 one — the worst possible way round,
+because it passes every test until a customer orders a round number. Use
+`(data['grand_total'] as num).toDouble()`.
+
+**Never recompute a total in the app.** The server is the only thing that
+prices a basket; display what it sent. Any figure the app calculates will
+eventually disagree with the bill, and the bill wins.
 
 ## What to build now
 
-1. App shell, routing, token storage with the refresh mutex
-2. **Screens 1–5** against live endpoints — sign in, address book, browse
-   restaurants, open a menu. That is a usable app right up to the point of
-   adding something to a cart.
-3. A `CartRepository` interface with a fake in-memory implementation, plus the
-   cart and checkout UI on top
+**All ten screens, against real endpoints.** Nothing needs stubbing any more.
 
-By the time the cart is wired the endpoints will exist, and only the repository
-implementation changes.
+Suggested order, so each step is testable end to end:
+
+1. App shell, routing, token storage with the refresh mutex
+2. Screens 1–3 — sign in and the address book
+3. Screens 4–5 — discovery and menu
+4. Screens 6–8 — cart, checkout, COD confirmation
+5. Screens 9–10 — tracking and history
+
+The only things you will come back for are an online payment screen and
+ratings, and neither changes anything you build now.
+
+You can exercise the whole flow yourself with the Postman collection: sign in,
+save an address near a test restaurant, add to cart, check out. The order
+appears in the merchant portal at `nexmile.in/merchants/orders`, where it can
+be accepted and marked ready — and your tracking screen will follow it.

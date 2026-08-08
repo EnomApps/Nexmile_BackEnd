@@ -43,6 +43,18 @@
         {
             "key": "restaurant_id",
             "value": ""
+        },
+        {
+            "key": "menu_item_id",
+            "value": ""
+        },
+        {
+            "key": "cart_item_id",
+            "value": ""
+        },
+        {
+            "key": "order_id",
+            "value": ""
         }
     ],
     "auth": {
@@ -680,6 +692,523 @@
                             "query": []
                         },
                         "description": "Categories with items, plus a top-level uncategorised array. Render both. Out-of-stock items are returned, not hidden."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "5. Cart",
+            "description": "One cart per restaurant, priced server-side. Never compute a total in the app.",
+            "item": [
+                {
+                    "name": "Add item to cart",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/restaurants/{{restaurant_id}}/cart/items",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "restaurants",
+                                "{{restaurant_id}}",
+                                "cart",
+                                "items"
+                            ]
+                        },
+                        "description": "Required option groups are enforced here. A 422 on option_ids means open the customisation sheet.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"menu_item_id\": \"{{menu_item_id}}\",\n    \"quantity\": 2,\n    \"option_ids\": [],\n    \"notes\": null\n}"
+                        }
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.items && body.data.items.length) {",
+                                    "    pm.collectionVariables.set(\"cart_item_id\", body.data.items[0].cart_item_id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "View cart",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/restaurants/{{restaurant_id}}/cart",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "restaurants",
+                                "{{restaurant_id}}",
+                                "cart"
+                            ],
+                            "query": [
+                                {
+                                    "key": "fulfilment_type",
+                                    "value": "delivery",
+                                    "description": "delivery | pickup"
+                                }
+                            ]
+                        },
+                        "description": "Fully priced. Gate your checkout button on can_checkout — it already accounts for the minimum, sold-out items and the restaurant being closed."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Change quantity",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/restaurants/{{restaurant_id}}/cart/items/{{cart_item_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "restaurants",
+                                "{{restaurant_id}}",
+                                "cart",
+                                "items",
+                                "{{cart_item_id}}"
+                            ]
+                        },
+                        "description": "Quantity 0 removes the line, so the minus button needs no special case.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"quantity\": 3\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Remove a line",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/restaurants/{{restaurant_id}}/cart/items/{{cart_item_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "restaurants",
+                                "{{restaurant_id}}",
+                                "cart",
+                                "items",
+                                "{{cart_item_id}}"
+                            ]
+                        },
+                        "description": "Remove one line."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Empty the cart",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/restaurants/{{restaurant_id}}/cart",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "restaurants",
+                                "{{restaurant_id}}",
+                                "cart"
+                            ]
+                        },
+                        "description": "Clear everything."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "All open carts",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/carts",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "carts"
+                            ]
+                        },
+                        "description": "Every restaurant the customer has an unfinished basket with — reads a \"you have an unfinished order\" banner."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "6. Checkout and orders",
+            "description": "Cash on delivery only for now. A COD order is created at `placed` and reaches the restaurant immediately.",
+            "item": [
+                {
+                    "name": "Place order (delivery)",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/restaurants/{{restaurant_id}}/cart/checkout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "restaurants",
+                                "{{restaurant_id}}",
+                                "cart",
+                                "checkout"
+                            ]
+                        },
+                        "description": "Everything is re-checked here: availability, opening hours, the 1 km radius, the minimum. Show errors.<field>[0] verbatim. The cart is emptied on success.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"fulfilment_type\": \"delivery\",\n    \"payment_method\": \"cod\",\n    \"address_id\": \"{{address_id}}\",\n    \"note\": \"Ring the bell twice\"\n}"
+                        }
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const body = pm.response.json();",
+                                    "if (body.data && body.data.id) {",
+                                    "    pm.collectionVariables.set(\"order_id\", body.data.id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Place order (self-pickup)",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/restaurants/{{restaurant_id}}/cart/checkout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "restaurants",
+                                "{{restaurant_id}}",
+                                "cart",
+                                "checkout"
+                            ]
+                        },
+                        "description": "No address needed and no delivery fee charged.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"fulfilment_type\": \"pickup\",\n    \"payment_method\": \"cod\"\n}"
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Track order",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/orders/{{order_id}}/track",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "orders",
+                                "{{order_id}}",
+                                "track"
+                            ]
+                        },
+                        "description": "Small and cheap — poll every few seconds while in flight. Reads Redis, falls back to MySQL."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Order history",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "orders"
+                            ],
+                            "query": [
+                                {
+                                    "key": "active",
+                                    "value": "1",
+                                    "description": "in-flight only, for a home-screen banner",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Newest first. Each order keeps its own snapshotted prices and item names."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Order details",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/orders/{{order_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "orders",
+                                "{{order_id}}"
+                            ]
+                        },
+                        "description": "Full order with items, options and status timeline."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Cancel order",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{access_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/orders/{{order_id}}/cancel",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "orders",
+                                "{{order_id}}",
+                                "cancel"
+                            ]
+                        },
+                        "description": "Only while status is `placed`. After the restaurant accepts this returns 422 — hide the button once the status moves on.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"reason\": \"Ordered by mistake\"\n}"
+                        }
                     },
                     "response": []
                 }
