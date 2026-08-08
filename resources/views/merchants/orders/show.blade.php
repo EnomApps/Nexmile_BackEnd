@@ -13,9 +13,16 @@
 
 <section class="max-w-3xl mx-auto px-4 sm:px-6 py-12">
 
-    <a href="{{ route('merchants.orders.index') }}" class="text-sm text-gray-500 hover:text-brand-green">
-        &larr; {{ __('portal.orders.back') }}
-    </a>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <a href="{{ route('merchants.orders.index') }}" class="text-sm text-gray-500 hover:text-brand-green">
+            &larr; {{ __('portal.orders.back') }}
+        </a>
+
+        <a href="{{ route('merchants.orders.invoice', $order->id) }}" target="_blank" rel="noopener"
+           class="px-3 py-1.5 rounded-lg border border-white/15 text-xs font-bold text-gray-300 hover:text-white hover:border-white/30 transition">
+            {{ __('portal.orders.invoice') }}
+        </a>
+    </div>
 
     <div class="mt-4 flex flex-wrap items-center gap-3">
         <h1 class="text-3xl font-extrabold tracking-tight text-white">#{{ $order->order_number }}</h1>

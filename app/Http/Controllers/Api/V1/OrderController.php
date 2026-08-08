@@ -8,6 +8,8 @@ use App\Http\Resources\OrderResource;
 use App\Models\Order;
 use App\Services\LiveState\OrderStateService;
 use App\Services\LiveState\RiderLocationService;
+use App\Services\Orders\InvoiceService;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -99,6 +101,19 @@ class OrderController extends Controller
                 ] : null,
             ],
         ]);
+    }
+
+    /**
+     * Tax invoice
+     *
+     * A printable page rather than JSON: this exists to be saved as a PDF or
+     * handed to an accountant, and nobody does either with an API response.
+     */
+    public function invoice(Request $request, int $order, InvoiceService $invoices): View
+    {
+        $model = $this->find($request, $order, ['items.options', 'merchant', 'customer', 'payments']);
+
+        return view('invoice', ['invoice' => $invoices->build($model)]);
     }
 
     /**

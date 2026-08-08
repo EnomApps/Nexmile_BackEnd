@@ -76,6 +76,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         */
         Route::prefix('restaurants')->name('restaurants.')->group(function () {
             Route::get('/', [RestaurantController::class, 'index'])->name('index');
+            // Before {restaurant}, or the literal path is read as an id.
+            Route::get('deals', [RestaurantController::class, 'deals'])->name('deals');
             Route::get('{restaurant}', [RestaurantController::class, 'show'])->name('show');
             Route::get('{restaurant}/menu', [RestaurantController::class, 'menu'])->name('menu');
 
@@ -104,6 +106,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/', [OrderController::class, 'index'])->name('index');
             Route::get('{order}', [OrderController::class, 'show'])->name('show');
             Route::get('{order}/track', [OrderController::class, 'track'])->name('track');
+            Route::get('{order}/invoice', [OrderController::class, 'invoice'])->name('invoice');
             Route::post('{order}/cancel', [OrderController::class, 'cancel'])->name('cancel');
         });
     });

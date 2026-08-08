@@ -10,6 +10,7 @@ use App\Http\Controllers\Web\MerchantOptionController;
 use App\Http\Controllers\Web\MerchantOrderController;
 use App\Http\Controllers\Web\MerchantPortalController;
 use App\Http\Controllers\Web\MerchantProfileController;
+use App\Http\Controllers\Web\MerchantSurplusController;
 use App\Http\Controllers\Web\MerchantStorefrontController;
 use App\Http\Controllers\Web\PageController;
 use Illuminate\Support\Facades\Route;
@@ -113,8 +114,21 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
         /*
          * Orders (EP5, EP8).
          */
+        /*
+         * Food Rescue (EP14). Its own page: a merchant reaches for this at the
+         * end of service with a specific question — what is left and what can
+         * I shift — which is a different task from editing a menu.
+         */
+        Route::prefix('food-rescue')->name('surplus.')->group(function () {
+            Route::get('/', [MerchantSurplusController::class, 'index'])->name('index');
+            Route::post('{item}', [MerchantSurplusController::class, 'store'])->name('store');
+            Route::delete('{item}', [MerchantSurplusController::class, 'destroy'])->name('destroy');
+        });
+
         Route::prefix('orders')->name('orders.')->group(function () {
             Route::get('/', [MerchantOrderController::class, 'index'])->name('index');
+            // Before {order} so the literal path is not read as an id.
+            Route::get('{order}/invoice', [MerchantOrderController::class, 'invoice'])->name('invoice');
             Route::get('{order}', [MerchantOrderController::class, 'show'])->name('show');
             Route::post('{order}/accept', [MerchantOrderController::class, 'accept'])->name('accept');
             Route::post('{order}/reject', [MerchantOrderController::class, 'reject'])->name('reject');

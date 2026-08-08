@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Merchant;
 use App\Models\Order;
+use App\Services\Orders\InvoiceService;
 use App\Services\Orders\OrderStatusService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,6 +49,21 @@ class MerchantOrderController extends Controller
                 ->with(['items.options', 'customer', 'statusHistory', 'rider'])
                 ->findOrFail($order),
         ]);
+    }
+
+    /**
+     * The tax invoice for an order.
+     *
+     * A GST-registered restaurant has to be able to produce one, and every
+     * figure it needs was snapshotted when the order was placed.
+     */
+    public function invoice(Request $request, int $order, InvoiceService $invoices): View
+    {
+        $model = $this->merchant($request)->orders()
+            ->with(['items.options', 'customer', 'merchant', 'payments'])
+            ->findOrFail($order);
+
+        return view('invoice', ['invoice' => $invoices->build($model)]);
     }
 
     public function accept(Request $request, int $order): RedirectResponse

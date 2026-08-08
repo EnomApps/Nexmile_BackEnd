@@ -8,6 +8,7 @@ use App\Models\ItemOption;
 use App\Models\ItemOptionGroup;
 use App\Models\MenuItem;
 use App\Models\User;
+use App\Services\Menu\SurplusService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -133,8 +134,23 @@ class CartService
     {
         $cart->loadMissing('items.menuItem');
 
+        $surplus = app(SurplusService::class);
+
         return $cart->items
-            ->filter(fn (CartItem $item) => $item->menuItem === null || ! $item->menuItem->is_available)
+            ->filter(function (CartItem $item) use ($surplus) {
+                if ($item->menuItem === null || ! $item->menuItem->is_available) {
+                    return true;
+                }
+
+                // A rescue deal that expired or sold out while the cart sat
+                // there is unavailable even though the dish is not.
+                if ($item->menuItem->is_surplus_deal) {
+                    return ! $surplus->isLive($item->menuItem)
+                        || (int) $item->menuItem->surplus_quantity < (int) $item->quantity;
+                }
+
+                return false;
+            })
             ->map(fn (CartItem $item) => $item->menuItem->name ?? 'An item')
             ->values()
             ->all();
@@ -160,6 +176,14 @@ class CartService
         if (! $item->is_available) {
             throw ValidationException::withMessages([
                 'menu_item_id' => "{$item->name} is out of stock right now.",
+            ]);
+        }
+
+        // A rescue deal outside its window or down to nothing is not orderable,
+        // even though the dish itself still is.
+        if ($item->is_surplus_deal && ! app(SurplusService::class)->isLive($item)) {
+            throw ValidationException::withMessages([
+                'menu_item_id' => "The {$item->name} rescue deal has ended.",
             ]);
         }
 

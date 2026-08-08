@@ -62,6 +62,15 @@ same reason.
 mid-service, on a phone, when the kitchen runs out — it must not require
 sending the whole item back.
 
+**A whole category switches at once** from the portal
+(`POST /merchants/menu/categories/{id}/availability`, and `0` for the
+uncategorised group). "No biryani today" is a single decision, and making a
+cook click through every biryani to express it is how a menu ends up wrong
+during the busiest hour.
+
+Surplus and Food Rescue deals live on the same items — see
+[FOOD_RESCUE_AND_INVOICES.md](FOOD_RESCUE_AND_INVOICES.md).
+
 ## Orders
 
 ### What a merchant may do

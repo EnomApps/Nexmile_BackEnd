@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\MenuItemResource;
 use App\Http\Resources\RestaurantResource;
 use App\Models\Address;
+use App\Models\MenuItem;
 use App\Models\Merchant;
 use App\Services\Discovery\NearbyMerchantService;
 use Illuminate\Http\JsonResponse;
@@ -57,6 +58,53 @@ class RestaurantController extends Controller
                 'radius_metres' => $this->nearby->radiusFor($latitude, $longitude),
             ]])
             ->response();
+    }
+
+    /**
+     * Food Rescue deals nearby
+     *
+     * Surplus food a kitchen would otherwise throw away, discounted and
+     * finite. Only deals that are actually orderable right now — inside their
+     * window with portions left — so the screen never advertises something
+     * checkout would refuse.
+     */
+    public function deals(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'address_id' => ['required_without_all:latitude,longitude', 'integer'],
+            'latitude' => ['required_without:address_id', 'numeric', 'between:-90,90'],
+            'longitude' => ['required_without:address_id', 'numeric', 'between:-180,180'],
+        ], [
+            'address_id.required_without_all' => 'Send an address_id, or latitude and longitude.',
+        ]);
+
+        [$latitude, $longitude] = $this->resolvePoint($request, $data);
+
+        // Reuse discovery so the radius, verification and open-first rules
+        // cannot drift from the main restaurant list.
+        $nearby = $this->nearby->search($latitude, $longitude, perPage: 50);
+
+        $items = MenuItem::query()
+            ->whereIn('merchant_id', collect($nearby->items())->pluck('id'))
+            ->available()
+            ->surplusActive()
+            ->where('surplus_quantity', '>', 0)
+            ->with(['merchant', 'optionGroups.options'])
+            ->orderBy('surplus_available_until')
+            ->get();
+
+        return response()->json([
+            'data' => $items->map(fn (MenuItem $item) => [
+                'restaurant' => [
+                    'id' => $item->merchant->id,
+                    'name' => $item->merchant->business_name,
+                    'is_open' => $item->merchant->isOpenNow(),
+                ],
+                'item' => new MenuItemResource($item),
+            ])->values(),
+            // Soonest to expire first — a rescue deal is a countdown.
+            'meta' => ['radius_metres' => $this->nearby->radiusFor($latitude, $longitude)],
+        ]);
     }
 
     /**

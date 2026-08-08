@@ -6,6 +6,7 @@
         ['route' => 'merchants.dashboard', 'pattern' => 'merchants.dashboard', 'label' => __('portal.nav.dashboard')],
         ['route' => 'merchants.menu.index', 'pattern' => 'merchants.menu.*', 'label' => __('portal.nav.menu')],
         ['route' => 'merchants.orders.index', 'pattern' => 'merchants.orders.*', 'label' => __('portal.nav.orders')],
+        ['route' => 'merchants.surplus.index', 'pattern' => 'merchants.surplus.*', 'label' => __('portal.nav.surplus')],
         ['route' => 'merchants.earnings', 'pattern' => 'merchants.earnings', 'label' => __('portal.nav.earnings')],
         ['route' => 'merchants.storefront.edit', 'pattern' => 'merchants.storefront.*', 'label' => __('portal.nav.storefront')],
         ['route' => 'merchants.profile.edit', 'pattern' => 'merchants.profile.*', 'label' => __('portal.nav.profile')],

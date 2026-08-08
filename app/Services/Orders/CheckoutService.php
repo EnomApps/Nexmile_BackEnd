@@ -12,6 +12,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Services\Discovery\NearbyMerchantService;
 use App\Services\LiveState\OrderStateService;
+use App\Services\Menu\SurplusService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -32,6 +33,7 @@ class CheckoutService
         protected CartService $carts,
         protected NearbyMerchantService $nearby,
         protected OrderStateService $liveState,
+        protected SurplusService $surplus,
     ) {}
 
     /**
@@ -93,6 +95,18 @@ class CheckoutService
                 'estimated_prep_minutes' => $cart->merchant->avg_prep_time_minutes,
                 'placed_at' => now(),
             ]);
+
+            /*
+             * Rescue portions are claimed inside the transaction, before the
+             * order is considered placed. Two customers taking the last two
+             * portions at the same instant must not both succeed, and if the
+             * claim fails the order must not exist at all.
+             */
+            foreach ($cart->items as $line) {
+                if ($line->menuItem?->is_surplus_deal) {
+                    $this->surplus->claim($line->menuItem, (int) $line->quantity);
+                }
+            }
 
             $this->snapshotItems($order, $quote['lines']);
 

@@ -308,6 +308,48 @@ POST /orders/{id}/cancel   { "reason": "Ordered by mistake" }
 started and the call returns 422 with "The restaurant has already started your
 order." Hide the cancel button as soon as the status leaves `placed`.
 
+## Food Rescue deals
+
+```
+GET /restaurants/deals?address_id=3
+GET /restaurants/deals?latitude=…&longitude=…
+```
+
+Surplus food nearby at a discount, **soonest to expire first**. Same radius and
+verification rules as the restaurant list.
+
+Only deals that are orderable *right now* appear — inside their window with
+portions left — so the screen never advertises something checkout would refuse.
+
+Every menu item also carries `is_rescue_deal`, and when it is one:
+
+```json
+"rescue": {
+  "portions_left": 3,
+  "available_from": "2026-08-09T20:00:00+05:30",
+  "available_until": "2026-08-09T22:30:00+05:30",
+  "saving": 110
+}
+```
+
+**Show the countdown and the portions left.** A rescue deal is a race, and
+hiding that makes it look like an ordinary discount.
+
+`is_rescue_deal` can go false while a customer is looking at it — the window
+closes or someone takes the last portion. Adding it to a cart then returns 422
+on `menu_item_id`, and checkout returns 422 on `cart` if it sells out between
+adding and paying. Both messages are written to be shown as they are.
+
+## 11. Tax invoice
+
+```
+GET /orders/{id}/invoice
+```
+
+Returns a **printable HTML page**, not JSON — open it in a webview or the
+system browser. It is meant to be saved as a PDF, and every figure comes from
+what the order was actually charged.
+
 ## 10. Order history
 
 | Method | Path | Purpose |
