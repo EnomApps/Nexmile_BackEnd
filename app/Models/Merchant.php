@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\DocumentStatus;
+use App\Enums\DocumentType;
 use App\Enums\KycStatus;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -190,5 +192,42 @@ class Merchant extends Model
         return $this->fssai_license_no !== null
             && $this->fssai_expiry_date !== null
             && $this->fssai_expiry_date->isFuture();
+    }
+
+    /**
+     * Why the licence is blocking them, in terms of who can do something
+     * about it.
+     *
+     * Uploading the certificate and having the licence recorded are two
+     * different things: the merchant does the first, an admin reads the second
+     * off it. A merchant looking at an approved document and being told to
+     * "update your licence" has nowhere to go, and telling someone to fix
+     * something they cannot reach is worse than saying nothing.
+     *
+     * @return 'no_document'|'awaiting_review'|'rejected'|'awaiting_details'|'expired'|null
+     */
+    public function fssaiBlocker(): ?string
+    {
+        if ($this->hasValidFssai()) {
+            return null;
+        }
+
+        // A recorded but lapsed licence is the merchant's problem to solve —
+        // they have to renew it and send the new certificate.
+        if ($this->fssai_license_no !== null && $this->fssai_expiry_date !== null) {
+            return 'expired';
+        }
+
+        $document = $this->kycDocuments()
+            ->where('type', DocumentType::FssaiCertificate->value)
+            ->latest('id')
+            ->first();
+
+        return match (true) {
+            $document === null => 'no_document',
+            $document->status === DocumentStatus::Rejected => 'rejected',
+            $document->status === DocumentStatus::Approved => 'awaiting_details',
+            default => 'awaiting_review',
+        };
     }
 }

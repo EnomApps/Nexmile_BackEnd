@@ -122,9 +122,17 @@ class MerchantPortalController extends Controller
                 return back()->withErrors(['is_accepting_orders' => __('portal.storefront.not_verified')]);
             }
 
-            // An expired food licence is a legal problem, not a warning.
-            if (! $merchant->hasValidFssai()) {
-                return back()->withErrors(['is_accepting_orders' => __('portal.storefront.fssai_expired')]);
+            /*
+             * An expired food licence is a legal problem, not a warning — but
+             * the message has to name who can fix it. Uploading the
+             * certificate and having the licence recorded are two different
+             * things, and a merchant staring at an approved document while
+             * being told to "update your licence" has nowhere to go.
+             */
+            if ($blocker = $merchant->fssaiBlocker()) {
+                return back()->withErrors([
+                    'is_accepting_orders' => __("portal.storefront.fssai.{$blocker}"),
+                ]);
             }
         }
 

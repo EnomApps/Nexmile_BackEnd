@@ -66,6 +66,16 @@
                 <p class="mt-3 text-sm text-red-300">{{ $message }}</p>
             @enderror
 
+            {{-- Shown before they click, not after. Discovering you cannot
+                 open by pressing a button that refuses is a poor way to find
+                 out, especially when the fix belongs to somebody else. --}}
+            @php $fssaiBlocker = $merchant->fssaiBlocker(); @endphp
+            @if ($fssaiBlocker && ! $errors->has('is_accepting_orders'))
+                <p class="mt-3 text-sm {{ $fssaiBlocker === 'awaiting_details' || $fssaiBlocker === 'awaiting_review' ? 'text-gray-400' : 'text-red-300' }}">
+                    {{ __("portal.storefront.fssai.{$fssaiBlocker}") }}
+                </p>
+            @endif
+
             @if ($merchant->is_accepting_orders && ! $withinHours)
                 <p class="mt-3 text-xs text-gray-500">
                     {{ __('portal.storefront.hours_note') }}
