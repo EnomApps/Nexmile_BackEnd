@@ -280,3 +280,33 @@ call it shut during its busiest hours.
 A merchant with **no hours configured at all is treated as open**. Defaulting
 to closed would hide everyone who has not filled in a schedule, which looks
 like a broken platform rather than a missing setting.
+
+## "Why can't customers see my restaurant?"
+
+The nearby search has several gates and failing any one of them produces the
+same empty list, so the answer is never obvious from the outside:
+
+```bash
+php artisan nexmile:why-hidden "Ponnusamy Hotel"
+php artisan nexmile:why-hidden veera@enom.ai --lat=13.0299690 --lng=80.1103750
+```
+
+It walks the gates in order and says which one is shut.
+
+**By far the most common answer is KYC.** A newly registered restaurant is
+`pending` and is filtered out of discovery entirely until an admin verifies it
+at `/admin` — that is deliberate, because nobody has yet confirmed a licensed
+food business is behind the storefront.
+
+The others, in the order the command checks them:
+
+| Gate | Effect |
+|---|---|
+| No coordinates | invisible — cannot be matched to any customer |
+| KYC not verified | invisible |
+| Further than the radius | invisible from that address |
+| Switched off, closed, FSSAI expired | **listed but shown closed**, not hidden |
+
+That last row matters: a closed restaurant still appears, ranked below open
+ones. If it is missing from the list entirely, the reason is one of the first
+three.
