@@ -80,6 +80,22 @@ class WhyHiddenCommandTest extends CheckoutTest
         $this->assertStringNotContainsString('Not in the nearby list', $output);
     }
 
+    public function test_it_sends_you_to_the_licence_before_the_switch(): void
+    {
+        $shop = $this->restaurant();
+        $this->dish($shop);
+        // Registered through the website, so no licence was ever captured.
+        $shop->forceFill(['fssai_license_no' => null, 'fssai_expiry_date' => null])->save();
+        $shop->update(['is_accepting_orders' => false]);
+
+        $output = $this->diagnose(['merchant' => $shop->id]);
+
+        // The two are chained — telling them to flip the switch first sends
+        // them round a loop, because switching on checks the licence.
+        $this->assertStringContainsString('an admin adds it at /admin', $output);
+        $this->assertStringContainsString('Record the FSSAI licence first', $output);
+    }
+
     public function test_it_finds_a_merchant_by_name_or_email(): void
     {
         $shop = $this->restaurant();

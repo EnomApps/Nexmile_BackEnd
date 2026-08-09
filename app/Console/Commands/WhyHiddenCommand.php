@@ -80,10 +80,16 @@ class WhyHiddenCommand extends Command
                 ? ($withinHours ? 'open now' : 'closed at this hour')
                 : 'no hours set, treated as always open');
 
+        /*
+         * Worth naming where to fix it: FSSAI is admin-only, so a merchant
+         * reading "no licence recorded" has nowhere in their own portal to go.
+         */
         $this->check($merchant->hasValidFssai(), 'FSSAI licence current',
             $merchant->fssai_expiry_date
-                ? 'expires '.$merchant->fssai_expiry_date->toDateString()
-                : 'no licence number or expiry recorded');
+                ? ($merchant->hasValidFssai()
+                    ? 'expires '.$merchant->fssai_expiry_date->toDateString()
+                    : 'expired '.$merchant->fssai_expiry_date->toDateString().' — record a current one at /admin')
+                : 'not recorded — an admin adds it at /admin from the uploaded certificate');
 
         $available = $merchant->menuItems()->where('is_available', true)->count();
         $this->check($available > 0, 'Has dishes on the menu',
@@ -95,6 +101,17 @@ class WhyHiddenCommand extends Command
             $this->line("  <fg=red;options=bold>Not in the nearby list.</> Fix the {$blocking} failing check above.");
         } elseif (! $merchant->isOpenNow()) {
             $this->line('  <fg=yellow;options=bold>In the list, but shown as closed.</>');
+
+            /*
+             * These two are chained and the order matters: a merchant cannot
+             * switch themselves on until the licence is recorded, so telling
+             * them to flip the switch first sends them round a loop.
+             */
+            if (! $merchant->hasValidFssai()) {
+                $this->line('  <fg=gray>Record the FSSAI licence first — the merchant cannot switch on without it.</>');
+            } elseif (! $merchant->is_accepting_orders) {
+                $this->line('  <fg=gray>The merchant switches themselves on from their dashboard.</>');
+            }
         } else {
             $this->line('  <fg=green;options=bold>Visible and open.</>');
         }

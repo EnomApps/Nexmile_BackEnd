@@ -145,6 +145,69 @@
         </dl>
     </div>
 
+    {{-- Food licence. Admin only, for the same reason KYC is: a merchant who
+         could type their own FSSAI number would make verification pointless.
+         Read it off the certificate in the documents above. --}}
+    @if ($isMerchant)
+        @php $hasLicence = $owner->fssai_license_no && $owner->fssai_expiry_date?->isFuture(); @endphp
+
+        <div class="mt-8 rounded-2xl border {{ $hasLicence ? 'border-white/10' : 'border-brand-orange/40' }} bg-white/[0.02] p-6">
+            <h2 class="font-semibold text-white">Food licence</h2>
+            <p class="mt-1 text-sm text-gray-500">
+                Copy these from the FSSAI certificate uploaded above.
+            </p>
+
+            @unless ($hasLicence)
+                <p class="mt-4 rounded-lg bg-brand-orange/10 border border-brand-orange/30 text-brand-orange px-4 py-3 text-sm">
+                    {{ $owner->fssai_license_no
+                        ? 'This licence has expired, so the restaurant cannot open.'
+                        : 'No licence recorded, so this restaurant cannot open — even once verified.' }}
+                </p>
+            @endunless
+
+            <form method="POST" action="{{ route('admin.merchants.compliance', $owner->id) }}"
+                  class="mt-5 flex flex-wrap items-end gap-3">
+                @csrf
+
+                <div>
+                    <label for="fssai_license_no" class="block text-xs text-gray-500 mb-1.5">FSSAI licence number</label>
+                    <input id="fssai_license_no" name="fssai_license_no" required inputmode="numeric"
+                           placeholder="14 digits"
+                           value="{{ old('fssai_license_no', $owner->fssai_license_no) }}"
+                           class="rounded-lg bg-white/[0.03] border border-white/15 px-3 py-2.5 text-sm text-white w-48
+                                  focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none">
+                </div>
+
+                <div>
+                    <label for="fssai_expiry_date" class="block text-xs text-gray-500 mb-1.5">Valid until</label>
+                    <input id="fssai_expiry_date" name="fssai_expiry_date" type="date" required
+                           value="{{ old('fssai_expiry_date', $owner->fssai_expiry_date?->toDateString()) }}"
+                           class="rounded-lg bg-white/[0.03] border border-white/15 px-3 py-2.5 text-sm text-white
+                                  focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none">
+                </div>
+
+                <div>
+                    <label for="gstin" class="block text-xs text-gray-500 mb-1.5">
+                        GSTIN <span class="text-gray-700">(optional)</span>
+                    </label>
+                    <input id="gstin" name="gstin" maxlength="15" placeholder="15 characters"
+                           value="{{ old('gstin', $owner->gstin) }}"
+                           class="rounded-lg bg-white/[0.03] border border-white/15 px-3 py-2.5 text-sm text-white w-52
+                                  focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none">
+                </div>
+
+                <button class="px-5 py-2.5 rounded-lg bg-brand-orange text-black text-sm font-bold hover:bg-orange-400">
+                    Save licence
+                </button>
+
+                <p class="w-full text-xs text-gray-600">
+                    An expired licence blocks the restaurant from opening, whatever their KYC status —
+                    a lapsed food licence is a legal problem, not a warning.
+                </p>
+            </form>
+        </div>
+    @endif
+
     {{-- Commercial terms. Merchants only, and admin only: commission is a
          contract term, not a preference, so it is deliberately absent from the
          merchant's own profile endpoint. --}}

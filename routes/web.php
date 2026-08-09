@@ -165,8 +165,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
          */
         Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-        // Commercial terms: admin-only, never on the merchant's own profile.
+        // Commercial terms and the food licence: admin-only, never on the
+        // merchant's own profile. A merchant who could type their own FSSAI
+        // number would make verification pointless.
         Route::post('merchants/{id}/terms', [AdminController::class, 'updateTerms'])->name('merchants.terms');
+        Route::post('merchants/{id}/compliance', [AdminController::class, 'updateCompliance'])->name('merchants.compliance');
 
         Route::prefix('orders')->name('orders.')->group(function () {
             Route::get('/', [AdminOrderController::class, 'index'])->name('index');

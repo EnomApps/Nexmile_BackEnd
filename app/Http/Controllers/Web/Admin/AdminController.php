@@ -101,6 +101,35 @@ class AdminController extends Controller
         return back()->with('status', 'Commission set to '.$data['commission_rate'].'%. Existing orders are unchanged.');
     }
 
+    /**
+     * The food licence, recorded from the certificate being reviewed.
+     *
+     * Deliberately not on the merchant's own profile: letting a verified
+     * merchant edit their own FSSAI number would make verification
+     * meaningless. The admin reading the uploaded certificate is the only
+     * person who should type what it says.
+     *
+     * Without it `hasValidFssai()` is false and the merchant cannot switch
+     * themselves on — so until this existed, a merchant who registered through
+     * the website could never trade and nothing in any screen could fix it.
+     */
+    public function updateCompliance(Request $request, int $id): RedirectResponse
+    {
+        $data = $request->validate([
+            'fssai_license_no' => ['required', 'string', 'regex:/^\d{14}$/'],
+            'fssai_expiry_date' => ['required', 'date', 'after:today'],
+            'gstin' => ['nullable', 'string', 'size:15'],
+        ], [
+            'fssai_license_no.regex' => 'An FSSAI licence number is exactly 14 digits.',
+            'fssai_expiry_date.after' => 'That licence has already expired — ask the merchant for a current one.',
+            'gstin.size' => 'A GSTIN is 15 characters.',
+        ]);
+
+        Merchant::findOrFail($id)->update($data);
+
+        return back()->with('status', 'Licence details saved. The restaurant can now open.');
+    }
+
     public function index(Request $request): View
     {
         $status = $request->string('status', KycStatus::Submitted->value)->toString();
