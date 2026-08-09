@@ -15,6 +15,7 @@ use App\Http\Controllers\Web\MerchantSurplusController;
 use App\Http\Controllers\Web\PageController;
 use App\Http\Controllers\Web\PostmanController;
 use App\Http\Middleware\EnsureApiDocsEnabled;
+use Dedoc\Scramble\Scramble;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -201,5 +202,28 @@ Route::middleware(EnsureApiDocsEnabled::class)->group(function () {
         ->whereIn('app', ['customer', 'rider', 'merchant'])
         ->name('postman.download');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Per-app OpenAPI documents
+|--------------------------------------------------------------------------
+| /docs/api stays as the complete reference. These are the same endpoints
+| split three ways, because an app developer reading one 94-endpoint document
+| has to work out which half belongs to them — and the answer is not obvious,
+| since /auth and /profile are shared and /orders means something different to
+| a customer and a rider.
+|
+| Registered here rather than in a provider: Scramble's own provider boots
+| first, so registerApi() alone produces a document with no route to reach it.
+*/
+foreach (['customer', 'rider', 'merchant'] as $api) {
+    Scramble::registerUiRoute("docs/{$api}", api: $api)
+        ->middleware(EnsureApiDocsEnabled::class)
+        ->name("docs.{$api}");
+
+    Scramble::registerJsonSpecificationRoute("docs/{$api}.json", api: $api)
+        ->middleware(EnsureApiDocsEnabled::class)
+        ->name("docs.{$api}.json");
+}
 
 Route::get('language/{locale}', [LanguageController::class, 'switch'])->name('language.switch');

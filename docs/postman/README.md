@@ -101,3 +101,28 @@ cloned the repo can still get them:
 Three download links, one per app. Behind the same `API_DOCS_ENABLED` switch as
 `/docs/api`, and allowlisted by name — the rest of `docs/` stays private,
 because DEPLOYMENT.md and MAPS.md describe the infrastructure.
+
+## Swagger, if you prefer it
+
+The same endpoints, split the same three ways, as browsable OpenAPI:
+
+| App | Swagger | OpenAPI JSON |
+|---|---|---|
+| Customer | `/docs/customer` | `/docs/customer.json` |
+| Rider | `/docs/rider` | `/docs/rider.json` |
+| Merchant | `/docs/merchant` | `/docs/merchant.json` |
+
+`/docs/api` remains the complete reference, including admin.
+
+`/auth` and `/profile` appear in both the customer and rider documents — both
+roles sign in the same way and edit the same profile. Merchants do neither;
+they use `/merchant/login` with a password, so the merchant document is
+merchant-only.
+
+The **`.json`** is what code generators read:
+
+```bash
+openapi-generator generate -i https://api.nexmile.in/docs/customer.json -g dart-dio -o ./api
+```
+
+`/docs/postman` links all of it in one place.
