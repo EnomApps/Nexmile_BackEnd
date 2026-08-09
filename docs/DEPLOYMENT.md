@@ -233,3 +233,44 @@ sudo systemctl restart php8.5-fpm nexmile-worker
 
 Run `php artisan config:clear` first if a changed `.env` value seems to be ignored —
 cached config does not re-read `.env`.
+
+## Timezone
+
+`APP_TIMEZONE=Asia/Kolkata`. **Not UTC**, and this matters more than it looks.
+
+Almost everything the platform decides is a local-clock question: whether a
+kitchen is inside its opening hours, which day an order counts toward, when a
+Food Rescue window closes, what "today" means on a dashboard.
+
+Running in UTC put all of those five and a half hours out. A merchant open
+09:00–22:00 was told they were outside their hours until half past two in the
+afternoon, because 09:00 IST is 03:30 UTC — so a lunchtime kitchen was
+invisible to customers for the whole of lunch.
+
+India has no daylight saving, so there is no ambiguity to reason about.
+Storing UTC and converting on display is right for a multi-region product and
+is needless indirection for one country.
+
+### Changing it on a running server
+
+MySQL `DATETIME` columns carry no timezone: Laravel writes whatever the app
+clock says. Switching the app timezone therefore reinterprets **existing** rows
+— a row written at 07:52 UTC now reads as 07:52 IST, five and a half hours
+later than it happened.
+
+At launch scale that is a handful of test orders and does not matter. Do it
+before real trading, not after.
+
+```bash
+echo 'APP_TIMEZONE=Asia/Kolkata' >> .env
+php artisan config:clear && php artisan config:cache
+sudo systemctl reload php8.5-fpm
+```
+
+Confirm:
+
+```bash
+php artisan tinker --execute="echo config('app.timezone'), ' ', now()->format('D H:i'), PHP_EOL;"
+```
+
+It should agree with a clock on the wall in Chennai.

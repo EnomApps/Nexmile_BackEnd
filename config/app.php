@@ -65,7 +65,23 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    /*
+     * Asia/Kolkata, not UTC.
+     *
+     * Nexmile operates in one country and one timezone, and almost everything
+     * the platform decides is a local-clock question: whether a kitchen is
+     * inside its opening hours, which day an order counts toward, when a
+     * Food Rescue window closes, what "today" means on a dashboard.
+     *
+     * Running in UTC made all of those wrong by five and a half hours — a
+     * merchant open 09:00–22:00 was told they were closed until half past two
+     * in the afternoon.
+     *
+     * India has no daylight saving, so there is no ambiguity to reason about.
+     * Storing UTC and converting for display would be right for a
+     * multi-region product and is needless indirection for this one.
+     */
+    'timezone' => env('APP_TIMEZONE', 'Asia/Kolkata'),
 
     /*
     |--------------------------------------------------------------------------
