@@ -113,7 +113,7 @@ class FoodRescueTest extends CheckoutTest
         // something checkout would refuse.
         $this->getJson("/api/v1/restaurants/{$shop->id}/menu")
             ->assertOk()
-            ->assertJsonPath('uncategorised.0.is_rescue_deal', false);
+            ->assertJsonPath('data.menu.0.items.0.is_rescue_deal', false);
     }
 
     public function test_an_expired_deal_cannot_be_added_to_a_cart(): void

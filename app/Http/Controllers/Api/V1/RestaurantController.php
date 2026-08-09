@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\KycStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CategoryResource;
 use App\Http\Resources\MenuItemResource;
 use App\Http\Resources\RestaurantResource;
 use App\Models\Address;
@@ -124,7 +125,7 @@ class RestaurantController extends Controller
      *
      * Categories in the merchant's own order, each with its items.
      */
-    public function menu(int $restaurant): JsonResponse
+    public function menu(Request $request, int $restaurant): JsonResponse
     {
         $merchant = $this->findServiceable($restaurant, [
             'operatingHours',
@@ -141,18 +142,36 @@ class RestaurantController extends Controller
             'categories.menuItems.optionGroups.options',
         ]);
 
+        $loose = $merchant->menuItems()
+            ->whereNull('category_id')
+            ->with('optionGroups.options')
+            ->ordered()
+            ->get();
+
+        $menu = CategoryResource::collection($merchant->categories)->toArray($request);
+
+        /*
+         * Loose items are appended to `menu` as a group with a null id rather
+         * than returned alongside it.
+         *
+         * They used to be a sibling key, and every reader who looped `menu`
+         * silently lost them — a shop that never made categories looked empty
+         * while its dishes sat one key away. Documenting the trap did not stop
+         * it happening; one list that is always complete does.
+         */
+        if ($loose->isNotEmpty()) {
+            $menu[] = [
+                'id' => null,
+                'name' => __('portal.menu.uncategorised'),
+                'description' => null,
+                'sort_order' => 9999,
+                'is_active' => true,
+                'items' => MenuItemResource::collection($loose)->toArray($request),
+            ];
+        }
+
         return response()->json([
-            'data' => new RestaurantResource($merchant),
-            // Items with no category still have to be orderable — including
-            // their customisation, which is loaded here as well as on the
-            // categorised branch above.
-            'uncategorised' => MenuItemResource::collection(
-                $merchant->menuItems()
-                    ->whereNull('category_id')
-                    ->with('optionGroups.options')
-                    ->ordered()
-                    ->get(),
-            ),
+            'data' => [...(new RestaurantResource($merchant))->toArray($request), 'menu' => $menu],
         ]);
     }
 

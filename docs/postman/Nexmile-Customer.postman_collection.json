@@ -741,7 +741,7 @@
                                 "menu"
                             ]
                         },
-                        "description": "`data.menu` is categories with items; items with no category come back separately under **`uncategorised`** — render both, or a shop that never made categories looks empty.\n\nOut-of-stock items are returned, not hidden. Show them struck through."
+                        "description": "**`data.menu` is the whole menu** — loop it and you have every dish.\n\nA restaurant with no categories gets one group named \"Uncategorised\" with a null `id`. There is no second array to remember.\n\nOut-of-stock items are returned, not hidden. Show them struck through."
                     },
                     "response": [],
                     "event": [
@@ -751,8 +751,7 @@
                                 "type": "text/javascript",
                                 "exec": [
                                     "const body = pm.response.json();",
-                                    "const cat = (body.data.menu || []).flatMap(c => c.items || []);",
-                                    "const all = cat.concat(body.uncategorised || []);",
+                                    "const all = (body.data.menu || []).flatMap(c => c.items || []);",
                                     "if (all.length) {",
                                     "    pm.collectionVariables.set(\"menu_item_id\", all[0].id);",
                                     "}"

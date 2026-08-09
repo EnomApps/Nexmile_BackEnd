@@ -100,8 +100,8 @@ class MenuOptionGroupTest extends TestCase
         // Before this existed, option_groups was permanently empty.
         $this->getJson("/api/v1/restaurants/{$merchant->id}/menu")
             ->assertOk()
-            ->assertJsonPath('uncategorised.0.option_groups.0.name', 'Spice level')
-            ->assertJsonCount(3, 'uncategorised.0.option_groups.0.options');
+            ->assertJsonPath('data.menu.0.items.0.option_groups.0.name', 'Spice level')
+            ->assertJsonCount(3, 'data.menu.0.items.0.option_groups.0.options');
     }
 
     public function test_updating_keeps_ids_for_options_that_survive(): void

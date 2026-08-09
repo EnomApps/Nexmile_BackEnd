@@ -165,9 +165,12 @@ GET /restaurants/{id}          — storefront + operating hours
 GET /restaurants/{id}/menu     — storefront + full menu
 ```
 
-`data.menu` is categories in the merchant's own order, each with its `items`.
-Items with no category come back separately under a top-level `uncategorised`
-array — **render both**, or a shop that never made categories looks empty.
+**`data.menu` is the whole menu.** Categories in the merchant's own order, each
+with its `items`. Loop it and you have every dish.
+
+A restaurant with no categories gets one group named "Uncategorised" with a
+**null `id`** — treat it like any other, or just render its items without a
+header. There is no second array to remember.
 
 Each item carries name, description, `image_url`, `price`, `compare_at_price`
 when discounted, `is_veg`, `contains_egg`, `prep_time_minutes`, `gst_rate` and

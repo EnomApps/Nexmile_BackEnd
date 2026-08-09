@@ -113,7 +113,48 @@ class RestaurantMenuTest extends TestCase
 
         $this->getJson("/api/v1/restaurants/{$shop->id}/menu")
             ->assertOk()
-            ->assertJsonPath('uncategorised.0.name', 'Filter Coffee');
+            ->assertJsonPath('data.menu.0.name', 'Uncategorised')
+            ->assertJsonPath('data.menu.0.items.0.name', 'Filter Coffee');
+    }
+
+    public function test_a_shop_with_no_categories_still_shows_its_dishes(): void
+    {
+        Sanctum::actingAs($this->customer());
+        $shop = $this->restaurant();
+
+        $shop->menuItems()->create(['name' => 'Dosa', 'price' => 50]);
+
+        /*
+         * This is the shape that lost a real merchant their whole menu: loose
+         * items used to sit in a sibling key, so an app looping `menu` found
+         * an empty list and showed "no dishes available" for a shop with a
+         * dish on it. Everything orderable now lives under `menu`.
+         */
+        $body = $this->getJson("/api/v1/restaurants/{$shop->id}/menu")->assertOk()->json();
+
+        $names = collect($body['data']['menu'])->flatMap(fn ($c) => array_column($c['items'], 'name'));
+
+        $this->assertSame(['Dosa'], $names->all());
+        $this->assertArrayNotHasKey('uncategorised', $body);
+    }
+
+    public function test_categorised_and_loose_dishes_arrive_in_one_list(): void
+    {
+        Sanctum::actingAs($this->customer());
+        $shop = $this->restaurant();
+
+        $mains = $shop->categories()->create(['name' => 'Mains']);
+        $shop->menuItems()->create(['category_id' => $mains->id, 'name' => 'Biryani', 'price' => 200]);
+        $shop->menuItems()->create(['name' => 'Filter Coffee', 'price' => 20]);
+
+        $body = $this->getJson("/api/v1/restaurants/{$shop->id}/menu")->assertOk()->json();
+
+        // Real categories first, loose items in a group of their own at the end.
+        $this->assertSame(['Mains', 'Uncategorised'], array_column($body['data']['menu'], 'name'));
+        $this->assertNull($body['data']['menu'][1]['id']);
+
+        $names = collect($body['data']['menu'])->flatMap(fn ($c) => array_column($c['items'], 'name'));
+        $this->assertEqualsCanonicalizing(['Biryani', 'Filter Coffee'], $names->all());
     }
 
     public function test_a_shop_with_no_hours_configured_is_treated_as_open(): void
