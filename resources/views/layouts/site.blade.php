@@ -157,8 +157,17 @@
         </div>
     </div>
 
-    <div class="border-t border-white/10 py-5 text-center text-xs text-gray-600">
-        &copy; {{ date('Y') }} Nexmile India Pvt. Ltd. {{ __('site.footer.rights') }}
+    {{-- Publicly linked on every page: a customer is entitled to read these
+         before ordering, and a payment provider will not activate live
+         payments until it can find them. --}}
+    <div class="border-t border-white/10 py-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-600">
+        <span>&copy; {{ date('Y') }} Nexmile India Pvt. Ltd. {{ __('site.footer.rights') }}</span>
+
+        @foreach (['terms', 'privacy', 'refunds'] as $document)
+            <a href="{{ route($document) }}" class="hover:text-brand-green">
+                {{ config("legal.documents.{$document}.title") }}
+            </a>
+        @endforeach
     </div>
 </footer>
 

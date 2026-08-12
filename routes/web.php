@@ -44,6 +44,17 @@ foreach ([
 }
 
 /*
+ * Terms, privacy and refunds. Razorpay will not activate live payments until
+ * all three are publicly reachable, and a customer is entitled to read them
+ * before they order.
+ */
+foreach (['terms', 'privacy', 'refunds'] as $document) {
+    Route::get($document, [PageController::class, 'legal'])
+        ->defaults('document', $document)
+        ->name($document);
+}
+
+/*
 |--------------------------------------------------------------------------
 | Merchant portal — registration and onboarding happen here, on nexmile.in
 |--------------------------------------------------------------------------
