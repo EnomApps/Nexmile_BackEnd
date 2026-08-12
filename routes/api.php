@@ -13,13 +13,29 @@ use App\Http\Controllers\Api\V1\Merchant\OrderController as MerchantOrderControl
 use App\Http\Controllers\Api\V1\Merchant\ProfileController as MerchantProfileController;
 use App\Http\Controllers\Api\V1\Merchant\StorefrontController;
 use App\Http\Controllers\Api\V1\OrderController;
+use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RestaurantController;
 use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
 use App\Http\Controllers\Api\V1\Rider\LocationController as RiderLocationController;
 use App\Http\Controllers\Api\V1\Rider\OrderController as RiderOrderController;
 use App\Http\Controllers\Api\V1\Rider\ProfileController as RiderProfileController;
+use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Provider webhooks
+|--------------------------------------------------------------------------
+| Outside the versioned group and unauthenticated by necessity — Razorpay has
+| no token to present. The signature is the only thing between this URL and a
+| stranger pushing unpaid orders into kitchens, so it is checked before
+| anything else is read.
+|
+| Also outside `throttle`: the provider retries on failure, and rate-limiting
+| a retry storm turns one lost payment into many.
+*/
+Route::post('webhooks/razorpay', [WebhookController::class, 'razorpay'])->name('webhooks.razorpay');
 
 // Names are prefixed with `api.` so they never collide with the web routes.
 Route::prefix('v1')->name('api.v1.')->group(function () {
@@ -107,6 +123,15 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('{order}', [OrderController::class, 'show'])->name('show');
             Route::get('{order}/track', [OrderController::class, 'track'])->name('track');
             Route::get('{order}/invoice', [OrderController::class, 'invoice'])->name('invoice');
+
+            /*
+             * Payment (EP6). `start` returns what the Razorpay SDK needs;
+             * `confirm` reports back what it produced. Neither is the
+             * authority — the webhook is — but confirming lets the customer's
+             * screen react without waiting for it.
+             */
+            Route::post('{order}/payment', [PaymentController::class, 'start'])->name('payment.start');
+            Route::post('{order}/payment/confirm', [PaymentController::class, 'confirm'])->name('payment.confirm');
             Route::post('{order}/cancel', [OrderController::class, 'cancel'])->name('cancel');
         });
     });

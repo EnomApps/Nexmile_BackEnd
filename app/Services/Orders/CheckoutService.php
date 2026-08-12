@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Discovery\NearbyMerchantService;
 use App\Services\LiveState\OrderStateService;
 use App\Services\Menu\SurplusService;
+use App\Services\Payments\PaymentService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -69,12 +70,15 @@ class CheckoutService
                 'zone_id' => $cart->merchant->zone_id,
 
                 /*
-                 * COD orders are placed immediately; there is nothing to wait
-                 * for. A gateway order would sit at pending_payment until the
-                 * webhook confirms, which is why the merchant's queue filters
-                 * that status out.
+                 * COD is placed immediately — there is nothing to wait for.
+                 * An online order sits at pending_payment until the provider
+                 * confirms, which is why the merchant queue filters that
+                 * status out: a kitchen must never start on money that has
+                 * not moved.
                  */
-                'status' => OrderStatus::Placed,
+                'status' => $method === PaymentMethod::Cod
+                    ? OrderStatus::Placed
+                    : OrderStatus::PendingPayment,
                 'fulfilment_type' => $fulfilment,
 
                 ...$this->addressSnapshot($address, $fulfilment),
@@ -93,7 +97,9 @@ class CheckoutService
                 'pickup_code' => str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT),
                 'customer_note' => $note,
                 'estimated_prep_minutes' => $cart->merchant->avg_prep_time_minutes,
-                'placed_at' => now(),
+                // Stamped when the order actually reaches the kitchen, which
+                // for an online order is when the money lands, not now.
+                'placed_at' => $method === PaymentMethod::Cod ? now() : null,
             ]);
 
             /*
@@ -120,7 +126,7 @@ class CheckoutService
 
             $order->statusHistory()->create([
                 'from_status' => null,
-                'to_status' => OrderStatus::Placed,
+                'to_status' => $order->status,
                 'changed_by_user_id' => $user->id,
                 'created_at' => now(),
             ]);
@@ -132,7 +138,7 @@ class CheckoutService
             return $order;
         });
 
-        rescue(fn () => $this->liveState->setStatus($order->id, OrderStatus::Placed), report: true);
+        rescue(fn () => $this->liveState->setStatus($order->id, $order->status), report: true);
 
         return $order->load('items.options');
     }
@@ -293,8 +299,10 @@ class CheckoutService
      */
     protected function guardPaymentMethod(PaymentMethod $method): void
     {
-        if (! in_array($method->value, config('checkout.payment_methods'), true)) {
-            $this->fail('payment_method', 'That payment method is not available yet.');
+        if (! in_array($method->value, PaymentService::availableMethods(), true)) {
+            $this->fail('payment_method', $method === PaymentMethod::Cod
+                ? 'Cash on delivery is not available for this order.'
+                : 'Online payment is not available yet. Choose cash on delivery.');
         }
     }
 

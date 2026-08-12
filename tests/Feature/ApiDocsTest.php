@@ -116,11 +116,23 @@ class ApiDocsTest extends TestCase
             $this->paths('merchant'),
         ));
 
-        // Admin endpoints are deliberately in neither split document.
         $missing = array_diff($all, $split);
 
+        /*
+         * Two things belong in no app document, and only these two.
+         *
+         * Admin is an internal tool. Webhooks are Razorpay talking to us
+         * server to server — no app ever calls one, and putting it in a
+         * customer document would suggest otherwise.
+         *
+         * Anything else appearing here is an endpoint that landed in no
+         * document at all, which is what this assertion exists to catch.
+         */
         foreach ($missing as $path) {
-            $this->assertStringContainsString('/admin/', $path, "{$path} is in no app document");
+            $this->assertTrue(
+                str_contains($path, '/admin/') || str_contains($path, '/webhooks/'),
+                "{$path} is in no app document",
+            );
         }
     }
 

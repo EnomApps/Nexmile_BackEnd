@@ -199,6 +199,10 @@ class CheckoutTest extends CartTest
 
     public function test_an_unavailable_payment_method_is_refused(): void
     {
+        // Stated rather than assumed: a subclass that switches a gateway on
+        // would otherwise silently turn this into a test of nothing.
+        config(['payments.gateway' => null]);
+
         Sanctum::actingAs($user = $this->customer());
         $shop = $this->restaurant();
         $address = $this->address($user);

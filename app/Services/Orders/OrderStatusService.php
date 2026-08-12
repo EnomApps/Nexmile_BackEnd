@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\LiveState\OrderStateService;
+use App\Services\Payments\PaymentService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -73,7 +74,10 @@ class OrderStatusService
         'release' => [OrderStatus::RiderAssigned->value],
     ];
 
-    public function __construct(protected OrderStateService $liveState) {}
+    public function __construct(
+        protected OrderStateService $liveState,
+        protected PaymentService $payments,
+    ) {}
 
     /**
      * @throws ValidationException
@@ -318,6 +322,18 @@ class OrderStatusService
          * the order its state — the hash rebuilds from the orders table.
          */
         rescue(fn () => $this->liveState->setStatus($order->id, $to), report: true);
+
+        /*
+         * An order that dies after the customer paid has to give the money
+         * back, whoever ended it. COD orders fall straight through — nothing
+         * was taken.
+         *
+         * Also outside the transaction: a gateway being slow must not roll
+         * back a cancellation the merchant has already been shown.
+         */
+        if (in_array($to, [OrderStatus::Cancelled, OrderStatus::Rejected], true)) {
+            $this->payments->refund($order, $note ?? 'Order '.$to->value, $actor->id);
+        }
 
         return $order->refresh();
     }

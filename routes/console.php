@@ -6,3 +6,16 @@ use Illuminate\Support\Facades\Artisan;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+/*
+ * Close out orders nobody paid for, releasing any Food Rescue portions they
+ * were holding. Every five minutes, so a customer who abandons a payment does
+ * not keep the last portion out of circulation for long.
+ *
+ * Needs `* * * * * cd /var/www/nexmile && php artisan schedule:run >> /dev/null 2>&1`
+ * in the server's crontab — see docs/PAYMENTS.md.
+ */
+Schedule::command('nexmile:expire-unpaid')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->runInBackground();

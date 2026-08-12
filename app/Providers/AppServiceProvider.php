@@ -2,7 +2,10 @@
 
 namespace App\Providers;
 
+use App\Contracts\PaymentGateway;
 use App\Contracts\SmsSender;
+use App\Services\Payments\FakeGateway;
+use App\Services\Payments\RazorpayGateway;
 use App\Services\Sms\LogSmsSender;
 use App\Services\Sms\NullSmsSender;
 use Dedoc\Scramble\Scramble;
@@ -23,6 +26,19 @@ class AppServiceProvider extends ServiceProvider
             return match (config('sms.driver')) {
                 'null' => new NullSmsSender,
                 default => new LogSmsSender,
+            };
+        });
+
+        /*
+         * Same shape for payments. With no PAYMENT_GATEWAY set the fake is
+         * bound — nothing calls it, because checkout only offers cash when
+         * online payment is off, and it keeps local development and tests off
+         * the real Razorpay API.
+         */
+        $this->app->bind(PaymentGateway::class, function () {
+            return match (config('payments.gateway')) {
+                'razorpay' => new RazorpayGateway,
+                default => new FakeGateway,
             };
         });
     }
