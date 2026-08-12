@@ -36,9 +36,13 @@ return [
      */
     'address' => env('LEGAL_ADDRESS', ''),
 
+    /*
+     * No address here on purpose: the page reads site.email.support, so the
+     * published grievance contact cannot drift from the mailbox that actually
+     * exists. A copy here once said support@nexmile.in, which does not.
+     */
     'grievance' => [
         'name' => env('LEGAL_GRIEVANCE_OFFICER', ''),
-        'email' => 'support@nexmile.in',
     ],
 
     'documents' => [

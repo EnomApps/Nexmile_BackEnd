@@ -228,16 +228,14 @@ return [
 
     'contact' => [
         'title' => 'Contact Us',
-        'meta' => 'Get in touch with Nexmile India Pvt. Ltd. — general, business and investor enquiries.',
+        'meta' => 'Get in touch with Nexmile India Pvt. Ltd. — customer support, general and investor enquiries.',
         'label' => 'Contact Us',
         'heading' => 'Talk to Nexmile',
         'intro' => "Whether you run a local business, want to ride with us, or are exploring an investment — we'd like to hear from you.",
         'support' => 'Customer support',
         'support_body' => 'Problems with an order, a refund, or your account.',
         'general' => 'General enquiries',
-        'general_body' => 'Anything about Nexmile that is not covered above.',
-        'business' => 'Business enquiries',
-        'business_body' => 'Merchant onboarding, partnerships and collaborations.',
+        'general_body' => 'Merchant onboarding, partnerships, and anything else about Nexmile.',
         'investor' => 'Investor relations',
         'investor_body' => 'Investment, strategy and shareholder matters.',
         'office' => 'Corporate office',

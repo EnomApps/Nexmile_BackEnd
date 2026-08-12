@@ -25,12 +25,16 @@ return [
     /*
      * One place, because these appear on several pages and in the footer.
      * Changing a mailbox should not mean hunting through Blade files.
+     *
+     * These are the mailboxes that exist on the mail server, verbatim. The
+     * repeated words in info.info@ and investor.investor@ read like mistakes
+     * and are not: plain info@ and investors@ were never created, so mail to
+     * them bounces. Check the mail admin before tidying any of these.
      */
     'email' => [
-        'info' => 'info@nexmile.in',
-        'business' => 'business@nexmile.in',
-        'investors' => 'investors@nexmile.in',
-        'support' => 'support@nexmile.in',
+        'info' => 'info.info@nexmile.in',
+        'investors' => 'investor.investor@nexmile.in',
+        'support' => 'support.nexmile@nexmile.in',
         'ceo' => 'ceo@nexmile.in',
         'cfo' => 'cfo@nexmile.in',
     ],

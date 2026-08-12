@@ -53,7 +53,7 @@ class LegalPagesTest extends TestCase
         // platform itself.
         $this->get('/privacy')
             ->assertOk()
-            ->assertSee(config('legal.grievance.email'))
+            ->assertSee(config('site.email.support'))
             ->assertSee('Grievance Officer');
     }
 
@@ -70,7 +70,7 @@ class LegalPagesTest extends TestCase
         $html = $this->get('/privacy')->assertOk()->getContent();
 
         $this->assertStringContainsString('Grievance Officer', $html);
-        $this->assertStringContainsString(config('legal.grievance.email'), $html);
+        $this->assertStringContainsString(config('site.email.support'), $html);
 
         foreach ([__('site.legal.officer'), __('site.legal.address')] as $label) {
             $this->assertStringNotContainsString($label.'</dt>', $html, "empty row rendered for {$label}");

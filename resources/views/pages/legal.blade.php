@@ -66,7 +66,7 @@
         <dl class="mt-4 space-y-2 text-sm">
             @foreach (array_filter([
                 __('site.legal.officer') => config('legal.grievance.name'),
-                __('site.contact.email') => config('legal.grievance.email'),
+                __('site.contact.email') => config('site.email.support'),
                 __('site.legal.address') => config('legal.address'),
             ], fn ($value) => filled($value)) as $label => $value)
                 <div class="flex flex-wrap justify-between gap-4 border-b border-white/5 pb-2">
