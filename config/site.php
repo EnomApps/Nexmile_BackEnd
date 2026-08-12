@@ -22,10 +22,17 @@ return [
 
     'founder' => 'Magendran Marthandan',
 
+    /*
+     * One place, because these appear on several pages and in the footer.
+     * Changing a mailbox should not mean hunting through Blade files.
+     */
     'email' => [
         'info' => 'info@nexmile.in',
         'business' => 'business@nexmile.in',
         'investors' => 'investors@nexmile.in',
+        'support' => 'support@nexmile.in',
+        'ceo' => 'ceo@nexmile.in',
+        'cfo' => 'cfo@nexmile.in',
     ],
 
     'website' => 'www.nexmile.in',

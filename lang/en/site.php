@@ -232,8 +232,10 @@ return [
         'label' => 'Contact Us',
         'heading' => 'Talk to Nexmile',
         'intro' => "Whether you run a local business, want to ride with us, or are exploring an investment — we'd like to hear from you.",
+        'support' => 'Customer support',
+        'support_body' => 'Problems with an order, a refund, or your account.',
         'general' => 'General enquiries',
-        'general_body' => 'Questions about Nexmile, orders or delivery partners.',
+        'general_body' => 'Anything about Nexmile that is not covered above.',
         'business' => 'Business enquiries',
         'business_body' => 'Merchant onboarding, partnerships and collaborations.',
         'investor' => 'Investor relations',
@@ -243,6 +245,9 @@ return [
         'website' => 'Website',
         'email' => 'Email',
         'founder' => 'Founder',
+        'leadership' => 'Leadership',
+        'ceo' => 'Chief Executive Officer',
+        'cfo' => 'Chief Financial Officer',
     ],
 
     'footer' => [
@@ -265,4 +270,14 @@ return [
         'Madurai',
     ],
 
+
+    'legal' => [
+        'label' => 'Legal',
+        'updated' => 'Last updated',
+        'grievance' => 'Grievance Officer',
+        'grievance_body' => 'If something has gone wrong and ordinary support has not resolved it, write to our Grievance Officer. This is required of us under the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021.',
+        'officer' => 'Officer',
+        'address' => 'Registered address',
+        'response_time' => 'We acknowledge complaints within 48 hours and aim to resolve them within 30 days.',
+    ],
 ];

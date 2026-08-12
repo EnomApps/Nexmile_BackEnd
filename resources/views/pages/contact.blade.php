@@ -10,8 +10,10 @@
     <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-white">{{ __('site.contact.heading') }}</h1>
     <p class="mt-4 text-lg text-gray-400 max-w-2xl leading-relaxed">{{ __('site.contact.intro') }}</p>
 
-    <div class="mt-12 grid sm:grid-cols-3 gap-5">
+    <div class="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
         @foreach ([
+            // Customer help first: it is what most people arriving here want.
+            [__('site.contact.support'), config('site.email.support'), __('site.contact.support_body')],
             [__('site.contact.general'), config('site.email.info'), __('site.contact.general_body')],
             [__('site.contact.business'), config('site.email.business'), __('site.contact.business_body')],
             [__('site.contact.investor'), config('site.email.investors'), __('site.contact.investor_body')],
@@ -54,6 +56,27 @@
                 <dd class="text-right text-gray-200">{{ config('site.founder') }}</dd>
             </div>
         </dl>
+
+        {{-- Leadership, for the enquiries that genuinely need a named person:
+             press, partnerships, anything escalated past support. --}}
+        <div class="mt-8 pt-6 border-t border-white/10">
+            <h3 class="text-sm font-semibold uppercase tracking-widest text-gray-500">
+                {{ __('site.contact.leadership') }}
+            </h3>
+            <div class="mt-4 flex flex-wrap gap-x-10 gap-y-3 text-sm">
+                @foreach ([
+                    __('site.contact.ceo') => config('site.email.ceo'),
+                    __('site.contact.cfo') => config('site.email.cfo'),
+                ] as $role => $address)
+                    <div>
+                        <div class="text-gray-500">{{ $role }}</div>
+                        <a href="mailto:{{ $address }}" class="text-brand-green hover:underline break-all">
+                            {{ $address }}
+                        </a>
+                    </div>
+                @endforeach
+            </div>
+        </div>
     </div>
 </section>
 
