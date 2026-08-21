@@ -1,16 +1,16 @@
 @extends('layouts.site')
 
 @section('title', __('site.about.title'))
-@section('description', __('site.about.meta'))
+@section('description', __('site.about.meta', ['company' => config('site.company')]))
 
 @section('content')
 
 <section class="max-w-4xl mx-auto px-4 sm:px-6 py-16">
     <span class="text-xs font-bold tracking-widest uppercase text-brand-green">{{ __('site.about.title') }}</span>
-    <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-white">{{ __('site.about.heading') }}</h1>
+    <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-white">{{ __('site.about.heading', ['company' => config('site.company')]) }}</h1>
 
     <div class="mt-8 space-y-6 text-gray-400 leading-relaxed text-lg">
-        <p>{{ __('site.about.p1') }}</p>
+        <p>{{ __('site.about.p1', ['company' => config('site.company')]) }}</p>
         <p>{{ __('site.about.p2') }}</p>
         <p>{{ __('site.about.p3') }}</p>
     </div>

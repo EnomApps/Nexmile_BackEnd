@@ -76,9 +76,9 @@ return [
 
     'about' => [
         'title' => 'About Us',
-        'meta' => 'Nexmile India Pvt. Ltd. is an innovative technology company transforming neighbourhood commerce through ultra-hyperlocal delivery.',
-        'heading' => 'About Nexmile India Pvt. Ltd.',
-        'p1' => 'Nexmile India Pvt. Ltd. is an innovative technology company transforming neighbourhood commerce through ultra-hyperlocal delivery. Our platform connects customers with nearby restaurants, grocery stores, pharmacies, and local businesses using an intelligent 1 km delivery ecosystem designed for unmatched speed, affordability, and reliability.',
+        'meta' => ':company is an innovative technology company transforming neighbourhood commerce through ultra-hyperlocal delivery.',
+        'heading' => 'About :company',
+        'p1' => ':company is an innovative technology company transforming neighbourhood commerce through ultra-hyperlocal delivery. Our platform connects customers with nearby restaurants, grocery stores, pharmacies, and local businesses using an intelligent 1 km delivery ecosystem designed for unmatched speed, affordability, and reliability.',
         'p2' => 'We believe every local business deserves the opportunity to thrive in the digital economy. By combining advanced technology with community-focused logistics, Nexmile enables merchants to increase sales, reduce food wastage, and reach more customers while giving consumers a faster and more convenient delivery experience.',
         'p3' => 'At Nexmile, our vision extends beyond deliveries. We are building a sustainable ecosystem where customers, merchants, and delivery partners grow together.',
         'quote' => 'Every order represents trust, every delivery creates a smile, and every mile brings communities closer.',
@@ -204,10 +204,10 @@ return [
 
     'investors' => [
         'title' => 'Investor Relations',
-        'meta' => "Nexmile India Pvt. Ltd. is building a scalable technology platform for India's rapidly growing hyperlocal commerce sector.",
+        'meta' => ":company is building a scalable technology platform for India's rapidly growing hyperlocal commerce sector.",
         'label' => 'Investors',
         'heading' => 'Investor Relations',
-        'p1' => "Nexmile India Pvt. Ltd. is building a scalable technology platform focused on India's rapidly growing hyperlocal commerce sector. Our innovative 1 km delivery model, sustainability initiatives, and merchant-first approach position us to capture opportunities in Tier 2 and Tier 3 cities before expanding nationwide.",
+        'p1' => ":company is building a scalable technology platform focused on India's rapidly growing hyperlocal commerce sector. Our innovative 1 km delivery model, sustainability initiatives, and merchant-first approach position us to capture opportunities in Tier 2 and Tier 3 cities before expanding nationwide.",
         'p2' => 'Our long-term strategy is centred on sustainable growth, operational excellence, technology innovation, and creating value for customers, merchants, delivery partners, and shareholders.',
         'p3' => 'We welcome strategic investors, venture capital firms, private equity partners, and institutional investors who share our vision of transforming neighbourhood commerce across India.',
         'enquiries_title' => 'Investor enquiries',
@@ -228,7 +228,7 @@ return [
 
     'contact' => [
         'title' => 'Contact Us',
-        'meta' => 'Get in touch with Nexmile India Pvt. Ltd. — customer support, general and investor enquiries.',
+        'meta' => 'Get in touch with :company — customer support, general and investor enquiries.',
         'label' => 'Contact Us',
         'heading' => 'Talk to Nexmile',
         'intro' => "Whether you run a local business, want to ride with us, or are exploring an investment — we'd like to hear from you.",
@@ -267,7 +267,6 @@ return [
     'cities' => [
         'Madurai',
     ],
-
 
     'legal' => [
         'label' => 'Legal',

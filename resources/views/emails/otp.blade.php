@@ -43,7 +43,7 @@
 
                     <tr>
                         <td style="background:#fafafa;padding:18px;text-align:center;font-size:12px;color:#a1a1aa;">
-                            &copy; {{ date('Y') }} Nexmile India Pvt. Ltd. &middot; Tamil Nadu, India
+                            &copy; {{ date('Y') }} {{ config('site.company') }} &middot; Tamil Nadu, India
                         </td>
                     </tr>
 

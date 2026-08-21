@@ -20,7 +20,7 @@
     <p class="mt-4 text-sm text-gray-500">
         {{ __('site.legal.updated') }} {{ $doc['updated'] }}
         <span class="mx-2 text-gray-700">·</span>
-        {{ config('legal.entity') }}
+        {{ config('site.company_legal') }}
     </p>
 
     @if (! empty($doc['intro']))

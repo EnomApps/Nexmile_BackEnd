@@ -6,7 +6,7 @@
     <meta name="description" content="@yield('description', __('site.home.meta'))">
     <meta name="theme-color" content="#000000">
 
-    <title>@yield('title', 'Nexmile') — Nexmile India Pvt. Ltd.</title>
+    <title>@yield('title', 'Nexmile') — {{ config('site.company') }}</title>
 
     <link rel="icon" href="{{ asset('images/nexmile-mark.png') }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -121,7 +121,7 @@
                 <span class="text-gray-400">{{ __('site.tagline.trusted') }}</span>
             </p>
             <p class="mt-4 text-gray-500 leading-relaxed">
-                Nexmile India Pvt. Ltd.<br>
+                {{ config('site.company') }}<br>
                 {{ __('site.footer.address') }}
             </p>
         </div>
@@ -161,7 +161,7 @@
          before ordering, and a payment provider will not activate live
          payments until it can find them. --}}
     <div class="border-t border-white/10 py-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-600">
-        <span>&copy; {{ date('Y') }} Nexmile India Pvt. Ltd. {{ __('site.footer.rights') }}</span>
+        <span>&copy; {{ date('Y') }} {{ config('site.company') }}. {{ __('site.footer.rights') }}</span>
 
         @foreach (['terms', 'privacy', 'refunds'] as $document)
             <a href="{{ route($document) }}" class="hover:text-brand-green">

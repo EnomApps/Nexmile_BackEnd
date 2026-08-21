@@ -21,7 +21,12 @@
 
 return [
 
-    'entity' => 'Nexmile India Pvt. Ltd.',
+    /*
+     * No name here on purpose: the page reads site.company_legal. A policy
+     * names the entity as a legal party, so a second copy free to drift from
+     * the registered name is exactly the copy that gets missed at a rename —
+     * as "Nexmile India Pvt. Ltd." was, in four files at once.
+     */
 
     /*
      * Left blank on purpose until the real values exist. Blank rows are

@@ -1,7 +1,7 @@
 @extends('layouts.site')
 
 @section('title', __('site.investors.title'))
-@section('description', __('site.investors.meta'))
+@section('description', __('site.investors.meta', ['company' => config('site.company')]))
 
 @section('content')
 
@@ -10,7 +10,7 @@
     <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-white">{{ __('site.investors.heading') }}</h1>
 
     <div class="mt-8 space-y-6 text-gray-400 leading-relaxed text-lg">
-        <p>{{ __('site.investors.p1') }}</p>
+        <p>{{ __('site.investors.p1', ['company' => config('site.company')]) }}</p>
         <p>{{ __('site.investors.p2') }}</p>
         <p>{{ __('site.investors.p3') }}</p>
     </div>

@@ -1,7 +1,7 @@
 @extends('layouts.site')
 
 @section('title', __('site.contact.title'))
-@section('description', __('site.contact.meta'))
+@section('description', __('site.contact.meta', ['company' => config('site.company')]))
 
 @section('content')
 
@@ -30,7 +30,7 @@
     </div>
 
     <div class="mt-12 rounded-2xl border border-white/10 bg-white/[0.02] p-8">
-        <h2 class="text-xl font-bold text-white">Nexmile India Pvt. Ltd.</h2>
+        <h2 class="text-xl font-bold text-white">{{ config('site.company') }}</h2>
         <dl class="mt-5 grid sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
             <div class="flex justify-between gap-4 border-b border-white/10 pb-3">
                 <dt class="text-gray-500">{{ __('site.contact.office') }}</dt>

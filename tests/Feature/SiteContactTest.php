@@ -24,6 +24,28 @@ class SiteContactTest extends TestCase
         'cfo@nexmile.in',
     ];
 
+    public function test_the_registered_company_name_is_used_everywhere(): void
+    {
+        /*
+         * "Nexmile India Pvt. Ltd." was never approved by the MCA and was
+         * hardcoded in twenty places — the footer, the page title, the contact
+         * card, three language files, the policies and the OTP email. A rename
+         * that reaches nineteen of them leaves the site claiming to be a
+         * company that does not exist.
+         */
+        foreach (['/', '/about', '/contact', '/investors', '/terms', '/privacy', '/refunds'] as $page) {
+            $html = $this->get($page)->assertOk()->getContent();
+
+            $this->assertStringNotContainsString('Nexmile India', $html, "{$page} still shows the unapproved name");
+        }
+
+        $this->get('/contact')->assertOk()->assertSee(config('site.company'));
+
+        // The policies name the entity as a legal party, so they carry the
+        // full registered form rather than the everyday short one.
+        $this->get('/terms')->assertOk()->assertSee(config('site.company_legal'));
+    }
+
     public function test_only_mailboxes_that_exist_are_published(): void
     {
         foreach (config('site.email') as $key => $address) {
