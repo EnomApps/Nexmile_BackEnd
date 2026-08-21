@@ -143,6 +143,9 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
             Route::get('/', [MerchantOrderController::class, 'index'])->name('index');
             // Before {order} so the literal path is not read as an id.
             Route::get('{order}/invoice', [MerchantOrderController::class, 'invoice'])->name('invoice');
+            // Polled by the detail page: everything after "ready" is done by a
+            // rider, so without it the merchant sees nothing until they reload.
+            Route::get('{order}/status', [MerchantOrderController::class, 'status'])->name('status');
             Route::get('{order}', [MerchantOrderController::class, 'show'])->name('show');
             Route::post('{order}/accept', [MerchantOrderController::class, 'accept'])->name('accept');
             Route::post('{order}/reject', [MerchantOrderController::class, 'reject'])->name('reject');

@@ -348,4 +348,104 @@ class MerchantOrderTest extends TestCase
         $this->assertSame(0, Order::withTrashed()->where('order_number', 'like', 'NXD%')->count());
         $this->assertNotNull(Order::find($real->id));
     }
+
+    public function test_the_actions_panel_is_hidden_when_there_is_nothing_to_press(): void
+    {
+        /*
+         * Once a rider holds the order the kitchen has no move left, and the
+         * panel rendered anyway as an empty bordered box that read as a fault.
+         */
+        $user = $this->merchantUser();
+        $actionable = $this->order($user->merchant, OrderStatus::Preparing);
+        $handedOver = $this->order($user->merchant, OrderStatus::PickedUp);
+
+        $this->actingAs($user)->get("/merchants/orders/{$actionable->id}")
+            ->assertOk()
+            ->assertSee(route('merchants.orders.ready', $actionable->id));
+
+        $html = $this->actingAs($user)->get("/merchants/orders/{$handedOver->id}")
+            ->assertOk()->getContent();
+
+        foreach (['accept', 'preparing', 'ready', 'reject', 'cancel'] as $action) {
+            $this->assertStringNotContainsString(
+                route("merchants.orders.{$action}", $handedOver->id),
+                $html,
+                "{$action} is still offered after the rider collected the order",
+            );
+        }
+    }
+
+    public function test_a_rider_without_a_phone_number_says_so(): void
+    {
+        /*
+         * users.phone is nullable, so this happens. A dash in the phone row is
+         * useless once the food has left the kitchen — the merchant needs to
+         * know they cannot reach the rider, not wonder if it failed to load.
+         */
+        $user = $this->merchantUser();
+        $order = $this->order($user->merchant, OrderStatus::PickedUp);
+
+        $riderUser = $this->user(UserRole::Rider);
+        $riderUser->forceFill(['phone' => null])->save();
+
+        $rider = $riderUser->rider()->create([
+            'full_name' => 'Selvam K',
+            'vehicle_type' => 'motorcycle',
+            'vehicle_number' => 'TN59AB1234',
+            'kyc_status' => KycStatus::Verified,
+        ]);
+
+        $order->forceFill(['rider_id' => $rider->id])->save();
+
+        $this->actingAs($user)->get("/merchants/orders/{$order->id}")
+            ->assertOk()
+            ->assertSee(__('portal.orders.rider_no_phone'));
+    }
+
+    /*
+     * The detail page polls this. Everything after "ready for pickup" is done
+     * by a rider, so without it a merchant sees nothing until they navigate
+     * away and back — which is exactly what they were doing.
+     */
+    public function test_the_status_endpoint_reports_the_current_status(): void
+    {
+        $user = $this->merchantUser();
+        $order = $this->order($user->merchant, OrderStatus::ReadyForPickup);
+
+        $this->actingAs($user)
+            ->getJson("/merchants/orders/{$order->id}/status")
+            ->assertOk()
+            ->assertJson(['status' => OrderStatus::ReadyForPickup->value, 'rider_id' => null]);
+    }
+
+    public function test_the_status_endpoint_is_scoped_to_the_owning_merchant(): void
+    {
+        // Otherwise it is an order-status oracle for anyone with an id.
+        $order = $this->order($this->merchantUser()->merchant);
+
+        $this->actingAs($this->merchantUser())
+            ->getJson("/merchants/orders/{$order->id}/status")
+            ->assertNotFound();
+    }
+
+    public function test_the_detail_page_polls_while_an_order_is_live_and_stops_when_it_is_not(): void
+    {
+        $user = $this->merchantUser();
+        $live = $this->order($user->merchant, OrderStatus::ReadyForPickup);
+        $done = $this->order($user->merchant, OrderStatus::Delivered);
+
+        // The URL reaches the page through @json, which escapes the slashes —
+        // so match what is actually rendered, not what route() returns.
+        $url = fn (Order $o) => trim(json_encode(route('merchants.orders.status', $o->id)), '"');
+
+        $this->actingAs($user)->get("/merchants/orders/{$live->id}")
+            ->assertOk()
+            ->assertSee($url($live), false);
+
+        // A delivered order is never going to change again; polling it forever
+        // is a request every ten seconds for nothing.
+        $this->actingAs($user)->get("/merchants/orders/{$done->id}")
+            ->assertOk()
+            ->assertDontSee($url($done), false);
+    }
 }

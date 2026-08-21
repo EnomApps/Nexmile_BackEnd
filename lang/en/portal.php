@@ -275,6 +275,7 @@ return [
         'pickup_code_hint' => 'Read this out to the rider. They confirm it to take the order.',
         'rider' => 'Rider',
         'rider_phone' => 'Rider mobile',
+        'rider_no_phone' => 'No number on file — call Nexmile support.',
         'vehicle' => 'Vehicle',
         'waiting_for_rider' => 'Waiting for a rider to be assigned.',
         'picked_up_at' => 'Picked up at',
@@ -312,7 +313,6 @@ return [
         'delivered' => 'Delivered',
         'cancelled' => 'Cancelled',
     ],
-
 
     'surplus' => [
         'title' => 'Food Rescue',

@@ -77,7 +77,18 @@
     @endunless
 
     {{-- Actions --}}
-    @if (! $order->status->isTerminal())
+    @php
+        /*
+         * Not simply "is it still live": once a rider holds the order there is
+         * nothing left for the kitchen to press, and rendering the panel anyway
+         * left an empty bordered box on the page that read as a fault.
+         */
+        $hasActions = in_array($order->status, [
+            OrderStatus::Placed, OrderStatus::Accepted, OrderStatus::Preparing,
+        ], true) || ($order->status === OrderStatus::ReadyForPickup && $order->rider_id === null);
+    @endphp
+
+    @if ($hasActions)
         <div class="mt-8 {{ $card }} space-y-4">
             <div class="flex flex-wrap gap-3">
                 @if ($order->status === OrderStatus::Placed)
@@ -182,10 +193,11 @@
 
             <div class="mt-5 pt-5 border-t border-white/10">
                 @if ($order->rider)
+                    @php $riderPhone = $order->rider->user?->phone; @endphp
+
                     <dl class="space-y-2">
                         @foreach ([
                             __('portal.orders.rider') => $order->rider->full_name,
-                            __('portal.orders.rider_phone') => $order->rider->user?->phone,
                             __('portal.orders.vehicle') => trim(($order->rider->vehicle_type ?? '').' '.($order->rider->vehicle_number ?? '')),
                         ] as $label => $value)
                             <div class="{{ $row }} text-gray-400">
@@ -193,6 +205,24 @@
                                 <dd class="text-gray-200">{{ $value ?: '—' }}</dd>
                             </div>
                         @endforeach
+
+                        {{-- Its own row rather than one of the plain ones: once
+                             the food has left, this is the only way to reach
+                             the person carrying it, so it is a button you can
+                             press, and a stated problem when it is missing. --}}
+                        <div class="{{ $row }} text-gray-400 items-center">
+                            <dt>{{ __('portal.orders.rider_phone') }}</dt>
+                            <dd class="text-right">
+                                @if ($riderPhone)
+                                    <a href="tel:{{ $riderPhone }}"
+                                       class="inline-block px-3 py-1.5 rounded-lg bg-white/10 text-white font-semibold text-xs hover:bg-white/20 transition">
+                                        {{ __('portal.orders.call_customer') }} {{ $riderPhone }}
+                                    </a>
+                                @else
+                                    <span class="text-amber-300">{{ __('portal.orders.rider_no_phone') }}</span>
+                                @endif
+                            </dd>
+                        </div>
                     </dl>
 
                     @if ($order->picked_up_at)
@@ -282,5 +312,65 @@
     @endif
 
 </section>
+
+{{-- Everything after "ready for pickup" is done by a rider, so a merchant
+     watching this page saw nothing until they pressed Back and returned.
+
+     Polls a few bytes rather than reloading on a timer: the page only reloads
+     when the status has genuinely moved, so a merchant reading the address is
+     not thrown back to the top every thirty seconds. A terminal order stops
+     polling — nothing more is coming.
+
+     The poor relation of a push notification, and replaced by one when that
+     exists. --}}
+@unless ($order->status->isTerminal())
+<script>
+    (function () {
+        const INTERVAL = 10000;
+        const url = @json(route('merchants.orders.status', $order->id));
+        const was = @json($order->status->value);
+        const hadRider = @json($order->rider_id !== null);
+
+        let stopped = false;
+
+        async function check() {
+            // Nothing changes while the tab is in the background, and polling
+            // it wastes a shop's data allowance.
+            if (stopped || document.hidden) return;
+
+            try {
+                const res = await fetch(url, {headers: {'Accept': 'application/json'}});
+
+                // A signed-out session redirects to the login page, which is
+                // not JSON. Reloading lets the merchant sign in again rather
+                // than watching a page that will never update.
+                if (res.status === 401 || res.status === 419) {
+                    stopped = true;
+                    window.location.reload();
+
+                    return;
+                }
+
+                if (!res.ok) return;
+
+                const data = await res.json();
+
+                if (data.status !== was || (data.rider_id !== null) !== hadRider) {
+                    stopped = true;
+                    window.location.reload();
+                }
+            } catch (e) {
+                // A dropped connection in a shop is normal. Try again next tick.
+            }
+        }
+
+        setInterval(check, INTERVAL);
+        document.addEventListener('visibilitychange', function () {
+            // Coming back to the tab is exactly when a merchant wants the truth.
+            if (!document.hidden) check();
+        });
+    })();
+</script>
+@endunless
 
 @endsection

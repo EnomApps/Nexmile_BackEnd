@@ -8,6 +8,7 @@ use App\Models\Merchant;
 use App\Models\Order;
 use App\Services\Orders\InvoiceService;
 use App\Services\Orders\OrderStatusService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -46,8 +47,35 @@ class MerchantOrderController extends Controller
         return view('merchants.orders.show', [
             'merchant' => $merchant,
             'order' => $merchant->orders()
-                ->with(['items.options', 'customer', 'statusHistory', 'rider'])
+                // rider.user, not just rider: the page shows the rider's phone,
+                // and that lives on the user record.
+                ->with(['items.options', 'customer', 'statusHistory', 'rider.user'])
                 ->findOrFail($order),
+        ]);
+    }
+
+    /**
+     * Just the status, for the detail page to poll.
+     *
+     * Everything that moves an order after "ready" is done by someone else —
+     * a rider accepts it, collects it, delivers it — so a merchant watching
+     * the page sees nothing until they navigate away and back. Reloading the
+     * whole page on a timer would do it, but this is a few bytes and lets the
+     * page reload only when something has actually changed.
+     *
+     * The poor relation of a push notification, and replaced by one when that
+     * exists. Until then a merchant should not have to press Back to find out
+     * their food has been collected.
+     */
+    public function status(Request $request, int $order): JsonResponse
+    {
+        $model = $this->merchant($request)->orders()->findOrFail($order);
+
+        return response()->json([
+            'status' => $model->status,
+            // The rider arriving is a change worth reloading for even though
+            // the status itself does not move.
+            'rider_id' => $model->rider_id,
         ]);
     }
 
