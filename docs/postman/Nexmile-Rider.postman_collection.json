@@ -408,7 +408,7 @@
                                 "profile"
                             ]
                         },
-                        "description": "Gate the whole working UI on **`can_accept_orders`**.\n\n`kyc.documents_expired` and the two expiry dates are how you warn a rider a week ahead — otherwise they find out at 8pm when a shift starts."
+                        "description": "Gate the duty toggle on **`can_go_online`** — paperwork only, true as soon as KYC is verified and both expiry dates are current.\n\n**Not `can_accept_orders`.** That one also requires `duty_status == available`, so it is false for every offline rider; gating the Go online button on it is a catch-22 the rider can never escape. Use it for the board and the accept button instead.\n\nWhen `can_go_online` is false, show **`offline_reason`** verbatim — it is the same string the duty-status endpoint refuses with, so the banner and the error cannot disagree.\n\n`kyc.documents_expired` and the two expiry dates are how you warn a rider a week ahead — otherwise they find out at 8pm when a shift starts."
                     },
                     "response": []
                 },

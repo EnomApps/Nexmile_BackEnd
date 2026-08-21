@@ -34,6 +34,18 @@ class RiderResource extends JsonResource
                 'documents_expired' => $this->hasExpiredDocuments(),
             ],
             'duty_status' => $this->duty_status,
+            /*
+             * Two different questions, and the app needs the first one.
+             *
+             * can_go_online is paperwork only — whether the Go online button
+             * should work. can_accept_orders also requires being on duty, so it
+             * is false while offline by definition; an app gating the button on
+             * it can never let the rider online at all.
+             */
+            'can_go_online' => $this->canGoOnline(),
+            // Null when nothing is blocking. Saves the app inventing its own
+            // wording for a refusal it has to guess the cause of.
+            'offline_reason' => $this->offlineReason(),
             'can_accept_orders' => $this->canAcceptOrders(),
             'completed_deliveries' => $this->completed_deliveries,
             'rating' => $this->rating,

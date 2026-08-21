@@ -261,7 +261,7 @@ MD,
 
         ['3. Profile and duty', '', [
             req('My profile', 'GET', 'rider/profile', null,
-                "Gate the whole working UI on **`can_accept_orders`**.\n\n`kyc.documents_expired` and the two expiry dates are how you warn a rider a week ahead — otherwise they find out at 8pm when a shift starts."),
+                "Gate the duty toggle on **`can_go_online`** — paperwork only, true as soon as KYC is verified and both expiry dates are current.\n\n**Not `can_accept_orders`.** That one also requires `duty_status == available`, so it is false for every offline rider; gating the Go online button on it is a catch-22 the rider can never escape. Use it for the board and the accept button instead.\n\nWhen `can_go_online` is false, show **`offline_reason`** verbatim — it is the same string the duty-status endpoint refuses with, so the banner and the error cannot disagree.\n\n`kyc.documents_expired` and the two expiry dates are how you warn a rider a week ahead — otherwise they find out at 8pm when a shift starts."),
             req('Go on duty', 'POST', 'rider/duty-status', ['duty_status' => 'available'],
                 "Accepts `offline`, `available`, `on_break` only. `on_order` is set by dispatch — a rider cannot declare themselves busy to skip the queue.\n\n403 with a specific reason when not eligible: documents unverified, or licence/insurance expired. Show the message.\n\n422 while carrying an order — finish or hand it back first."),
             req('Go offline', 'POST', 'rider/duty-status', ['duty_status' => 'offline'], 'Refused while an order is in hand.'),

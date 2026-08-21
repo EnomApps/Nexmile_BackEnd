@@ -71,8 +71,10 @@ carries `role` and `status`. Each app must read them and route accordingly:
 - The **rider app** must check `role === 'rider'` and refuse anything else with
   "This number is not registered as a delivery partner" — otherwise a customer
   who downloads the rider app gets an empty duty screen and no explanation.
-- The rider app must also gate on `can_accept_orders`, which stays false until
-  KYC is verified.
+- The rider app must also gate the duty toggle on `can_go_online`, which stays
+  false until KYC is verified and both expiry dates are current. Not
+  `can_accept_orders` — that also requires being on duty, so it is false for
+  every offline rider and gating the toggle on it locks them out for good.
 
 A rider's `status` is `pending` until their documents are approved. **That must
 not block them from ordering** — it means "cannot work yet", not "cannot use

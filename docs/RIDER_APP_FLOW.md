@@ -44,7 +44,7 @@ does.
 Read the stored `refresh_token` → `POST /auth/refresh`. Success, then decide
 where to land by calling `GET /rider/profile`:
 
-- `can_accept_orders: true` → screen 7 (duty)
+- `can_go_online: true` → screen 7 (duty)
 - otherwise → resume the wizard at whatever step `GET /rider/kyc` says is next
 
 Never resume from local state. Riders change devices, and an admin can reject a
@@ -192,7 +192,23 @@ eligible:
 warn a week ahead rather than letting someone discover it at 8pm when they try
 to start a shift.
 
-Gate the whole working UI on `can_accept_orders` from `GET /rider/profile`.
+Gate the whole working UI on **`can_go_online`** from `GET /rider/profile`.
+
+**Not `can_accept_orders`.** They read alike and mean different things:
+
+| Field | Question it answers | While offline |
+|---|---|---|
+| `can_go_online` | May this rider go on duty at all? Paperwork only. | `true` if verified |
+| `can_accept_orders` | Is this rider dispatchable *right now*? | always `false` |
+
+`can_accept_orders` includes `duty_status == available`, so gating the Go
+online button on it is a catch-22 — false until the rider is online, and they
+cannot get online while it is false. Use it for the board and the accept
+button, never for the toggle that gets them there.
+
+When `can_go_online` is `false`, show **`offline_reason`** verbatim rather than
+your own copy. It is the same string `POST /rider/duty-status` refuses with, so
+the banner and the error cannot disagree. It is `null` when nothing is blocking.
 
 ---
 
@@ -336,7 +352,7 @@ will not read English comfortably.
 
 1. App shell, token storage with the refresh mutex
 2. Screens 1–6 — sign in and the onboarding wizard
-3. Screen 7 — duty toggle, gated on `can_accept_orders`
+3. Screen 7 — duty toggle, gated on `can_go_online`
 4. Screens 8–11 — the working shift: ping, board, accept, pickup, deliver
 
 Only earnings is left, and it changes nothing you build now.

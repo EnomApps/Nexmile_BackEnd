@@ -74,17 +74,50 @@ class Rider extends Model
     }
 
     /**
-     * A rider may only be dispatched with verified KYC and documents that have
-     * not lapsed — an expired licence or insurance is a legal exposure, not a
-     * paperwork detail.
+     * May this rider go on duty at all?
+     *
+     * Paperwork only, deliberately not duty_status. This is the question the
+     * app asks before showing the Go online button, and folding duty_status in
+     * would make it a catch-22: false until they are online, and they cannot
+     * get online while it is false.
+     */
+    public function canGoOnline(): bool
+    {
+        return $this->isKycVerified() && ! $this->hasExpiredDocuments();
+    }
+
+    /**
+     * Why not — in the same words the API refuses with, so the app can show the
+     * real reason instead of guessing at one. Null when nothing is blocking.
+     */
+    public function offlineReason(): ?string
+    {
+        return match (true) {
+            ! $this->isKycVerified() => 'Your documents are still being verified.',
+            $this->hasExpiredDocuments() => 'Your licence or insurance has expired. Upload current documents to go online.',
+            default => null,
+        };
+    }
+
+    /**
+     * Dispatchable right now: eligible, and actually on duty. This is what
+     * dispatch asks, and it is a different question from canGoOnline().
+     *
+     * An expired licence or insurance is a legal exposure, not a paperwork
+     * detail, so both gates apply.
      */
     public function canAcceptOrders(): bool
     {
-        return $this->isKycVerified()
-            && $this->duty_status === RiderStatus::Available
-            && ! $this->hasExpiredDocuments();
+        return $this->canGoOnline()
+            && $this->duty_status === RiderStatus::Available;
     }
 
+    /**
+     * A missing expiry counts as expired. The safe reading — an unrecorded
+     * licence is not evidence of a current one — but it does mean a rider an
+     * admin has just approved can still be blocked by a blank date, so
+     * `nexmile:why-offline` names that case explicitly.
+     */
     public function hasExpiredDocuments(): bool
     {
         return ($this->driving_licence_expiry?->isPast() ?? true)

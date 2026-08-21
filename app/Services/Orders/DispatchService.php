@@ -209,12 +209,8 @@ class DispatchService
      */
     protected function guardRider(Rider $rider): void
     {
-        if (! $rider->isKycVerified()) {
-            $this->fail('rider', 'Your documents are still being verified.');
-        }
-
-        if ($rider->hasExpiredDocuments()) {
-            $this->fail('rider', 'Your licence or insurance has expired. Upload current documents to go online.');
+        if (($reason = $rider->offlineReason()) !== null) {
+            $this->fail('rider', $reason);
         }
 
         if ($rider->duty_status === RiderStatus::Offline || $rider->duty_status === RiderStatus::OnBreak) {

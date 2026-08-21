@@ -72,18 +72,10 @@ class ProfileController extends Controller
 
         $requested = RiderStatus::from($data['duty_status']);
 
-        if ($requested === RiderStatus::Available) {
-            if (! $rider->isKycVerified()) {
-                return response()->json([
-                    'message' => 'Your documents are still being verified.',
-                ], 403);
-            }
-
-            if ($rider->hasExpiredDocuments()) {
-                return response()->json([
-                    'message' => 'Your licence or insurance has expired. Upload current documents to go online.',
-                ], 403);
-            }
+        // One source of the refusal wording, so what the app is told here
+        // matches the offline_reason it was already showing.
+        if ($requested === RiderStatus::Available && ($reason = $rider->offlineReason()) !== null) {
+            return response()->json(['message' => $reason], 403);
         }
 
         /*
