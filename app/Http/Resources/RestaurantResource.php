@@ -15,6 +15,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class RestaurantResource extends JsonResource
 {
+    /** Where the per-request favourites memo is kept. */
+    private const FAVOURITES_KEY = 'nexmile.favourite_ids';
+
     /**
      * @return array<string, mixed>
      */
@@ -43,6 +46,28 @@ class RestaurantResource extends JsonResource
             'min_order_value' => (float) $this->min_order_value,
             'supports_pickup' => (bool) $this->supports_pickup,
 
+            /*
+             * Card and filter fields (home screen v2).
+             *
+             * rating is null, never 0.0, until enough people have rated —
+             * "0.0" reads as bad where a new kitchen is only new, and the app
+             * hides the badge on null.
+             */
+            'rating' => $this->rating === null ? null : (float) $this->rating,
+            'rating_count' => (int) $this->rating_count,
+            'is_pure_veg' => (bool) $this->is_pure_veg,
+            'cost_for_two' => $this->cost_for_two === null ? null : (int) $this->cost_for_two,
+            'cuisines' => array_values($this->cuisines ?? []),
+
+            // Derived from what the pricing code actually does, not stored:
+            // an offer nobody honours is worse than no offer.
+            'offers' => $this->offers(),
+            'has_free_delivery' => $this->hasFreeDelivery(),
+
+            // Only meaningful for a signed-in customer, which every route
+            // returning this resource requires.
+            'is_favourite' => in_array($this->id, self::favouriteIds($request), true),
+
             // Present only on a nearby search; null when fetched directly.
             'distance_metres' => $this->when(
                 isset($this->distance_metres),
@@ -63,5 +88,39 @@ class RestaurantResource extends JsonResource
 
             'menu' => CategoryResource::collection($this->whenLoaded('categories')),
         ];
+    }
+
+    /**
+     * The caller's favourite restaurant ids, fetched once per request.
+     *
+     * Asking per card would be one query per restaurant on the busiest list in
+     * the product — twenty cards, twenty round trips, for a bookmark icon.
+     *
+     * @return list<int>
+     */
+    private static function favouriteIds(Request $request): array
+    {
+        $user = $request->user();
+
+        if ($user === null) {
+            return [];
+        }
+
+        /*
+         * Memoised on the request, not in a static.
+         *
+         * A static survives the process, not the request. Under a persistent
+         * worker that means a customer bookmarks a restaurant and the icon
+         * stays empty until the worker recycles — and it is exactly what made
+         * this test pass alone and fail in the suite.
+         */
+        if (! $request->attributes->has(self::FAVOURITES_KEY)) {
+            $request->attributes->set(self::FAVOURITES_KEY, $user->favourites()
+                ->pluck('merchants.id')
+                ->map(fn ($id) => (int) $id)
+                ->all());
+        }
+
+        return $request->attributes->get(self::FAVOURITES_KEY);
     }
 }

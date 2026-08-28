@@ -57,6 +57,15 @@ class Merchant extends Model
         'packaging_fee',
         'min_order_value',
         'supports_pickup',
+
+        /*
+         * Card and filter attributes. rating and rating_count are deliberately
+         * absent: they are earned from reviews, and a restaurant that could
+         * set its own score would make the badge worthless.
+         */
+        'is_pure_veg',
+        'cost_for_two',
+        'cuisines',
     ];
 
     protected $hidden = [
@@ -77,6 +86,11 @@ class Merchant extends Model
             'commission_rate' => 'decimal:2',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
+            'rating' => 'float',
+            'rating_count' => 'integer',
+            'is_pure_veg' => 'boolean',
+            'cost_for_two' => 'integer',
+            'cuisines' => 'array',
         ];
     }
 
@@ -98,6 +112,12 @@ class Merchant extends Model
     public function categories(): HasMany
     {
         return $this->hasMany(Category::class);
+    }
+
+    /** Ratings left against this restaurant (EP12). */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
     }
 
     public function menuItems(): HasMany
@@ -229,5 +249,54 @@ class Merchant extends Model
             $document->status === DocumentStatus::Approved => 'awaiting_details',
             default => 'awaiting_review',
         };
+    }
+
+    /**
+     * Whether a delivery from here can ever be free.
+     *
+     * Config-wide today rather than per restaurant, so this is true for
+     * everyone. Kept as a method so that when the threshold becomes a merchant
+     * or zone setting, the card and the filter follow without another change.
+     */
+    public function hasFreeDelivery(): bool
+    {
+        return config('checkout.free_delivery_above') !== null;
+    }
+
+    /**
+     * Promotions to show on the card, newest-first by importance.
+     *
+     * Derived from what the system will actually do at checkout rather than
+     * stored as free text. A merchant who could type their own offer label
+     * could promise a discount the pricing code has never heard of, and the
+     * customer would find out at the payment screen.
+     *
+     * @return list<array{label: string, type: string}>
+     */
+    public function offers(): array
+    {
+        $offers = [];
+
+        // surplusActive + available is exactly what the deals endpoint
+        // offers, so a badge here and an orderable deal there agree.
+        $liveDeals = $this->menuItems()->surplusActive()->available()->count();
+
+        if ($liveDeals > 0) {
+            $offers[] = [
+                'label' => __('portal.offers.food_rescue'),
+                'type' => 'food_rescue',
+            ];
+        }
+
+        $threshold = config('checkout.free_delivery_above');
+
+        if ($threshold !== null) {
+            $offers[] = [
+                'label' => __('portal.offers.free_delivery', ['amount' => (int) $threshold]),
+                'type' => 'free_delivery',
+            ];
+        }
+
+        return $offers;
     }
 }

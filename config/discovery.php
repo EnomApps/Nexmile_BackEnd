@@ -37,4 +37,14 @@ return [
      */
     'show_closed' => true,
 
+    /*
+     * The "near and fast" chip on the home screen. Defined here rather than in
+     * the app, which asked us to own it — two apps inventing their own
+     * distance and time rule would disagree with each other and with us.
+     *
+     * A restaurant qualifies inside half the search radius with a prep time at
+     * or under this, and only while it is open.
+     */
+    'near_and_fast_prep_minutes' => env('NEAR_AND_FAST_PREP_MINUTES', 30),
+
 ];

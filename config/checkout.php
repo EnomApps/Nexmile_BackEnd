@@ -18,6 +18,17 @@ return [
     'free_delivery_above' => env('FREE_DELIVERY_ABOVE', 299),
 
     /*
+     * Whether free delivery differs between restaurants.
+     *
+     * It does not today — the threshold above is platform-wide, so a
+     * "free delivery" filter would match every restaurant and tell a customer
+     * nothing. GET /filters leaves that filter out while this is false rather
+     * than offering a control that cannot narrow anything.
+     *
+     * Flip it when the threshold becomes a merchant or zone setting.
+     */
+    'free_delivery_varies_by_merchant' => false,
+    /*
      * Menu prices are tax-**exclusive**: GST is added at checkout and shown as
      * its own line, which is what `orders.tax_total` and `orders.items_total`
      * being separate columns already assumes. Each item carries its own rate

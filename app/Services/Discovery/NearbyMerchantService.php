@@ -45,14 +45,14 @@ class NearbyMerchantService
     public function search(
         float $latitude,
         float $longitude,
-        ?string $serviceCategory = null,
-        ?string $search = null,
-        ?int $perPage = null,
+        ?RestaurantFilters $filters = null,
     ): LengthAwarePaginator {
-        $radius = $this->radiusFor($latitude, $longitude);
-        $perPage ??= (int) config('discovery.per_page');
+        $filters ??= new RestaurantFilters;
 
-        $candidates = $this->candidates($latitude, $longitude, $radius, $serviceCategory, $search);
+        $radius = $this->radiusFor($latitude, $longitude);
+        $perPage = $filters->perPage ?? (int) config('discovery.per_page');
+
+        $candidates = $this->candidates($latitude, $longitude, $radius, $filters);
 
         $matches = $candidates
             ->each(fn (Merchant $m) => $m->distance_metres = $this->distance(
@@ -64,13 +64,11 @@ class NearbyMerchantService
              * closest restaurant that cannot cook is worth less than one two
              * hundred metres further that can.
              */
-            ->sortBy([
-                fn (Merchant $a, Merchant $b) => ($b->isOpenNow() <=> $a->isOpenNow()),
-                fn (Merchant $a, Merchant $b) => $a->distance_metres <=> $b->distance_metres,
-            ])
             ->values();
 
-        return $this->paginate($matches, $perPage);
+        $matches = $this->applyFilters($matches, $filters, $radius);
+
+        return $this->paginate($this->sort($matches, $filters->sort), $perPage);
     }
 
     /**
@@ -138,8 +136,7 @@ class NearbyMerchantService
         float $latitude,
         float $longitude,
         int $radius,
-        ?string $serviceCategory,
-        ?string $search,
+        RestaurantFilters $filters,
     ): EloquentCollection {
         [$latDelta, $lngDelta] = $this->box($latitude, $radius);
 
@@ -154,8 +151,23 @@ class NearbyMerchantService
             ->where('kyc_status', KycStatus::Verified->value)
             ->whereBetween('latitude', [$latitude - $latDelta, $latitude + $latDelta])
             ->whereBetween('longitude', [$longitude - $lngDelta, $longitude + $lngDelta])
-            ->when($serviceCategory, fn (Builder $q) => $q->where('service_category', $serviceCategory))
-            ->when($search, fn (Builder $q) => $q->where('business_name', 'like', '%'.$search.'%'))
+            ->when($filters->serviceCategory, fn (Builder $q, $c) => $q->where('service_category', $c))
+            /*
+             * The search bar says "Restaurant name or a dish", so a dish name
+             * has to find the kitchen that cooks it. Matched against available
+             * items only — sending someone to a shop for a dish that is off
+             * the menu is worse than no result.
+             */
+            ->when($filters->search, fn (Builder $q, $term) => $q->where(fn (Builder $w) => $w
+                ->where('business_name', 'like', '%'.$term.'%')
+                ->orWhereHas('menuItems', fn (Builder $m) => $m
+                    ->where('is_available', true)
+                    ->where('name', 'like', '%'.$term.'%'))))
+            ->when($filters->vegOnly, fn (Builder $q) => $q->where('is_pure_veg', true))
+            ->when($filters->noPackagingFee, fn (Builder $q) => $q->where('packaging_fee', '<=', 0))
+            ->when($filters->ratingMin, fn (Builder $q, $min) => $q->where('rating', '>=', $min))
+            ->when($filters->costMin, fn (Builder $q, $min) => $q->where('cost_for_two', '>=', $min))
+            ->when($filters->costMax, fn (Builder $q, $max) => $q->where('cost_for_two', '<=', $max))
             /*
              * A ceiling, not a page size: the box is already small, and this
              * only exists so a bad radius cannot pull the whole table into
@@ -201,5 +213,93 @@ class NearbyMerchantService
             $page,
             ['path' => Paginator::resolveCurrentPath()],
         );
+    }
+
+    /**
+     * The filters that cannot run in SQL.
+     *
+     * Opening hours are seven rows per merchant evaluated against the clock,
+     * and offers depend on live surplus windows. Both are already loaded or
+     * cheap over the handful of candidates the box returned; expressing them
+     * as SQL would mean a query the SQLite test suite cannot run, which is how
+     * the haversine ended up in PHP too.
+     *
+     * @param  Collection<int, Merchant>  $matches
+     * @return Collection<int, Merchant>
+     */
+    protected function applyFilters(Collection $matches, RestaurantFilters $filters, int $radius): Collection
+    {
+        if ($filters->openNow) {
+            $matches = $matches->filter(fn (Merchant $m) => $m->isOpenNow());
+        }
+
+        if ($filters->freeDelivery) {
+            $matches = $matches->filter(fn (Merchant $m) => $m->hasFreeDelivery());
+        }
+
+        if ($filters->hasOffers) {
+            $matches = $matches->filter(fn (Merchant $m) => $m->offers() !== []);
+        }
+
+        /*
+         * "Near and fast" is defined here rather than in the app, which asked
+         * us to own it: inside half the search radius, and a kitchen that
+         * turns food around inside the configured target. Two apps inventing
+         * their own rule would disagree with each other and with us.
+         */
+        if ($filters->nearAndFast) {
+            $maxPrep = (int) config('discovery.near_and_fast_prep_minutes', 30);
+
+            $matches = $matches->filter(fn (Merchant $m) => $m->distance_metres <= $radius / 2
+                && (int) $m->avg_prep_time_minutes <= $maxPrep
+                && $m->isOpenNow());
+        }
+
+        if ($filters->cuisines !== []) {
+            $wanted = array_map('strtolower', $filters->cuisines);
+
+            $matches = $matches->filter(function (Merchant $m) use ($wanted) {
+                $has = array_map('strtolower', $m->cuisines ?? []);
+
+                return array_intersect($wanted, $has) !== [];
+            });
+        }
+
+        return $matches->values();
+    }
+
+    /**
+     * @param  Collection<int, Merchant>  $matches
+     * @return Collection<int, Merchant>
+     */
+    protected function sort(Collection $matches, string $sort): Collection
+    {
+        /*
+         * Every sort keeps open restaurants above closed ones. A customer
+         * wants dinner now, so the best-rated kitchen that cannot cook is
+         * still worth less than one that can.
+         */
+        $openFirst = fn (Merchant $a, Merchant $b) => $b->isOpenNow() <=> $a->isOpenNow();
+
+        $then = match ($sort) {
+            // Null ratings last: unrated is not the same as bad, but it cannot
+            // outrank a restaurant that has earned a score either.
+            'rating' => fn (Merchant $a, Merchant $b) => ($b->rating ?? -1) <=> ($a->rating ?? -1),
+            'delivery_time' => fn (Merchant $a, Merchant $b) => (int) $a->avg_prep_time_minutes <=> (int) $b->avg_prep_time_minutes,
+            'cost_low_high' => fn (Merchant $a, Merchant $b) => ($a->cost_for_two ?? PHP_INT_MAX) <=> ($b->cost_for_two ?? PHP_INT_MAX),
+            'cost_high_low' => fn (Merchant $a, Merchant $b) => ($b->cost_for_two ?? -1) <=> ($a->cost_for_two ?? -1),
+            // Relevance is nearest-first, which is the whole premise of a 1 km
+            // service.
+            default => fn (Merchant $a, Merchant $b) => $a->distance_metres <=> $b->distance_metres,
+        };
+
+        return $matches
+            ->sortBy([
+                $openFirst,
+                $then,
+                // A stable tie-break, so page 2 is not a reshuffle of page 1.
+                fn (Merchant $a, Merchant $b) => $a->distance_metres <=> $b->distance_metres,
+            ])
+            ->values();
     }
 }

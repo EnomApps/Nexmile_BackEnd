@@ -7,12 +7,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\CategoryResource;
 use App\Http\Resources\MenuItemResource;
 use App\Http\Resources\RestaurantResource;
-use App\Models\Address;
 use App\Models\MenuItem;
 use App\Models\Merchant;
 use App\Services\Discovery\NearbyMerchantService;
+use App\Services\Discovery\RestaurantFilters;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * Restaurant discovery and menu browsing for customers (EP3, EP4).
@@ -23,6 +24,8 @@ use Illuminate\Http\Request;
  */
 class RestaurantController extends Controller
 {
+    use ResolvesCustomerLocation;
+
     public function __construct(protected NearbyMerchantService $nearby) {}
 
     /**
@@ -40,23 +43,44 @@ class RestaurantController extends Controller
             'service_category' => ['sometimes', 'string', 'max:30'],
             'search' => ['sometimes', 'string', 'max:100'],
             'per_page' => ['sometimes', 'integer', 'between:1,50'],
+
+            /*
+             * Home screen v2 filters. All optional — absent means "no filter",
+             * exactly as before, so an older build of the app is unaffected.
+             */
+            'sort' => ['sometimes', 'string', Rule::in(RestaurantFilters::SORTS)],
+            'cuisine' => ['sometimes', 'array', 'max:20'],
+            'cuisine.*' => ['string', 'max:40'],
+            'rating_min' => ['sometimes', 'numeric', 'between:0,5'],
+            'cost_min' => ['sometimes', 'integer', 'min:0'],
+            'cost_max' => ['sometimes', 'integer', 'min:0'],
+            'cost_for_two' => ['sometimes', 'string', 'max:20'],
+            'veg_only' => ['sometimes', 'boolean'],
+            'free_delivery' => ['sometimes', 'boolean'],
+            'no_packaging_fee' => ['sometimes', 'boolean'],
+            'near_and_fast' => ['sometimes', 'boolean'],
+            'has_offers' => ['sometimes', 'boolean'],
+            'open_now' => ['sometimes', 'boolean'],
         ], [
             'address_id.required_without_all' => 'Send an address_id, or latitude and longitude.',
         ]);
 
         [$latitude, $longitude] = $this->resolvePoint($request, $data);
 
-        $results = $this->nearby->search(
-            $latitude,
-            $longitude,
-            $data['service_category'] ?? null,
-            $data['search'] ?? null,
-            $data['per_page'] ?? null,
-        );
+        $filters = RestaurantFilters::fromArray($data);
+        $results = $this->nearby->search($latitude, $longitude, $filters);
 
         return RestaurantResource::collection($results)
             ->additional(['meta' => [
                 'radius_metres' => $this->nearby->radiusFor($latitude, $longitude),
+                /*
+                 * No 'total' here: the paginator already puts one in meta, and
+                 * Laravel merges this array into that one *recursively* — a
+                 * second total does not overwrite the first, it turns the key
+                 * into [1, 1]. It is what drives "Show results (42)" on the
+                 * filter sheet, and it is already correct.
+                 */
+                'applied_filters' => (object) $filters->applied(),
             ]])
             ->response();
     }
@@ -83,7 +107,7 @@ class RestaurantController extends Controller
 
         // Reuse discovery so the radius, verification and open-first rules
         // cannot drift from the main restaurant list.
-        $nearby = $this->nearby->search($latitude, $longitude, perPage: 50);
+        $nearby = $this->nearby->search($latitude, $longitude, new RestaurantFilters(perPage: 50));
 
         $items = MenuItem::query()
             ->whereIn('merchant_id', collect($nearby->items())->pluck('id'))
@@ -194,24 +218,4 @@ class RestaurantController extends Controller
      * @param  array<string, mixed>  $data
      * @return array{float, float}
      */
-    protected function resolvePoint(Request $request, array $data): array
-    {
-        if (isset($data['latitude'], $data['longitude'])) {
-            return [(float) $data['latitude'], (float) $data['longitude']];
-        }
-
-        // Scoped to the caller: another customer's address id is a 404, not a
-        // window onto where they live.
-        $address = Address::query()
-            ->where('user_id', $request->user()->id)
-            ->findOrFail($data['address_id']);
-
-        abort_if(
-            $address->latitude === null || $address->longitude === null,
-            422,
-            'This address has no location saved. Edit it and drop a pin.',
-        );
-
-        return [(float) $address->latitude, (float) $address->longitude];
-    }
 }
