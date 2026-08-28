@@ -50,7 +50,22 @@ class MenuItemRequest extends FormRequest
 
             'gst_rate' => ['sometimes', Rule::in(config('menu.gst_rates'))],
 
-            'is_veg' => ['sometimes', 'boolean'],
+            /*
+             * A pure vegetarian kitchen cannot list a non-veg dish.
+             *
+             * Nothing stopped this before, so a shop could tick "pure veg" and
+             * still sell mutton biryani. A customer filtering veg-only would
+             * be sent there, open the menu, and stop trusting the filter —
+             * which costs more than the filter was ever worth.
+             */
+            'is_veg' => [
+                'sometimes', 'boolean',
+                function (string $attribute, $value, \Closure $fail) {
+                    if (! $this->toBoolean($value) && $this->user()->merchant?->is_pure_veg) {
+                        $fail(__('portal.menu.veg_conflict_dish'));
+                    }
+                },
+            ],
             'contains_egg' => ['sometimes', 'boolean'],
             'is_available' => ['sometimes', 'boolean'],
 
@@ -97,5 +112,11 @@ class MenuItemRequest extends FormRequest
         if ($this->input('compare_at_price') === '') {
             $this->merge(['compare_at_price' => null]);
         }
+    }
+
+    /** The portal posts "0"/"1" strings; the API sends real booleans. */
+    private function toBoolean(mixed $value): bool
+    {
+        return filter_var($value, FILTER_VALIDATE_BOOL);
     }
 }

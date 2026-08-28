@@ -68,7 +68,30 @@ class MerchantStorefrontController extends Controller
             'cuisines.max' => __('portal.storefront.cuisines_max'),
         ]);
 
-        $this->merchant($request)->update([
+        $merchant = $this->merchant($request);
+
+        /*
+         * The other half of the same rule enforced on a dish: a kitchen cannot
+         * declare itself pure veg while non-veg dishes are on its menu.
+         *
+         * Named rather than counted. "You have 3 non-veg dishes" sends the
+         * merchant hunting; naming them is the difference between a refusal
+         * they can act on and one they argue with.
+         */
+        if (($data['is_pure_veg'] ?? false) && ! $merchant->is_pure_veg) {
+            $nonVeg = $merchant->menuItems()->where('is_veg', false)->pluck('name');
+
+            if ($nonVeg->isNotEmpty()) {
+                return back()->withErrors([
+                    'is_pure_veg' => __('portal.menu.veg_conflict_menu', [
+                        'dishes' => $nonVeg->take(5)->implode(', ')
+                            .($nonVeg->count() > 5 ? __('portal.menu.and_more', ['count' => $nonVeg->count() - 5]) : ''),
+                    ]),
+                ])->withInput();
+            }
+        }
+
+        $merchant->update([
             'is_pure_veg' => (bool) ($data['is_pure_veg'] ?? false),
             'cost_for_two' => $data['cost_for_two'] ?? null,
             'cuisines' => array_values($data['cuisines'] ?? []),

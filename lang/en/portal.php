@@ -212,6 +212,9 @@ return [
     ],
 
     'menu' => [
+        'veg_conflict_dish' => 'Your storefront says this is a pure vegetarian kitchen, so a non-veg dish cannot be added. Change that setting under Store first if it is wrong.',
+        'veg_conflict_menu' => 'Your menu still has non-veg dishes: :dishes. Remove them or mark them veg before setting the kitchen to pure vegetarian.',
+        'and_more' => ' and :count more',
         'category_image' => 'Category photo',
         'category_image_hint' => 'A photo against each section. Customers scan pictures before they read headings, so this is the quickest thing you can do to get a section noticed.',
         'category_image_saved' => 'Category photo saved.',
