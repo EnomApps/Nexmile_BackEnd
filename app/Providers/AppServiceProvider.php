@@ -75,7 +75,9 @@ class AppServiceProvider extends ServiceProvider
                 'description' => "Everything the customer app needs.\n\n".
                     "Sign-up and sign-in are the same two calls — there is no separate registration endpoint, and the account is created on first successful verification.\n\n".
                     '**Money is a JSON number** and loses its zero fraction: ₹430.00 arrives as `430`. Read it as `num`, never `double`.',
-                'prefixes' => [...$shared, 'api/v1/addresses', 'api/v1/restaurants', 'api/v1/carts', 'api/v1/orders'],
+                'prefixes' => [...$shared, 'api/v1/addresses', 'api/v1/restaurants', 'api/v1/carts', 'api/v1/orders',
+                    // Home screen v2: discovery, merchandising and favourites.
+                    'api/v1/home', 'api/v1/filters', 'api/v1/collections', 'api/v1/favourites'],
             ],
             'rider' => [
                 'title' => 'Nexmile — Rider app',

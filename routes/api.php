@@ -4,6 +4,10 @@ use App\Http\Controllers\Api\V1\AddressController;
 use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
 use App\Http\Controllers\Api\V1\CartController;
+use App\Http\Controllers\Api\V1\CollectionController;
+use App\Http\Controllers\Api\V1\FavouriteController;
+use App\Http\Controllers\Api\V1\FilterController;
+use App\Http\Controllers\Api\V1\HomeController;
 use App\Http\Controllers\Api\V1\Merchant\AuthController as MerchantAuthController;
 use App\Http\Controllers\Api\V1\Merchant\CategoryController;
 use App\Http\Controllers\Api\V1\Merchant\KycController as MerchantKycController;
@@ -16,6 +20,7 @@ use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RestaurantController;
+use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
 use App\Http\Controllers\Api\V1\Rider\LocationController as RiderLocationController;
 use App\Http\Controllers\Api\V1\Rider\OrderController as RiderOrderController;
@@ -90,12 +95,26 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         | Not role-gated. A rider ordering dinner and a merchant ordering from
         | the shop opposite are both customers here — see docs/ROLES.md.
         */
+        /*
+         * The home screen as ordered sections, and the filter sheet's own
+         * definitions. Both exist so that merchandising and filtering can
+         * change from the server rather than through a Play Store release.
+         */
+        Route::get('home', [HomeController::class, 'index'])->name('home');
+        Route::get('filters', [FilterController::class, 'index'])->name('filters');
+        Route::get('collections/{slug}', [CollectionController::class, 'show'])->name('collections.show');
+        Route::get('favourites', [FavouriteController::class, 'index'])->name('favourites.index');
+
         Route::prefix('restaurants')->name('restaurants.')->group(function () {
             Route::get('/', [RestaurantController::class, 'index'])->name('index');
             // Before {restaurant}, or the literal path is read as an id.
             Route::get('deals', [RestaurantController::class, 'deals'])->name('deals');
             Route::get('{restaurant}', [RestaurantController::class, 'show'])->name('show');
             Route::get('{restaurant}/menu', [RestaurantController::class, 'menu'])->name('menu');
+
+            // The bookmark on a restaurant card.
+            Route::post('{restaurant}/favourite', [FavouriteController::class, 'store'])->name('favourite.store');
+            Route::delete('{restaurant}/favourite', [FavouriteController::class, 'destroy'])->name('favourite.destroy');
 
             /*
              * One cart per restaurant. Glancing at another shop does not empty
@@ -133,6 +152,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('{order}/payment', [PaymentController::class, 'start'])->name('payment.start');
             Route::post('{order}/payment/confirm', [PaymentController::class, 'confirm'])->name('payment.confirm');
             Route::post('{order}/cancel', [OrderController::class, 'cancel'])->name('cancel');
+
+            /*
+             * Ratings (EP12). One per order, only after delivery — the order is
+             * the proof the person actually ate there.
+             */
+            Route::get('{order}/review', [ReviewController::class, 'show'])->name('review.show');
+            Route::post('{order}/review', [ReviewController::class, 'store'])->name('review.store');
         });
     });
 

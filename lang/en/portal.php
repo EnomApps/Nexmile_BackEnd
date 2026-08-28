@@ -338,4 +338,40 @@ return [
         'quantity_range' => 'Offer between 1 and 500 portions.',
         'note' => 'A deal stops selling the moment the portions run out or the window closes, whichever comes first. The dish stays on your menu at its usual price afterwards.',
     ],
+    /*
+     * Offer labels shown on a restaurant card. The app renders these verbatim,
+     * so the wording stays ours and stays consistent across all three
+     * languages.
+     */
+    'offers' => [
+        'food_rescue' => 'Food Rescue deals live',
+        'free_delivery' => 'Free delivery above ₹:amount',
+    ],
+
+    'home' => [
+        'recommended' => 'Recommended for you',
+        'featured' => 'Featured',
+    ],
+
+    'filters' => [
+        'sort' => 'Sort by',
+        'sort_relevance' => 'Relevance',
+        'sort_rating' => 'Rating',
+        'sort_delivery_time' => 'Delivery time',
+        'sort_cost_low' => 'Cost: low to high',
+        'sort_cost_high' => 'Cost: high to low',
+        'rating' => 'Restaurant rating',
+        'rated_min' => 'Rated :score+',
+        'cost' => 'Dish price',
+        'cost_under' => 'Less than ₹:amount',
+        'cost_over' => '₹:amount+',
+        'cuisine' => 'Cuisine',
+        'veg_only' => 'Pure veg',
+        'open_now' => 'Open now',
+        'has_offers' => 'Offers',
+        'near_and_fast' => 'Near and fast',
+        'no_packaging_fee' => 'No packaging charges',
+        'free_delivery' => 'Free delivery',
+    ],
+
 ];

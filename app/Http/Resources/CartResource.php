@@ -39,6 +39,13 @@ class CartResource extends JsonResource
                 'supports_pickup' => (bool) $this->merchant->supports_pickup,
             ],
 
+            /*
+             * Both, on purpose. GET /carts returns every cart a customer has
+             * open, and the badge on the basket icon only needs the number —
+             * the app was summing `items` to get it, which meant parsing every
+             * line of every cart to render one digit.
+             */
+            'item_count' => (int) $this->items->sum('quantity'),
             'items' => $quote['lines'],
 
             'totals' => [

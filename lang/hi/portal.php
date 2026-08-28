@@ -343,4 +343,40 @@ return [
         'quantity_range' => '1 से 500 हिस्से तक ऑफ़र करें।',
         'note' => 'हिस्से खत्म होते ही या अवधि पूरी होते ही, जो पहले हो, ऑफ़र बंद हो जाता है। उसके बाद व्यंजन सामान्य कीमत पर मेन्यू में रहता है।',
     ],
+    /*
+     * Offer labels shown on a restaurant card. The app renders these verbatim,
+     * so the wording stays ours and stays consistent across all three
+     * languages.
+     */
+    'offers' => [
+        'food_rescue' => 'Food Rescue ऑफ़र लाइव',
+        'free_delivery' => '₹:amount से ऊपर मुफ़्त डिलीवरी',
+    ],
+
+    'home' => [
+        'recommended' => 'आपके लिए सुझाए गए',
+        'featured' => 'फ़ीचर्ड',
+    ],
+
+    'filters' => [
+        'sort' => 'क्रमबद्ध करें',
+        'sort_relevance' => 'प्रासंगिकता',
+        'sort_rating' => 'रेटिंग',
+        'sort_delivery_time' => 'डिलीवरी समय',
+        'sort_cost_low' => 'क़ीमत: कम से ज़्यादा',
+        'sort_cost_high' => 'क़ीमत: ज़्यादा से कम',
+        'rating' => 'रेस्तराँ रेटिंग',
+        'rated_min' => ':score+ रेटेड',
+        'cost' => 'व्यंजन की क़ीमत',
+        'cost_under' => '₹:amount से कम',
+        'cost_over' => '₹:amount+',
+        'cuisine' => 'व्यंजन',
+        'veg_only' => 'शुद्ध शाकाहारी',
+        'open_now' => 'अभी खुला',
+        'has_offers' => 'ऑफ़र',
+        'near_and_fast' => 'पास और तेज़',
+        'no_packaging_fee' => 'कोई पैकेजिंग शुल्क नहीं',
+        'free_delivery' => 'मुफ़्त डिलीवरी',
+    ],
+
 ];

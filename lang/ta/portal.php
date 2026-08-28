@@ -343,4 +343,40 @@ return [
         'quantity_range' => '1 முதல் 500 பங்குகள் வரை வழங்கவும்.',
         'note' => 'பங்குகள் தீர்ந்தாலோ நேரம் முடிந்தாலோ, எது முதலில் நடக்கிறதோ அப்போதே சலுகை நிற்கும். அதன் பிறகு உணவு வழக்கமான விலையில் மெனுவில் இருக்கும்.',
     ],
+    /*
+     * Offer labels shown on a restaurant card. The app renders these verbatim,
+     * so the wording stays ours and stays consistent across all three
+     * languages.
+     */
+    'offers' => [
+        'food_rescue' => 'Food Rescue சலுகைகள் இப்போது',
+        'free_delivery' => '₹:amount-க்கு மேல் இலவச டெலிவரி',
+    ],
+
+    'home' => [
+        'recommended' => 'உங்களுக்கான பரிந்துரைகள்',
+        'featured' => 'சிறப்பானவை',
+    ],
+
+    'filters' => [
+        'sort' => 'வரிசைப்படுத்து',
+        'sort_relevance' => 'பொருத்தம்',
+        'sort_rating' => 'மதிப்பீடு',
+        'sort_delivery_time' => 'டெலிவரி நேரம்',
+        'sort_cost_low' => 'விலை: குறைவிலிருந்து அதிகம்',
+        'sort_cost_high' => 'விலை: அதிகத்திலிருந்து குறைவு',
+        'rating' => 'உணவக மதிப்பீடு',
+        'rated_min' => ':score+ மதிப்பீடு',
+        'cost' => 'உணவு விலை',
+        'cost_under' => '₹:amount-க்கு குறைவு',
+        'cost_over' => '₹:amount+',
+        'cuisine' => 'உணவு வகை',
+        'veg_only' => 'முழு சைவம்',
+        'open_now' => 'இப்போது திறந்துள்ளது',
+        'has_offers' => 'சலுகைகள்',
+        'near_and_fast' => 'அருகில், விரைவாக',
+        'no_packaging_fee' => 'பேக்கேஜிங் கட்டணம் இல்லை',
+        'free_delivery' => 'இலவச டெலிவரி',
+    ],
+
 ];
