@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\KycStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Http\Resources\CategoryResource;
 use App\Models\Cuisine;
 use App\Models\ItemOption;
 use App\Models\Merchant;
@@ -245,5 +246,72 @@ class MerchantPortalStorefrontTest extends TestCase
                 'cuisines' => ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
             ])
             ->assertSessionHasErrors('cuisines');
+    }
+
+    public function test_a_merchant_can_photograph_a_menu_category(): void
+    {
+        $user = $this->merchantUser();
+        $category = $user->merchant->categories()->create(['name' => 'Biryani']);
+
+        $this->actingAs($user)
+            ->post("/merchants/menu/categories/{$category->id}/image", ['image' => $this->png()])
+            ->assertRedirect();
+
+        $stored = $category->fresh()->image_path;
+
+        $this->assertNotNull($stored);
+        Storage::disk('s3')->assertExists($stored);
+
+        // And it reaches the customer app as a URL, not a raw storage path.
+        $this->assertNotNull(
+            (new CategoryResource($category->fresh()))
+                ->toArray(request())['image_url']
+        );
+    }
+
+    public function test_removing_a_category_photo_deletes_the_file(): void
+    {
+        // An orphaned object is a bill nobody is watching.
+        $user = $this->merchantUser();
+        $category = $user->merchant->categories()->create(['name' => 'Tiffin']);
+
+        $this->actingAs($user)
+            ->post("/merchants/menu/categories/{$category->id}/image", ['image' => $this->png()]);
+
+        $stored = $category->fresh()->image_path;
+
+        $this->actingAs($user)
+            ->delete("/merchants/menu/categories/{$category->id}/image")
+            ->assertRedirect();
+
+        $this->assertNull($category->fresh()->image_path);
+        Storage::disk('s3')->assertMissing($stored);
+    }
+
+    public function test_another_merchants_category_cannot_be_photographed(): void
+    {
+        // The id is scoped to the signed-in merchant, so someone else's is a
+        // 404 rather than an edit.
+        $theirs = $this->merchantUser()->merchant->categories()->create(['name' => 'Theirs']);
+
+        $this->actingAs($this->merchantUser())
+            ->post("/merchants/menu/categories/{$theirs->id}/image", ['image' => $this->png()])
+            ->assertNotFound();
+
+        $this->assertNull($theirs->fresh()->image_path);
+    }
+
+    public function test_a_category_photo_must_be_an_image(): void
+    {
+        $user = $this->merchantUser();
+        $category = $user->merchant->categories()->create(['name' => 'Drinks']);
+
+        $this->actingAs($user)
+            ->post("/merchants/menu/categories/{$category->id}/image", [
+                'image' => UploadedFile::fake()->createWithContent('menu.pdf', '%PDF-1.4 not a photo'),
+            ])
+            ->assertSessionHasErrors('image');
+
+        $this->assertNull($category->fresh()->image_path);
     }
 }

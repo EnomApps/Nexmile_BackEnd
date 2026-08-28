@@ -156,6 +156,43 @@ class MerchantMenuController extends Controller
         return back()->with('status', __('portal.menu.category_created'));
     }
 
+    /**
+     * A photo for one category.
+     *
+     * Its own action rather than a field on the create form: a merchant adds
+     * categories quickly while building a menu and photographs them later, so
+     * requiring an image up front would either block the menu or produce
+     * categories nobody ever goes back to.
+     */
+    public function uploadCategoryImage(Request $request, int $category): RedirectResponse
+    {
+        $request->validate(
+            ['image' => ImageService::rules()],
+            ImageService::messages('image'),
+        );
+
+        $merchant = $this->merchant($request);
+
+        $this->images->attach(
+            $merchant->categories()->findOrFail($category),
+            'image_path',
+            'categories/'.$merchant->id,
+            $request->file('image'),
+        );
+
+        return back()->with('status', __('portal.menu.category_image_saved'));
+    }
+
+    public function destroyCategoryImage(Request $request, int $category): RedirectResponse
+    {
+        $this->images->detach(
+            $this->merchant($request)->categories()->findOrFail($category),
+            'image_path',
+        );
+
+        return back()->with('status', __('portal.menu.category_image_removed'));
+    }
+
     public function destroyCategory(Request $request, int $category): RedirectResponse
     {
         $model = $this->merchant($request)->categories()->findOrFail($category);

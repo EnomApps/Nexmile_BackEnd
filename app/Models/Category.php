@@ -13,6 +13,11 @@ class Category extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /*
+     * image_path is deliberately absent: it is written by ImageService after a
+     * file is stored, never taken from request input. A mass-assignable path
+     * column is a way to point a record at any object in the bucket.
+     */
     protected $fillable = [
         'merchant_id', 'name', 'description', 'sort_order', 'is_active',
     ];

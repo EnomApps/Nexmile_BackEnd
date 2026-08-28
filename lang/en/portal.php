@@ -212,6 +212,12 @@ return [
     ],
 
     'menu' => [
+        'category_image' => 'Category photo',
+        'category_image_hint' => 'A photo against each section. Customers scan pictures before they read headings, so this is the quickest thing you can do to get a section noticed.',
+        'category_image_saved' => 'Category photo saved.',
+        'category_image_removed' => 'Category photo removed.',
+        'remove_photo' => 'Remove photo',
+        'dish_count' => '{0} No dishes|{1} 1 dish|[2,*] :count dishes',
         'title' => 'Menu',
         'intro' => 'Dishes you add here are what customers see. Turn an item off the moment the kitchen runs out.',
         'categories' => 'Categories',

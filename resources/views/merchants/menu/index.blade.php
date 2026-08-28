@@ -51,17 +51,62 @@
     <div class="mt-8 rounded-2xl border border-white/10 bg-white/[0.02] p-6">
         <h3 class="font-bold text-white">{{ __('portal.menu.categories') }}</h3>
 
-        <div class="mt-4 flex flex-wrap gap-2">
+        <p class="mt-1 text-sm text-gray-500">{{ __('portal.menu.category_image_hint') }}</p>
+
+        <div class="mt-4 space-y-2">
             @forelse ($categories as $category)
-                <span class="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-black/30 px-3 py-1.5 text-sm text-gray-300">
-                    {{ $category->name }}
-                    <span class="text-xs text-gray-600">{{ $category->menu_items_count }}</span>
+                <div class="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-3">
+                    @php $categoryImage = $images->url($category->image_path); @endphp
+
+                    @if ($categoryImage)
+                        <img src="{{ $categoryImage }}" alt="{{ $category->name }}"
+                             class="w-14 h-14 rounded-lg object-cover bg-white/5 shrink-0">
+                    @else
+                        {{-- A dashed frame rather than a grey box: it reads as
+                             something to fill in, not something that failed. --}}
+                        <div class="w-14 h-14 rounded-lg border border-dashed border-white/20 shrink-0
+                                    flex items-center justify-center text-gray-600 text-xl">+</div>
+                    @endif
+
+                    <div class="flex-1 min-w-[8rem]">
+                        <p class="text-sm font-semibold text-gray-200">{{ $category->name }}</p>
+                        <p class="text-xs text-gray-600">
+                            {{ trans_choice('portal.menu.dish_count', $category->menu_items_count, ['count' => $category->menu_items_count]) }}
+                        </p>
+                    </div>
+
+                    <form method="POST" action="{{ route('merchants.menu.categories.image.upload', $category->id) }}"
+                          enctype="multipart/form-data" class="flex items-center gap-2">
+                        @csrf
+                        <label class="cursor-pointer">
+                            <span class="sr-only">{{ __('portal.menu.category_image') }}</span>
+                            {{-- Submits on choose: a separate Upload button is a
+                                 step merchants forget, then wonder why nothing saved. --}}
+                            <input type="file" name="image" accept=".jpg,.jpeg,.png,.webp"
+                                   onchange="this.form.submit()"
+                                   class="block w-40 text-xs text-gray-500
+                                          file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0
+                                          file:text-xs file:font-semibold file:bg-white/10 file:text-gray-200
+                                          hover:file:bg-white/20 file:cursor-pointer">
+                        </label>
+                    </form>
+
+                    @if ($categoryImage)
+                        <form method="POST" action="{{ route('merchants.menu.categories.image.destroy', $category->id) }}">
+                            @csrf @method('DELETE')
+                            <button class="text-xs font-semibold text-gray-500 hover:text-red-300">
+                                {{ __('portal.menu.remove_photo') }}
+                            </button>
+                        </form>
+                    @endif
+
                     <form method="POST" action="{{ route('merchants.menu.categories.destroy', $category->id) }}"
                           onsubmit="return confirm('{{ __('portal.menu.category_delete_confirm') }}')">
                         @csrf @method('DELETE')
-                        <button type="submit" class="text-gray-600 hover:text-red-400 leading-none" aria-label="{{ __('portal.menu.delete') }}">&times;</button>
+                        <button type="submit" class="text-gray-600 hover:text-red-400 leading-none px-1"
+                                aria-label="{{ __('portal.menu.delete') }}">&times;</button>
                     </form>
-                </span>
+                </div>
             @empty
                 <p class="text-sm text-gray-600">{{ __('portal.menu.no_categories') }}</p>
             @endforelse
@@ -94,7 +139,11 @@
 
             <div class="mt-8">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h3 class="text-sm font-bold uppercase tracking-widest text-gray-500">
+                    <h3 class="flex items-center gap-2.5 text-sm font-bold uppercase tracking-widest text-gray-500">
+                        @if ($category && $images->url($category->image_path))
+                            <img src="{{ $images->url($category->image_path) }}" alt=""
+                                 class="w-7 h-7 rounded-md object-cover bg-white/5">
+                        @endif
                         {{ $category?->name ?? __('portal.menu.uncategorised') }}
                     </h3>
 

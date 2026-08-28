@@ -99,6 +99,13 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
             Route::post('categories/{category}/availability', [MerchantMenuController::class, 'toggleCategory'])
                 ->whereNumber('category')->name('categories.availability');
 
+            // A photo per category. Added after the fact, because a merchant
+            // builds the menu first and photographs it later.
+            Route::post('categories/{category}/image', [MerchantMenuController::class, 'uploadCategoryImage'])
+                ->whereNumber('category')->name('categories.image.upload');
+            Route::delete('categories/{category}/image', [MerchantMenuController::class, 'destroyCategoryImage'])
+                ->whereNumber('category')->name('categories.image.destroy');
+
             // 'create' before '{item}' so the literal path is not swallowed.
             Route::get('items/create', [MerchantMenuController::class, 'createItem'])->name('items.create');
             Route::post('items', [MerchantMenuController::class, 'storeItem'])->name('items.store');
