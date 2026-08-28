@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -62,6 +63,12 @@ class User extends Authenticatable
     public function merchant(): HasOne
     {
         return $this->hasOne(Merchant::class);
+    }
+
+    /** Restaurants this customer bookmarked. */
+    public function favourites(): BelongsToMany
+    {
+        return $this->belongsToMany(Merchant::class, 'favourites')->withTimestamps();
     }
 
     public function rider(): HasOne
