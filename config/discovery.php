@@ -47,4 +47,12 @@ return [
      */
     'near_and_fast_prep_minutes' => env('NEAR_AND_FAST_PREP_MINUTES', 30),
 
+    /*
+     * How many matching dishes a search result names.
+     *
+     * Two or three is the point — enough to show why the restaurant is in the
+     * list and what it costs. A card listing every match stops being a card.
+     */
+    'matched_dishes_shown' => 3,
+
 ];

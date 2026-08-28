@@ -3,6 +3,7 @@
 namespace App\Services\Discovery;
 
 use App\Enums\KycStatus;
+use App\Models\MenuItem;
 use App\Models\Merchant;
 use App\Models\Zone;
 use Illuminate\Database\Eloquent\Builder;
@@ -68,7 +69,18 @@ class NearbyMerchantService
 
         $matches = $this->applyFilters($matches, $filters, $radius);
 
-        return $this->paginate($this->sort($matches, $filters->sort), $perPage);
+        $page = $this->paginate($this->sort($matches, $filters->sort), $perPage);
+
+        /*
+         * Why each result matched. Run against the page rather than every
+         * candidate: a search inside a 1 km radius can still cross a hundred
+         * restaurants, and only the fifteen being shown need their dishes.
+         */
+        if ($filters->search !== null) {
+            $this->attachMatchedDishes($page->getCollection(), $filters->search);
+        }
+
+        return $page;
     }
 
     /**
@@ -301,5 +313,50 @@ class NearbyMerchantService
                 fn (Merchant $a, Merchant $b) => $a->distance_metres <=> $b->distance_metres,
             ])
             ->values();
+    }
+
+    /**
+     * Name the dishes that made a restaurant match.
+     *
+     * A search for "dosa" returning "Hotel Vasanth" with no explanation leaves
+     * the customer to open the menu and hunt for it. Naming the dish, with its
+     * price, is what makes a search result worth trusting.
+     *
+     * Empty for a restaurant matched on its own name — there is nothing to
+     * explain when the name is the thing you typed.
+     *
+     * @param  Collection<int, Merchant>  $merchants
+     */
+    protected function attachMatchedDishes(Collection $merchants, string $term): void
+    {
+        if ($merchants->isEmpty()) {
+            return;
+        }
+
+        // One query for the whole page, grouped in PHP: a query per card is
+        // fifteen round trips to decorate a list.
+        $dishes = MenuItem::query()
+            ->whereIn('merchant_id', $merchants->pluck('id'))
+            ->where('is_available', true)
+            ->where('name', 'like', '%'.$term.'%')
+            ->orderBy('merchant_id')
+            ->orderBy('price')
+            ->get(['id', 'merchant_id', 'name', 'price', 'is_veg'])
+            ->groupBy('merchant_id');
+
+        $limit = (int) config('discovery.matched_dishes_shown');
+
+        $merchants->each(function (Merchant $merchant) use ($dishes, $limit) {
+            $merchant->matched_dishes = ($dishes[$merchant->id] ?? collect())
+                ->take($limit)
+                ->map(fn (MenuItem $item) => [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'price' => (float) $item->price,
+                    'is_veg' => (bool) $item->is_veg,
+                ])
+                ->values()
+                ->all();
+        });
     }
 }

@@ -68,6 +68,19 @@ class RestaurantResource extends JsonResource
             // returning this resource requires.
             'is_favourite' => in_array($this->id, self::favouriteIds($request), true),
 
+            /*
+             * Why this restaurant matched, on a search only. A result reading
+             * "Hotel Vasanth" for a search of "dosa" leaves the customer to
+             * open the menu and hunt for it; naming the dish and its price is
+             * what makes the result worth trusting.
+             *
+             * Absent when the restaurant matched on its own name — there is
+             * nothing to explain when the name is what was typed.
+             */
+            'matched_dishes' => $this->when(
+                ! empty($this->matched_dishes),
+                fn () => $this->matched_dishes,
+            ),
             // Present only on a nearby search; null when fetched directly.
             'distance_metres' => $this->when(
                 isset($this->distance_metres),

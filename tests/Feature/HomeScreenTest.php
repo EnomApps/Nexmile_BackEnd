@@ -280,4 +280,96 @@ class HomeScreenTest extends TestCase
             ->assertJsonPath('data.0.rating', null)
             ->assertJsonPath('data.0.rating_count', 0);
     }
+
+    public function test_a_dish_search_names_the_dish_that_matched(): void
+    {
+        /*
+         * A result reading "Hotel 1" for a search of "dosa" leaves the
+         * customer to open the menu and hunt for it. Naming the dish and its
+         * price is what makes the result worth trusting.
+         */
+        $merchant = $this->restaurant();
+        $merchant->menuItems()->create(['name' => 'Masala Dosa', 'price' => 60, 'is_available' => true]);
+        $merchant->menuItems()->create(['name' => 'Ghee Roast Dosa', 'price' => 90, 'is_available' => true]);
+        $merchant->menuItems()->create(['name' => 'Idli', 'price' => 30, 'is_available' => true]);
+
+        Sanctum::actingAs($this->customer());
+
+        $matched = $this->getJson('/api/v1/restaurants?'.$this->query(['search' => 'dosa']))
+            ->assertOk()
+            ->json('data.0.matched_dishes');
+
+        $this->assertCount(2, $matched);
+        // Cheapest first: it is the number a customer is deciding on.
+        $this->assertSame('Masala Dosa', $matched[0]['name']);
+        // Money is a JSON number and loses its zero fraction: 60.00 arrives as
+        // 60 and decodes as an int, so compare the value not the type.
+        $this->assertEqualsWithDelta(60, (float) $matched[0]['price'], 0.001);
+        $this->assertSame('Ghee Roast Dosa', $matched[1]['name']);
+    }
+
+    public function test_an_unavailable_dish_is_never_named(): void
+    {
+        // It is also why the restaurant is not in the list at all — the two
+        // rules have to agree, or a card explains a match that did not happen.
+        $merchant = $this->restaurant();
+        $merchant->menuItems()->create(['name' => 'Paneer Dosa', 'price' => 80, 'is_available' => false]);
+        $merchant->menuItems()->create(['name' => 'Plain Dosa', 'price' => 40, 'is_available' => true]);
+
+        Sanctum::actingAs($this->customer());
+
+        $matched = $this->getJson('/api/v1/restaurants?'.$this->query(['search' => 'dosa']))
+            ->assertOk()
+            ->json('data.0.matched_dishes');
+
+        $this->assertSame(['Plain Dosa'], array_column($matched, 'name'));
+    }
+
+    public function test_matching_on_the_name_alone_explains_nothing(): void
+    {
+        // There is nothing to explain when the restaurant name is what was
+        // typed, so the key is absent rather than an empty array.
+        $merchant = $this->restaurant();
+        $merchant->menuItems()->create(['name' => 'Idli', 'price' => 30, 'is_available' => true]);
+
+        Sanctum::actingAs($this->customer());
+
+        $this->getJson('/api/v1/restaurants?'.$this->query(['search' => $merchant->business_name]))
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $merchant->id)
+            ->assertJsonMissingPath('data.0.matched_dishes');
+    }
+
+    public function test_a_listing_without_a_search_carries_no_matched_dishes(): void
+    {
+        // Every card would otherwise pay for a field it never uses.
+        $merchant = $this->restaurant();
+        $merchant->menuItems()->create(['name' => 'Idli', 'price' => 30, 'is_available' => true]);
+
+        Sanctum::actingAs($this->customer());
+
+        $this->getJson('/api/v1/restaurants?'.$this->query())
+            ->assertOk()
+            ->assertJsonMissingPath('data.0.matched_dishes');
+    }
+
+    public function test_a_card_names_at_most_three_dishes(): void
+    {
+        // A card listing every match stops being a card.
+        $merchant = $this->restaurant();
+
+        foreach (['Plain Dosa', 'Masala Dosa', 'Ghee Dosa', 'Onion Dosa', 'Egg Dosa'] as $i => $name) {
+            $merchant->menuItems()->create([
+                'name' => $name, 'price' => 40 + $i * 10, 'is_available' => true,
+            ]);
+        }
+
+        Sanctum::actingAs($this->customer());
+
+        $matched = $this->getJson('/api/v1/restaurants?'.$this->query(['search' => 'dosa']))
+            ->assertOk()
+            ->json('data.0.matched_dishes');
+
+        $this->assertCount(config('discovery.matched_dishes_shown'), $matched);
+    }
 }
