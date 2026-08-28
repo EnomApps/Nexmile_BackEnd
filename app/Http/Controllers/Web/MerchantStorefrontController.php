@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Cuisine;
 use App\Models\Merchant;
 use App\Services\Media\ImageService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
@@ -41,7 +43,38 @@ class MerchantStorefrontController extends Controller
             'bannerUrl' => $this->images->url($merchant->banner_path),
             'hours' => $merchant->operatingHours()->get()->keyBy('day_of_week'),
             'days' => self::DAYS,
+            'cuisineChoices' => Cuisine::live()->get(),
         ]);
+    }
+
+    /**
+     * How the restaurant is listed and filtered.
+     *
+     * Set by the merchant rather than by us: they know whether their kitchen
+     * is pure veg and what two people actually spend. Without these three the
+     * cuisine rail, the VEG toggle and the price filters all match nothing —
+     * they look broken when they are only unset.
+     */
+    public function saveListing(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'is_pure_veg' => ['sometimes', 'boolean'],
+            'cost_for_two' => ['nullable', 'integer', 'between:1,10000'],
+            'cuisines' => ['nullable', 'array', 'max:6'],
+            // Slugs, matched against the cuisines an admin has configured.
+            // Anything else would filter to nothing, silently.
+            'cuisines.*' => ['string', Rule::exists('cuisines', 'slug')],
+        ], [
+            'cuisines.max' => __('portal.storefront.cuisines_max'),
+        ]);
+
+        $this->merchant($request)->update([
+            'is_pure_veg' => (bool) ($data['is_pure_veg'] ?? false),
+            'cost_for_two' => $data['cost_for_two'] ?? null,
+            'cuisines' => array_values($data['cuisines'] ?? []),
+        ]);
+
+        return back()->with('status', __('portal.storefront.listing_saved'));
     }
 
     public function uploadImage(Request $request): RedirectResponse

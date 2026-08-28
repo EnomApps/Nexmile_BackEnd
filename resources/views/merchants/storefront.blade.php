@@ -78,6 +78,70 @@
         </div>
     </div>
 
+    {{-- How the restaurant is listed and filtered. Set by the merchant: they
+         know whether their kitchen is pure veg and what two people spend. --}}
+    <div class="mt-8 {{ $card }}">
+        <h2 class="text-xl font-bold text-white">{{ __('portal.storefront.listing') }}</h2>
+        <p class="mt-1 text-sm text-gray-500">{{ __('portal.storefront.listing_hint') }}</p>
+
+        <form method="POST" action="{{ route('merchants.storefront.listing') }}" class="mt-6 space-y-6">
+            @csrf
+
+            <div>
+                <span class="block text-xs font-medium mb-2 text-gray-400">
+                    {{ __('portal.storefront.cuisines') }}
+                </span>
+
+                @if ($cuisineChoices->isEmpty())
+                    <p class="text-sm text-gray-500">{{ __('portal.storefront.cuisines_none') }}</p>
+                @else
+                    <div class="flex flex-wrap gap-2">
+                        @foreach ($cuisineChoices as $cuisine)
+                            @php $checked = in_array($cuisine->slug, $merchant->cuisines ?? [], true); @endphp
+                            <label class="cursor-pointer">
+                                <input type="checkbox" name="cuisines[]" value="{{ $cuisine->slug }}"
+                                       class="peer sr-only" @checked($checked)>
+                                <span class="inline-block px-3.5 py-2 rounded-lg border text-sm transition
+                                             border-white/15 text-gray-400
+                                             peer-checked:border-brand-green peer-checked:text-brand-green
+                                             peer-checked:bg-brand-green/10">
+                                    {{ $cuisine->name }}
+                                </span>
+                            </label>
+                        @endforeach
+                    </div>
+                    <p class="mt-2 text-xs text-gray-600">{{ __('portal.storefront.cuisines_max_hint') }}</p>
+                @endif
+            </div>
+
+            <div class="grid sm:grid-cols-2 gap-5">
+                <div>
+                    <label for="cost_for_two" class="block text-xs font-medium mb-1.5 text-gray-400">
+                        {{ __('portal.storefront.cost_for_two') }}
+                    </label>
+                    <input id="cost_for_two" name="cost_for_two" type="number" min="1" max="10000"
+                           value="{{ old('cost_for_two', $merchant->cost_for_two) }}"
+                           class="w-full rounded-lg bg-white/[0.03] border border-white/15 px-3 py-2 text-sm text-white
+                                  focus:border-brand-green focus:ring-1 focus:ring-brand-green outline-none">
+                    <p class="mt-1 text-xs text-gray-600">{{ __('portal.storefront.cost_for_two_hint') }}</p>
+                </div>
+
+                <div class="flex items-start gap-3 pt-6">
+                    <input id="is_pure_veg" name="is_pure_veg" type="checkbox" value="1"
+                           @checked(old('is_pure_veg', $merchant->is_pure_veg))
+                           class="mt-0.5 w-4 h-4 rounded border-white/20 bg-white/[0.03] text-brand-green">
+                    <label for="is_pure_veg" class="text-sm text-gray-300">
+                        {{ __('portal.storefront.pure_veg') }}
+                        <span class="block text-xs text-gray-600 mt-0.5">{{ __('portal.storefront.pure_veg_hint') }}</span>
+                    </label>
+                </div>
+            </div>
+
+            <button class="px-5 py-2.5 rounded-lg bg-brand-green text-black font-bold text-sm hover:bg-lime-400 transition">
+                {{ __('portal.storefront.save') }}
+            </button>
+        </form>
+    </div>
     {{-- Opening hours --}}
     <div class="mt-8 {{ $card }}">
         <h2 class="text-xl font-bold text-white">{{ __('portal.storefront.hours') }}</h2>

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\KycStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Models\Cuisine;
 use App\Models\ItemOption;
 use App\Models\Merchant;
 use App\Models\User;
@@ -172,5 +173,77 @@ class MerchantPortalStorefrontTest extends TestCase
         $this->actingAs($this->merchantUser())
             ->get("/merchants/menu/items/{$item->id}/options")
             ->assertNotFound();
+    }
+
+    /*
+     * Listing details. Without these three a restaurant is invisible to the
+     * cuisine rail, the VEG toggle and the price filters — the filters look
+     * broken when they are only unset.
+     */
+    public function test_a_merchant_sets_their_own_cuisine_price_and_veg_status(): void
+    {
+        Cuisine::create(['slug' => 'biryani', 'name' => 'Biryani']);
+        Cuisine::create(['slug' => 'dosa', 'name' => 'Dosa']);
+
+        $user = $this->merchantUser();
+
+        $this->actingAs($user)
+            ->post('/merchants/storefront/listing', [
+                'cuisines' => ['biryani', 'dosa'],
+                'cost_for_two' => 300,
+                'is_pure_veg' => 1,
+            ])
+            ->assertRedirect();
+
+        $merchant = $user->merchant->fresh();
+
+        $this->assertSame(['biryani', 'dosa'], $merchant->cuisines);
+        $this->assertSame(300, $merchant->cost_for_two);
+        $this->assertTrue($merchant->is_pure_veg);
+    }
+
+    public function test_an_unknown_cuisine_slug_is_refused(): void
+    {
+        /*
+         * A slug that matches no configured cuisine filters to nothing,
+         * silently — the merchant would believe they are listed under it and
+         * never appear.
+         */
+        $user = $this->merchantUser();
+
+        $this->actingAs($user)
+            ->post('/merchants/storefront/listing', ['cuisines' => ['not-a-cuisine']])
+            ->assertSessionHasErrors('cuisines.0');
+
+        $this->assertNull($user->merchant->fresh()->cuisines);
+    }
+
+    public function test_clearing_the_veg_flag_works(): void
+    {
+        // An unchecked checkbox sends nothing at all, so absence has to mean
+        // false rather than "leave it as it was".
+        $user = $this->merchantUser();
+        $user->merchant->forceFill(['is_pure_veg' => true])->save();
+
+        $this->actingAs($user)
+            ->post('/merchants/storefront/listing', ['cost_for_two' => 200])
+            ->assertRedirect();
+
+        $this->assertFalse($user->merchant->fresh()->is_pure_veg);
+    }
+
+    public function test_a_merchant_cannot_claim_every_cuisine(): void
+    {
+        // Six is plenty. A restaurant listed under everything is listed under
+        // nothing useful.
+        foreach (['a', 'b', 'c', 'd', 'e', 'f', 'g'] as $slug) {
+            Cuisine::create(['slug' => $slug, 'name' => strtoupper($slug)]);
+        }
+
+        $this->actingAs($this->merchantUser())
+            ->post('/merchants/storefront/listing', [
+                'cuisines' => ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+            ])
+            ->assertSessionHasErrors('cuisines');
     }
 }

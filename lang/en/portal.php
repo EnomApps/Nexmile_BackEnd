@@ -128,6 +128,18 @@ return [
     ],
 
     'storefront' => [
+        'listing' => 'Listing and filters',
+        'listing_hint' => 'How customers find you when they filter or search. Leave these blank and you will not appear under a cuisine, a price range, or the veg-only toggle.',
+        'cuisines' => 'Cuisines you serve',
+        'cuisines_none' => 'No cuisines have been set up yet. Nexmile adds these — ask us and we will.',
+        'cuisines_max_hint' => 'Pick up to six. Fewer and more accurate beats all of them.',
+        'cost_for_two' => 'Typical cost for two (₹)',
+        'cost_for_two_hint' => 'What two people usually spend. Used for the price filter only — it is not a price you are held to.',
+        'pure_veg' => 'This is a pure vegetarian kitchen',
+        'pure_veg_hint' => 'Only tick this if you serve no meat, fish or egg at all.',
+        'listing_saved' => 'Listing details saved.',
+        'cuisines_max' => 'Pick at most six cuisines.',
+        'save' => 'Save',
         'title' => 'Store',
         'open_now' => 'You are open',
         'closed_now' => 'You are closed',

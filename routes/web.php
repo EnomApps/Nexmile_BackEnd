@@ -124,6 +124,9 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
             Route::post('image', [MerchantStorefrontController::class, 'uploadImage'])->name('image.upload');
             Route::delete('image/{type}', [MerchantStorefrontController::class, 'destroyImage'])->name('image.destroy');
             Route::post('hours', [MerchantStorefrontController::class, 'saveHours'])->name('hours');
+            // Cuisine, price bracket and pure-veg: without them a restaurant is
+            // invisible to the cuisine rail, the VEG toggle and the price filters.
+            Route::post('listing', [MerchantStorefrontController::class, 'saveListing'])->name('listing');
         });
 
         /*
