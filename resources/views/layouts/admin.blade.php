@@ -37,6 +37,7 @@
                         ['route' => 'admin.dashboard', 'pattern' => 'admin.dashboard', 'label' => 'Dashboard'],
                         ['route' => 'admin.index', 'pattern' => 'admin.index', 'label' => 'Verification'],
                         ['route' => 'admin.orders.index', 'pattern' => 'admin.orders.*', 'label' => 'Orders'],
+                        ['route' => 'admin.merchandising.index', 'pattern' => 'admin.merchandising.*', 'label' => 'Home screen'],
                     ] as $tab)
                         <a href="{{ route($tab['route']) }}"
                            class="font-medium transition

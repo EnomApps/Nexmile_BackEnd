@@ -3,6 +3,7 @@
 use App\Http\Controllers\Web\Admin\AdminController;
 use App\Http\Controllers\Web\Admin\AdminOrderController;
 use App\Http\Controllers\Web\Admin\DashboardController;
+use App\Http\Controllers\Web\Admin\MerchandisingController;
 use App\Http\Controllers\Web\LanguageController;
 use App\Http\Controllers\Web\MerchantEarningsController;
 use App\Http\Controllers\Web\MerchantMenuController;
@@ -178,6 +179,29 @@ Route::prefix('admin')->name('admin.')->group(function () {
          * catch-all, or 'orders' is read as an account type.
          */
         Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+        /*
+         * Home screen merchandising. The banners, cuisines and collections
+         * tables exist so the customer home screen can change without an app
+         * release; without this screen that only moved the release from the
+         * Play Store to a database client, which needs an engineer at night
+         * with production credentials.
+         */
+        Route::prefix('home-screen')->name('merchandising.')->group(function () {
+            Route::get('/', [MerchandisingController::class, 'index'])->name('index');
+
+            Route::post('banners', [MerchandisingController::class, 'storeBanner'])->name('banners.store');
+            Route::post('banners/{banner}/toggle', [MerchandisingController::class, 'toggleBanner'])->name('banners.toggle');
+            Route::delete('banners/{banner}', [MerchandisingController::class, 'destroyBanner'])->name('banners.destroy');
+
+            Route::post('cuisines', [MerchandisingController::class, 'storeCuisine'])->name('cuisines.store');
+            Route::delete('cuisines/{cuisine}', [MerchandisingController::class, 'destroyCuisine'])->name('cuisines.destroy');
+
+            Route::post('collections', [MerchandisingController::class, 'storeCollection'])->name('collections.store');
+            Route::post('collections/{collection}/merchants', [MerchandisingController::class, 'updateCollectionMerchants'])->name('collections.merchants');
+            Route::post('collections/{collection}/toggle', [MerchandisingController::class, 'toggleCollection'])->name('collections.toggle');
+            Route::delete('collections/{collection}', [MerchandisingController::class, 'destroyCollection'])->name('collections.destroy');
+        });
 
         // Commercial terms and the food licence: admin-only, never on the
         // merchant's own profile. A merchant who could type their own FSSAI
