@@ -1,0 +1,302 @@
+[
+    {
+        "slug": "biryani",
+        "name": "Biryani",
+        "position": 1
+    },
+    {
+        "slug": "dosa",
+        "name": "Dosa",
+        "position": 2
+    },
+    {
+        "slug": "idli",
+        "name": "Idli",
+        "position": 3
+    },
+    {
+        "slug": "vada",
+        "name": "Vada",
+        "position": 4
+    },
+    {
+        "slug": "pongal",
+        "name": "Pongal",
+        "position": 5
+    },
+    {
+        "slug": "parotta",
+        "name": "Parotta",
+        "position": 6
+    },
+    {
+        "slug": "meals",
+        "name": "Full Meals",
+        "position": 7
+    },
+    {
+        "slug": "thali",
+        "name": "Thali",
+        "position": 8
+    },
+    {
+        "slug": "tiffin",
+        "name": "Tiffin",
+        "position": 9
+    },
+    {
+        "slug": "chettinad",
+        "name": "Chettinad",
+        "position": 10
+    },
+    {
+        "slug": "appam",
+        "name": "Appam",
+        "position": 11
+    },
+    {
+        "slug": "puttu",
+        "name": "Puttu",
+        "position": 12
+    },
+    {
+        "slug": "upma",
+        "name": "Upma",
+        "position": 13
+    },
+    {
+        "slug": "poha",
+        "name": "Poha",
+        "position": 14
+    },
+    {
+        "slug": "chapati",
+        "name": "Chapati",
+        "position": 15
+    },
+    {
+        "slug": "south-indian",
+        "name": "South Indian",
+        "position": 16
+    },
+    {
+        "slug": "north-indian",
+        "name": "North Indian",
+        "position": 17
+    },
+    {
+        "slug": "kerala",
+        "name": "Kerala",
+        "position": 18
+    },
+    {
+        "slug": "andhra",
+        "name": "Andhra",
+        "position": 19
+    },
+    {
+        "slug": "punjabi",
+        "name": "Punjabi",
+        "position": 20
+    },
+    {
+        "slug": "hyderabadi",
+        "name": "Hyderabadi",
+        "position": 21
+    },
+    {
+        "slug": "mughlai",
+        "name": "Mughlai",
+        "position": 22
+    },
+    {
+        "slug": "chinese",
+        "name": "Chinese",
+        "position": 23
+    },
+    {
+        "slug": "arabian",
+        "name": "Arabian",
+        "position": 24
+    },
+    {
+        "slug": "chicken",
+        "name": "Chicken",
+        "position": 25
+    },
+    {
+        "slug": "mutton",
+        "name": "Mutton",
+        "position": 26
+    },
+    {
+        "slug": "fish",
+        "name": "Fish",
+        "position": 27
+    },
+    {
+        "slug": "prawn",
+        "name": "Prawn",
+        "position": 28
+    },
+    {
+        "slug": "crab",
+        "name": "Crab",
+        "position": 29
+    },
+    {
+        "slug": "egg",
+        "name": "Egg",
+        "position": 30
+    },
+    {
+        "slug": "tandoori",
+        "name": "Tandoori",
+        "position": 31
+    },
+    {
+        "slug": "kebab",
+        "name": "Kebab",
+        "position": 32
+    },
+    {
+        "slug": "shawarma",
+        "name": "Shawarma",
+        "position": 33
+    },
+    {
+        "slug": "grill",
+        "name": "Grill",
+        "position": 34
+    },
+    {
+        "slug": "momos",
+        "name": "Momos",
+        "position": 35
+    },
+    {
+        "slug": "chaat",
+        "name": "Chaat",
+        "position": 36
+    },
+    {
+        "slug": "samosa",
+        "name": "Samosa",
+        "position": 37
+    },
+    {
+        "slug": "pav-bhaji",
+        "name": "Pav Bhaji",
+        "position": 38
+    },
+    {
+        "slug": "roll",
+        "name": "Rolls",
+        "position": 39
+    },
+    {
+        "slug": "sandwich",
+        "name": "Sandwich",
+        "position": 40
+    },
+    {
+        "slug": "burger",
+        "name": "Burger",
+        "position": 41
+    },
+    {
+        "slug": "pizza",
+        "name": "Pizza",
+        "position": 42
+    },
+    {
+        "slug": "pasta",
+        "name": "Pasta",
+        "position": 43
+    },
+    {
+        "slug": "noodles",
+        "name": "Noodles",
+        "position": 44
+    },
+    {
+        "slug": "fried-rice",
+        "name": "Fried Rice",
+        "position": 45
+    },
+    {
+        "slug": "soup",
+        "name": "Soup",
+        "position": 46
+    },
+    {
+        "slug": "salad",
+        "name": "Salad",
+        "position": 47
+    },
+    {
+        "slug": "paneer",
+        "name": "Paneer",
+        "position": 48
+    },
+    {
+        "slug": "cake",
+        "name": "Cake",
+        "position": 49
+    },
+    {
+        "slug": "pastry",
+        "name": "Pastry",
+        "position": 50
+    },
+    {
+        "slug": "ice-cream",
+        "name": "Ice Cream",
+        "position": 51
+    },
+    {
+        "slug": "sweets",
+        "name": "Sweets",
+        "position": 52
+    },
+    {
+        "slug": "bakery",
+        "name": "Bakery",
+        "position": 53
+    },
+    {
+        "slug": "biscuits",
+        "name": "Biscuits",
+        "position": 54
+    },
+    {
+        "slug": "juice",
+        "name": "Fresh Juice",
+        "position": 55
+    },
+    {
+        "slug": "milkshake",
+        "name": "Milkshake",
+        "position": 56
+    },
+    {
+        "slug": "lassi",
+        "name": "Lassi",
+        "position": 57
+    },
+    {
+        "slug": "tea",
+        "name": "Tea",
+        "position": 58
+    },
+    {
+        "slug": "coffee",
+        "name": "Filter Coffee",
+        "position": 59
+    },
+    {
+        "slug": "breakfast",
+        "name": "Breakfast",
+        "position": 60
+    }
+]
