@@ -15,18 +15,28 @@
         "position": 3
     },
     {
+        "slug": "fresh",
+        "caption": "Fresh today",
+        "position": 4
+    },
+    {
         "slug": "packed-order",
         "caption": "Packed and ready",
-        "position": 4
+        "position": 5
     },
     {
         "slug": "on-the-way",
         "caption": "On the way",
-        "position": 5
+        "position": 6
     },
     {
         "slug": "sweets",
         "caption": "Sweets counter",
-        "position": 6
+        "position": 7
+    },
+    {
+        "slug": "tea",
+        "caption": "Tea and coffee",
+        "position": 8
     }
 ]

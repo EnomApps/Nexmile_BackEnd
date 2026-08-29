@@ -71,7 +71,9 @@ class SeedStorefrontPhotosCommand extends Command
         $slides = array_slice(json_decode(file_get_contents($manifest), true), 0, $limit);
 
         foreach ($slides as $slide) {
-            $file = $dir.'/'.$slide['slug'].'.png';
+            // WebP: a fifth the size of PNG at this resolution, and Flutter renders
+            // it natively.
+            $file = $dir.'/'.$slide['slug'].'.webp';
 
             if (! is_file($file)) {
                 continue;
@@ -81,7 +83,7 @@ class SeedStorefrontPhotosCommand extends Command
                 'storefront/'.$merchant->id,
                 // Copied, not moved: the seed set has to survive the next
                 // restaurant.
-                new UploadedFile($file, $slide['slug'].'.png', 'image/png', null, true),
+                new UploadedFile($file, $slide['slug'].'.webp', 'image/webp', null, true),
             );
 
             $photo = $merchant->photos()->make([

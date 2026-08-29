@@ -332,11 +332,11 @@ class StorefrontPhotosTest extends TestCase
         // UploadedFile moves the file it is given unless told otherwise, which
         // would leave the next restaurant with nothing.
         $dir = database_path('seeders/storefront');
-        $before = count(glob($dir.'/*.png'));
+        $before = count(glob($dir.'/*.webp'));
 
         $this->artisan('nexmile:seed-photos', ['merchant' => $this->merchantUser()->merchant->id])
             ->assertSuccessful();
 
-        $this->assertSame($before, count(glob($dir.'/*.png')));
+        $this->assertSame($before, count(glob($dir.'/*.webp')));
     }
 }
