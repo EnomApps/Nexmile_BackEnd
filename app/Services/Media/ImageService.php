@@ -103,6 +103,26 @@ class ImageService
     }
 
     /**
+     * Validation for a banner, which may animate.
+     *
+     * Spelled out rather than leaning on Laravel's `image` rule: that rule
+     * also admits SVG, which is a document that can carry script, and this is
+     * the one upload whose output is rendered full-bleed on every customer's
+     * home screen.
+     *
+     * @return array<int, mixed>
+     */
+    public static function bannerRules(bool $required = true): array
+    {
+        return [
+            $required ? 'required' : 'sometimes',
+            'file',
+            'mimes:'.implode(',', config('media.banner_mimes')),
+            'max:'.config('media.max_size_kb'),
+        ];
+    }
+
+    /**
      * Validation for an uploaded image, shared by every caller so the API and
      * the portal cannot accept different files.
      *

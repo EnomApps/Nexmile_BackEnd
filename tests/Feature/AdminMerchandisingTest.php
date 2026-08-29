@@ -313,4 +313,67 @@ class AdminMerchandisingTest extends TestCase
             app(ImageService::class)->url($cuisine->fresh()->image_path)
         );
     }
+
+    /** A tiny but valid animated GIF: two 1x1 frames. */
+    private function animatedGif(): UploadedFile
+    {
+        $bytes = base64_decode(
+            'R0lGODlhAQABAIAAAP///wAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQJZAAAACwAAAAAAQABAAACAkQBACH5BAlkAAAALAAAAAABAAEAAAICRAEAOw=='
+        );
+
+        return UploadedFile::fake()->createWithContent('banner.gif', $bytes);
+    }
+
+    public function test_a_banner_may_be_an_animated_gif(): void
+    {
+        // The carousel is the one place motion is a design choice rather than
+        // a menu that will not sit still to be read.
+        $this->actingAs($this->admin())
+            ->post('/admin/home-screen/banners', [
+                'image' => $this->animatedGif(),
+                'alt_text' => 'Free delivery above 299',
+                'action_type' => 'none',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $this->assertSame(1, Banner::count());
+        $this->assertStringEndsWith('.gif', Banner::sole()->image_path);
+    }
+
+    public function test_a_banner_cannot_be_an_svg(): void
+    {
+        /*
+         * Laravel's `image` rule admits SVG, which is a document that can
+         * carry script — not something to accept from an upload and serve back
+         * under our own domain, least of all on the one asset rendered
+         * full-bleed on every customer's home screen.
+         */
+        $svg = UploadedFile::fake()->createWithContent(
+            'banner.svg',
+            '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+        );
+
+        $this->actingAs($this->admin())
+            ->post('/admin/home-screen/banners', [
+                'image' => $svg,
+                'alt_text' => 'Nice try',
+                'action_type' => 'none',
+            ])
+            ->assertSessionHasErrors('image');
+
+        $this->assertSame(0, Banner::count());
+    }
+
+    public function test_a_cuisine_icon_cannot_animate(): void
+    {
+        // Sixty animating icons on one screen is a phone getting warm.
+        $cuisine = Cuisine::create(['slug' => 'biryani', 'name' => 'Biryani']);
+
+        $this->actingAs($this->admin())
+            ->post("/admin/home-screen/cuisines/{$cuisine->id}/image", ['image' => $this->animatedGif()])
+            ->assertSessionHasErrors('image');
+
+        $this->assertNull($cuisine->fresh()->image_path);
+    }
 }

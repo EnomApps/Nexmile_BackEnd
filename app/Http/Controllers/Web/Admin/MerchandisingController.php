@@ -44,7 +44,8 @@ class MerchandisingController extends Controller
     public function storeBanner(Request $request, ImageService $images): RedirectResponse
     {
         $data = $request->validate([
-            'image' => ['required', 'image', 'max:4096'],
+            // Animated GIF allowed here and only here — see config/media.php.
+            'image' => ImageService::bannerRules(),
             'alt_text' => ['required', 'string', 'max:120'],
             'action_type' => ['required', Rule::in(self::ACTIONS)],
             // Required for every action except "none", which needs no target.
@@ -53,6 +54,7 @@ class MerchandisingController extends Controller
             'ends_at' => ['nullable', 'date', 'after:starts_at'],
             'position' => ['nullable', 'integer', 'min:0'],
         ], [
+            'image.mimes' => 'Upload a JPG, PNG, WebP or animated GIF.',
             'alt_text.required' => 'Alt text is required — a screen reader has nothing else to announce.',
             'ends_at.after' => 'The end of a campaign has to come after its start.',
         ]);

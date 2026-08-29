@@ -28,4 +28,17 @@ return [
 
     'mimes' => ['jpg', 'jpeg', 'png', 'webp'],
 
+    /*
+     * Banners may animate; dish photos and cuisine icons may not.
+     *
+     * A moving carousel slide is a design choice. A dish photo that animates
+     * is a menu that will not sit still to be read, and sixty animating
+     * cuisine icons on one screen is a phone getting warm.
+     *
+     * svg is deliberately absent from both. Laravel's `image` rule allows it,
+     * and an SVG is a document that can carry script — not something to accept
+     * from an upload and serve back under our own domain.
+     */
+    'banner_mimes' => ['jpg', 'jpeg', 'png', 'webp', 'gif'],
+
 ];
