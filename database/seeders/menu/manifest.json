@@ -1,0 +1,446 @@
+[
+    {
+        "category": "Tiffin",
+        "sort_order": 1,
+        "dishes": [
+            {
+                "slug": "idli",
+                "name": "Idli (2 pcs)",
+                "description": "Steamed rice cakes with sambar and chutney",
+                "price": 30,
+                "is_veg": true,
+                "sort_order": 1
+            },
+            {
+                "slug": "medu-vada",
+                "name": "Medu Vada (2 pcs)",
+                "description": "Crisp lentil doughnuts, soft inside",
+                "price": 40,
+                "is_veg": true,
+                "sort_order": 2
+            },
+            {
+                "slug": "plain-dosa",
+                "name": "Plain Dosa",
+                "description": "Thin and crisp, with sambar and chutney",
+                "price": 45,
+                "is_veg": true,
+                "sort_order": 3
+            },
+            {
+                "slug": "masala-dosa",
+                "name": "Masala Dosa",
+                "description": "Filled with spiced potato masala",
+                "price": 65,
+                "is_veg": true,
+                "sort_order": 4
+            },
+            {
+                "slug": "ghee-roast",
+                "name": "Ghee Roast Dosa",
+                "description": "Roasted in ghee until deep golden",
+                "price": 90,
+                "is_veg": true,
+                "sort_order": 5
+            },
+            {
+                "slug": "onion-uthappam",
+                "name": "Onion Uthappam",
+                "description": "Thick dosa with onion and green chilli",
+                "price": 70,
+                "is_veg": true,
+                "sort_order": 6
+            },
+            {
+                "slug": "ven-pongal",
+                "name": "Ven Pongal",
+                "description": "Rice and lentils with pepper, cumin and ghee",
+                "price": 55,
+                "is_veg": true,
+                "sort_order": 7
+            },
+            {
+                "slug": "poori",
+                "name": "Poori (2 pcs)",
+                "description": "With potato masala",
+                "price": 55,
+                "is_veg": true,
+                "sort_order": 8
+            },
+            {
+                "slug": "idiyappam",
+                "name": "Idiyappam (3 pcs)",
+                "description": "String hoppers with coconut milk",
+                "price": 50,
+                "is_veg": true,
+                "sort_order": 9
+            },
+            {
+                "slug": "appam",
+                "name": "Appam (2 pcs)",
+                "description": "Lace-edged, with coconut milk",
+                "price": 55,
+                "is_veg": true,
+                "sort_order": 10
+            }
+        ]
+    },
+    {
+        "category": "Biryani",
+        "sort_order": 2,
+        "dishes": [
+            {
+                "slug": "chicken-biryani",
+                "name": "Chicken Biryani",
+                "description": "Seeraga samba rice, slow-cooked chicken",
+                "price": 180,
+                "is_veg": false,
+                "sort_order": 1
+            },
+            {
+                "slug": "mutton-biryani",
+                "name": "Mutton Biryani",
+                "description": "Slow-cooked mutton on the bone",
+                "price": 260,
+                "is_veg": false,
+                "sort_order": 2
+            },
+            {
+                "slug": "egg-biryani",
+                "name": "Egg Biryani",
+                "description": "With two boiled eggs",
+                "price": 140,
+                "is_veg": false,
+                "sort_order": 3
+            },
+            {
+                "slug": "veg-biryani",
+                "name": "Vegetable Biryani",
+                "description": "Mixed vegetables, whole spices",
+                "price": 130,
+                "is_veg": true,
+                "sort_order": 4
+            },
+            {
+                "slug": "prawn-biryani",
+                "name": "Prawn Biryani",
+                "description": "Coastal style, lightly spiced",
+                "price": 280,
+                "is_veg": false,
+                "sort_order": 5
+            }
+        ]
+    },
+    {
+        "category": "Meals",
+        "sort_order": 3,
+        "dishes": [
+            {
+                "slug": "veg-meals",
+                "name": "Full Veg Meals",
+                "description": "Rice, sambar, rasam, poriyal, curd, appalam",
+                "price": 120,
+                "is_veg": true,
+                "sort_order": 1
+            },
+            {
+                "slug": "non-veg-meals",
+                "name": "Non-Veg Meals",
+                "description": "Full meals with chicken curry and fry",
+                "price": 190,
+                "is_veg": false,
+                "sort_order": 2
+            },
+            {
+                "slug": "mini-tiffin",
+                "name": "Mini Tiffin",
+                "description": "Idli, dosa, vada, pongal and coffee",
+                "price": 110,
+                "is_veg": true,
+                "sort_order": 3
+            }
+        ]
+    },
+    {
+        "category": "Starters",
+        "sort_order": 4,
+        "dishes": [
+            {
+                "slug": "chicken-65",
+                "name": "Chicken 65",
+                "description": "Madurai style, curry leaves and chilli",
+                "price": 170,
+                "is_veg": false,
+                "sort_order": 1
+            },
+            {
+                "slug": "gobi-65",
+                "name": "Gobi 65",
+                "description": "Cauliflower, same masala",
+                "price": 130,
+                "is_veg": true,
+                "sort_order": 2
+            },
+            {
+                "slug": "chilli-chicken",
+                "name": "Chilli Chicken",
+                "description": "Dry, with capsicum and onion",
+                "price": 190,
+                "is_veg": false,
+                "sort_order": 3
+            },
+            {
+                "slug": "paneer-tikka",
+                "name": "Paneer Tikka",
+                "description": "Char-grilled, with mint chutney",
+                "price": 180,
+                "is_veg": true,
+                "sort_order": 4
+            },
+            {
+                "slug": "fish-fry",
+                "name": "Fish Fry",
+                "description": "Seer fish, rava coated",
+                "price": 210,
+                "is_veg": false,
+                "sort_order": 5
+            },
+            {
+                "slug": "prawn-fry",
+                "name": "Prawn Fry",
+                "description": "Pepper and curry leaf",
+                "price": 240,
+                "is_veg": false,
+                "sort_order": 6
+            }
+        ]
+    },
+    {
+        "category": "Parotta & Kothu",
+        "sort_order": 5,
+        "dishes": [
+            {
+                "slug": "parotta",
+                "name": "Parotta (2 pcs)",
+                "description": "Flaky, with salna",
+                "price": 40,
+                "is_veg": true,
+                "sort_order": 1
+            },
+            {
+                "slug": "veechu-parotta",
+                "name": "Veechu Parotta",
+                "description": "Thin, hand-thrown",
+                "price": 60,
+                "is_veg": true,
+                "sort_order": 2
+            },
+            {
+                "slug": "kothu-parotta",
+                "name": "Kothu Parotta (Veg)",
+                "description": "Shredded parotta, egg optional",
+                "price": 110,
+                "is_veg": true,
+                "sort_order": 3
+            },
+            {
+                "slug": "chicken-kothu",
+                "name": "Chicken Kothu Parotta",
+                "description": "With shredded chicken and salna",
+                "price": 170,
+                "is_veg": false,
+                "sort_order": 4
+            }
+        ]
+    },
+    {
+        "category": "Rice & Noodles",
+        "sort_order": 6,
+        "dishes": [
+            {
+                "slug": "veg-fried-rice",
+                "name": "Veg Fried Rice",
+                "description": "Wok-tossed with vegetables",
+                "price": 120,
+                "is_veg": true,
+                "sort_order": 1
+            },
+            {
+                "slug": "chicken-fried-rice",
+                "name": "Chicken Fried Rice",
+                "description": "With shredded chicken",
+                "price": 160,
+                "is_veg": false,
+                "sort_order": 2
+            },
+            {
+                "slug": "schezwan-rice",
+                "name": "Schezwan Fried Rice",
+                "description": "Hot, with schezwan sauce",
+                "price": 150,
+                "is_veg": true,
+                "sort_order": 3
+            },
+            {
+                "slug": "veg-noodles",
+                "name": "Veg Noodles",
+                "description": "Hakka style",
+                "price": 120,
+                "is_veg": true,
+                "sort_order": 4
+            },
+            {
+                "slug": "chicken-noodles",
+                "name": "Chicken Noodles",
+                "description": "With shredded chicken",
+                "price": 160,
+                "is_veg": false,
+                "sort_order": 5
+            }
+        ]
+    },
+    {
+        "category": "Curries",
+        "sort_order": 7,
+        "dishes": [
+            {
+                "slug": "chicken-curry",
+                "name": "Chicken Curry",
+                "description": "Chettinad masala, coconut",
+                "price": 180,
+                "is_veg": false,
+                "sort_order": 1
+            },
+            {
+                "slug": "mutton-curry",
+                "name": "Mutton Curry",
+                "description": "Slow-cooked, pepper heavy",
+                "price": 260,
+                "is_veg": false,
+                "sort_order": 2
+            },
+            {
+                "slug": "fish-curry",
+                "name": "Fish Curry",
+                "description": "Tamarind and coconut",
+                "price": 200,
+                "is_veg": false,
+                "sort_order": 3
+            },
+            {
+                "slug": "paneer-butter-masala",
+                "name": "Paneer Butter Masala",
+                "description": "Rich tomato and cream",
+                "price": 190,
+                "is_veg": true,
+                "sort_order": 4
+            },
+            {
+                "slug": "dal-fry",
+                "name": "Dal Fry",
+                "description": "Tempered with cumin and garlic",
+                "price": 110,
+                "is_veg": true,
+                "sort_order": 5
+            }
+        ]
+    },
+    {
+        "category": "Breads",
+        "sort_order": 8,
+        "dishes": [
+            {
+                "slug": "chapati",
+                "name": "Chapati (2 pcs)",
+                "description": "With kurma",
+                "price": 40,
+                "is_veg": true,
+                "sort_order": 1
+            },
+            {
+                "slug": "butter-naan",
+                "name": "Butter Naan",
+                "description": "Tandoor baked, brushed with butter",
+                "price": 60,
+                "is_veg": true,
+                "sort_order": 2
+            }
+        ]
+    },
+    {
+        "category": "Desserts",
+        "sort_order": 9,
+        "dishes": [
+            {
+                "slug": "gulab-jamun",
+                "name": "Gulab Jamun (2 pcs)",
+                "description": "Warm, in cardamom syrup",
+                "price": 60,
+                "is_veg": true,
+                "sort_order": 1
+            },
+            {
+                "slug": "payasam",
+                "name": "Semiya Payasam",
+                "description": "Vermicelli, milk, cashew",
+                "price": 70,
+                "is_veg": true,
+                "sort_order": 2
+            },
+            {
+                "slug": "ice-cream",
+                "name": "Ice Cream",
+                "description": "Vanilla, butterscotch or chocolate",
+                "price": 80,
+                "is_veg": true,
+                "sort_order": 3
+            }
+        ]
+    },
+    {
+        "category": "Beverages",
+        "sort_order": 10,
+        "dishes": [
+            {
+                "slug": "filter-coffee",
+                "name": "Filter Coffee",
+                "description": "Degree coffee, strong",
+                "price": 30,
+                "is_veg": true,
+                "sort_order": 1
+            },
+            {
+                "slug": "tea",
+                "name": "Tea",
+                "description": "Milk tea",
+                "price": 25,
+                "is_veg": true,
+                "sort_order": 2
+            },
+            {
+                "slug": "buttermilk",
+                "name": "Buttermilk",
+                "description": "Salted, with curry leaf",
+                "price": 30,
+                "is_veg": true,
+                "sort_order": 3
+            },
+            {
+                "slug": "lassi",
+                "name": "Sweet Lassi",
+                "description": "Thick, lightly sweet",
+                "price": 60,
+                "is_veg": true,
+                "sort_order": 4
+            },
+            {
+                "slug": "fresh-juice",
+                "name": "Fresh Lime Juice",
+                "description": "Sweet or salt",
+                "price": 40,
+                "is_veg": true,
+                "sort_order": 5
+            }
+        ]
+    }
+]
