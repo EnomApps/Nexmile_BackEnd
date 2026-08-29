@@ -169,7 +169,7 @@ class SeedMenuTest extends TestCase
 
         foreach ($groups as $group) {
             foreach ($group['dishes'] as $dish) {
-                $this->assertFileExists($dir.'/'.$dish['slug'].'.png', "{$dish['slug']} has no photo");
+                $this->assertFileExists($dir.'/'.$dish['slug'].'.webp', "{$dish['slug']} has no photo");
                 $this->assertGreaterThan(0, $dish['price'], "{$dish['slug']} has no price");
             }
         }
@@ -180,11 +180,11 @@ class SeedMenuTest extends TestCase
         // UploadedFile moves the file it is given unless told otherwise, which
         // would empty the folder for the next merchant.
         $dir = database_path('seeders/menu');
-        $before = count(glob($dir.'/*.png'));
+        $before = count(glob($dir.'/*.webp'));
 
         $this->artisan('nexmile:seed-menu', ['merchant' => $this->restaurant()->id, '--only' => 'Desserts'])
             ->assertSuccessful();
 
-        $this->assertSame($before, count(glob($dir.'/*.png')));
+        $this->assertSame($before, count(glob($dir.'/*.webp')));
     }
 }

@@ -125,7 +125,9 @@ class SeedMenuCommand extends Command
                     'sort_order' => $dish['sort_order'],
                 ])->save();
 
-                $photo = $dir.'/'.$dish['slug'].'.png';
+                // WebP: transparent, and a fifth the size of the equivalent PNG at this
+                // resolution. Flutter renders it natively.
+                $photo = $dir.'/'.$dish['slug'].'.webp';
 
                 if (is_file($photo) && ($item->image_path === null || $this->option('force'))) {
                     $images->attach(
@@ -134,7 +136,7 @@ class SeedMenuCommand extends Command
                         $item->photoDirectory(),
                         // Copied, not moved: the seed set has to survive the
                         // next run and the next merchant.
-                        new UploadedFile($photo, $dish['slug'].'.png', 'image/png', null, true),
+                        new UploadedFile($photo, $dish['slug'].'.webp', 'image/webp', null, true),
                     );
                 }
 
