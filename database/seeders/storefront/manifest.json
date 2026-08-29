@@ -1,0 +1,32 @@
+[
+    {
+        "slug": "dining-area",
+        "caption": "Dining area",
+        "position": 1
+    },
+    {
+        "slug": "counter",
+        "caption": "Counter",
+        "position": 2
+    },
+    {
+        "slug": "kitchen",
+        "caption": "Kitchen",
+        "position": 3
+    },
+    {
+        "slug": "packed-order",
+        "caption": "Packed and ready",
+        "position": 4
+    },
+    {
+        "slug": "on-the-way",
+        "caption": "On the way",
+        "position": 5
+    },
+    {
+        "slug": "sweets",
+        "caption": "Sweets counter",
+        "position": 6
+    }
+]

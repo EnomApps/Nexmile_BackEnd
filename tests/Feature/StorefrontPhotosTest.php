@@ -270,4 +270,73 @@ class StorefrontPhotosTest extends TestCase
             'status' => UserStatus::Active,
         ]);
     }
+
+    public function test_the_seeder_fills_an_empty_carousel(): void
+    {
+        // A storefront with no photos gives an app developer nothing to build
+        // a carousel against.
+        $user = $this->merchantUser();
+
+        $this->artisan('nexmile:seed-photos', ['merchant' => $user->merchant->id])
+            ->assertSuccessful();
+
+        $photos = $user->merchant->photos()->get();
+
+        $this->assertGreaterThan(3, $photos->count());
+        $this->assertSame('Dining area', $photos->first()->caption);
+        Storage::disk(config('media.disk'))->assertExists($photos->first()->image_path);
+    }
+
+    public function test_the_seeder_will_not_sit_beside_a_merchants_own_photos(): void
+    {
+        /*
+         * Samples pushed in beside real ones is the worst of both — the
+         * carousel looks unfinished and the merchant did the work for nothing.
+         */
+        $user = $this->merchantUser();
+        $this->addPhoto($user, 'Our actual dining room');
+
+        $this->artisan('nexmile:seed-photos', ['merchant' => $user->merchant->id])
+            ->assertSuccessful();
+
+        $this->assertSame(1, $user->merchant->photos()->count());
+        $this->assertSame('Our actual dining room', $user->merchant->photos()->sole()->caption);
+    }
+
+    public function test_replace_swaps_them_out(): void
+    {
+        $user = $this->merchantUser();
+        $this->addPhoto($user, 'Old');
+
+        $this->artisan('nexmile:seed-photos', ['merchant' => $user->merchant->id, '--replace' => true])
+            ->assertSuccessful();
+
+        $this->assertGreaterThan(1, $user->merchant->photos()->count());
+        $this->assertNull($user->merchant->photos()->where('caption', 'Old')->first());
+    }
+
+    public function test_the_seeder_never_exceeds_the_carousel_cap(): void
+    {
+        $user = $this->merchantUser();
+
+        $this->artisan('nexmile:seed-photos', ['merchant' => $user->merchant->id])->assertSuccessful();
+
+        $this->assertLessThanOrEqual(
+            (int) config('media.max_storefront_photos'),
+            $user->merchant->photos()->count(),
+        );
+    }
+
+    public function test_the_sample_set_survives_being_used(): void
+    {
+        // UploadedFile moves the file it is given unless told otherwise, which
+        // would leave the next restaurant with nothing.
+        $dir = database_path('seeders/storefront');
+        $before = count(glob($dir.'/*.png'));
+
+        $this->artisan('nexmile:seed-photos', ['merchant' => $this->merchantUser()->merchant->id])
+            ->assertSuccessful();
+
+        $this->assertSame($before, count(glob($dir.'/*.png')));
+    }
 }
