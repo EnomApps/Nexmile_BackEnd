@@ -92,7 +92,9 @@ class MerchandisingController extends Controller
     public function destroyBanner(Banner $banner, ImageService $images): RedirectResponse
     {
         // Drop the file too: an orphaned image is a bill nobody is watching.
-        $images->detach($banner, 'image_path');
+        // purge, not detach — detach nulls the column first, and image_path is
+        // NOT NULL, so it threw before it ever reached the delete.
+        $images->purge($banner->image_path);
         $banner->delete();
 
         return back()->with('status', 'Banner removed.');
@@ -163,7 +165,7 @@ class MerchandisingController extends Controller
 
     public function destroyCuisine(Cuisine $cuisine, ImageService $images): RedirectResponse
     {
-        $images->detach($cuisine, 'image_path');
+        $images->purge($cuisine->image_path);
         $cuisine->delete();
 
         return back()->with('status', 'Cuisine removed.');
@@ -227,7 +229,7 @@ class MerchandisingController extends Controller
 
     public function destroyCollection(Collection $collection, ImageService $images): RedirectResponse
     {
-        $images->detach($collection, 'banner_path');
+        $images->purge($collection->banner_path);
         $collection->delete();
 
         return back()->with('status', 'Collection removed.');

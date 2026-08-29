@@ -87,6 +87,19 @@ class ImageService
     }
 
     /**
+     * Delete the stored object without touching a record.
+     *
+     * For when the record is being deleted too. detach() nulls the column
+     * first, which is pointless before a DELETE and outright breaks where the
+     * column is NOT NULL — banners.image_path is, because a banner without an
+     * image is not a banner.
+     */
+    public function purge(?string $path): void
+    {
+        $this->deleteObject($path);
+    }
+
+    /**
      * A signed, expiring link. Null when there is no photo — the apps show a
      * placeholder rather than a broken image.
      */

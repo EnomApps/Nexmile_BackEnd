@@ -376,4 +376,54 @@ class AdminMerchandisingTest extends TestCase
 
         $this->assertNull($cuisine->fresh()->image_path);
     }
+
+    public function test_a_banner_can_be_removed(): void
+    {
+        $this->actingAs($this->admin())
+            ->post('/admin/home-screen/banners', [
+                'image' => $this->image(),
+                'alt_text' => 'Diwali offer',
+                'action_type' => 'none',
+            ])->assertRedirect();
+
+        $banner = Banner::sole();
+        $stored = $banner->image_path;
+
+        $this->actingAs($this->admin())
+            ->delete("/admin/home-screen/banners/{$banner->id}")
+            ->assertRedirect();
+
+        $this->assertSame(0, Banner::count());
+        // The file goes too: an orphaned object is a bill nobody is watching.
+        Storage::disk(config('media.disk'))->assertMissing($stored);
+    }
+
+    public function test_a_banner_with_no_stored_image_can_still_be_removed(): void
+    {
+        /*
+         * The rows left by the old silent-failure bug. Deleting one must not
+         * trip over the missing file — otherwise the broken banners are also
+         * the ones that cannot be cleaned up.
+         */
+        $banner = Banner::create(['image_path' => '', 'alt_text' => 'Broken']);
+
+        $this->actingAs($this->admin())
+            ->delete("/admin/home-screen/banners/{$banner->id}")
+            ->assertRedirect();
+
+        $this->assertSame(0, Banner::count());
+    }
+
+    public function test_a_banner_whose_file_is_already_gone_can_be_removed(): void
+    {
+        // A path that points at nothing — a bucket cleaned by hand, a restore
+        // from a backup taken before the upload.
+        $banner = Banner::create(['image_path' => 'banners/vanished.png', 'alt_text' => 'Ghost']);
+
+        $this->actingAs($this->admin())
+            ->delete("/admin/home-screen/banners/{$banner->id}")
+            ->assertRedirect();
+
+        $this->assertSame(0, Banner::count());
+    }
 }
