@@ -45,6 +45,18 @@ class ReviewController extends Controller
             'rating' => ['required', 'integer', 'between:1,5'],
             'rider_rating' => ['sometimes', 'nullable', 'integer', 'between:1,5'],
             'comment' => ['sometimes', 'nullable', 'string', 'max:1000'],
+
+            /*
+             * Optional per-dish scores, keyed by menu_item_id:
+             *   {"dishes": {"41": 5, "44": 3}}
+             *
+             * Anything not on the order is ignored rather than refused — a
+             * stale menu id from a slow screen should not lose the whole
+             * review, and rating dishes you did not buy is the cheapest way
+             * there is to bury a competitor.
+             */
+            'dishes' => ['sometimes', 'array', 'max:30'],
+            'dishes.*' => ['integer', 'between:1,5'],
         ]);
 
         $review = $this->reviews->leave(
@@ -53,6 +65,7 @@ class ReviewController extends Controller
             $data['rating'],
             $data['rider_rating'] ?? null,
             $data['comment'] ?? null,
+            $data['dishes'] ?? [],
         );
 
         return response()->json([
@@ -77,6 +90,9 @@ class ReviewController extends Controller
             'rating' => $review->rating,
             'rider_rating' => $review->rider_rating,
             'comment' => $review->comment,
+            // Only what was kept: a dish that was not on the order is silently
+            // dropped, and the app should show what actually saved.
+            'dishes' => $review->items()->pluck('rating', 'menu_item_id'),
             'created_at' => $review->created_at,
         ];
     }

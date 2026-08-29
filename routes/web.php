@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\Admin\AdminController;
 use App\Http\Controllers\Web\Admin\AdminOrderController;
 use App\Http\Controllers\Web\Admin\DashboardController;
 use App\Http\Controllers\Web\Admin\MerchandisingController;
+use App\Http\Controllers\Web\Admin\ReviewModerationController;
 use App\Http\Controllers\Web\LanguageController;
 use App\Http\Controllers\Web\MerchantEarningsController;
 use App\Http\Controllers\Web\MerchantMenuController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Web\MerchantOptionController;
 use App\Http\Controllers\Web\MerchantOrderController;
 use App\Http\Controllers\Web\MerchantPortalController;
 use App\Http\Controllers\Web\MerchantProfileController;
+use App\Http\Controllers\Web\MerchantReviewController;
 use App\Http\Controllers\Web\MerchantStorefrontController;
 use App\Http\Controllers\Web\MerchantSurplusController;
 use App\Http\Controllers\Web\PageController;
@@ -81,6 +83,9 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
             ->name('accepting-orders');
 
         Route::get('earnings', [MerchantEarningsController::class, 'index'])->name('earnings');
+
+        // A score a merchant cannot explain is a score they cannot act on.
+        Route::get('reviews', [MerchantReviewController::class, 'index'])->name('reviews');
 
         Route::get('profile', [MerchantProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('profile', [MerchantProfileController::class, 'update'])->name('profile.update');
@@ -189,6 +194,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
          * catch-all, or 'orders' is read as an account type.
          */
         Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+        /*
+         * Review moderation. Without it the only options for an abusive
+         * comment are leaving it up or reaching into the database.
+         */
+        Route::get('reviews', [ReviewModerationController::class, 'index'])->name('reviews.index');
+        Route::post('reviews/{review}/hide', [ReviewModerationController::class, 'hide'])->name('reviews.hide');
+        Route::post('reviews/{review}/unhide', [ReviewModerationController::class, 'unhide'])->name('reviews.unhide');
 
         /*
          * Home screen merchandising. The banners, cuisines and collections

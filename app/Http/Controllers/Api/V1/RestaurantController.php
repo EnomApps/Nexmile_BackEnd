@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\CategoryResource;
 use App\Http\Resources\MenuItemResource;
 use App\Http\Resources\RestaurantResource;
+use App\Http\Resources\ReviewResource;
 use App\Models\MenuItem;
 use App\Models\Merchant;
 use App\Services\Discovery\NearbyMerchantService;
@@ -83,6 +84,65 @@ class RestaurantController extends Controller
                 'applied_filters' => (object) $filters->applied(),
             ]])
             ->response();
+    }
+
+    /**
+     * Reviews for a restaurant
+     *
+     * Newest first. Hidden reviews are absent entirely — moderation that only
+     * removed a score while leaving the words would be worthless.
+     */
+    public function reviews(Request $request, int $restaurant): JsonResponse
+    {
+        $data = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'between:1,50'],
+            // "Only reviews with something written" — a wall of bare stars is
+            // not what anyone opens this list for.
+            'with_comment' => ['sometimes', 'boolean'],
+        ]);
+
+        $merchant = Merchant::where('kyc_status', KycStatus::Verified->value)->findOrFail($restaurant);
+
+        $reviews = $merchant->reviews()
+            ->visible()
+            ->with(['user:id,name', 'items.menuItem:id,name'])
+            ->when($data['with_comment'] ?? false, fn ($q) => $q->whereNotNull('comment')->where('comment', '!=', ''))
+            ->latest()
+            ->paginate($data['per_page'] ?? 20);
+
+        return ReviewResource::collection($reviews)
+            ->additional(['meta' => [
+                'rating' => $merchant->rating === null ? null : (float) $merchant->rating,
+                'rating_count' => (int) $merchant->rating_count,
+                /*
+                 * The histogram behind the score. A 4.2 built from forty
+                 * fives and ten ones is a different restaurant from a 4.2
+                 * where everyone said four.
+                 */
+                'breakdown' => $this->ratingBreakdown($merchant),
+            ]])
+            ->response();
+    }
+
+    /**
+     * How many reviews sit at each star, 5 down to 1.
+     *
+     * @return array<int, int>
+     */
+    private function ratingBreakdown(Merchant $merchant): array
+    {
+        $counts = $merchant->reviews()->visible()
+            ->selectRaw('rating, COUNT(*) as total')
+            ->groupBy('rating')
+            ->pluck('total', 'rating');
+
+        $breakdown = [];
+
+        foreach ([5, 4, 3, 2, 1] as $star) {
+            $breakdown[$star] = (int) ($counts[$star] ?? 0);
+        }
+
+        return $breakdown;
     }
 
     /**

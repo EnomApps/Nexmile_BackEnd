@@ -30,6 +30,8 @@ class MenuItem extends Model
             'is_veg' => 'boolean',
             'contains_egg' => 'boolean',
             'is_available' => 'boolean',
+            'rating' => 'float',
+            'rating_count' => 'integer',
             'is_surplus_deal' => 'boolean',
             'prep_time_minutes' => 'integer',
             'sort_order' => 'integer',

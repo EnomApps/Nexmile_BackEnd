@@ -111,6 +111,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('deals', [RestaurantController::class, 'deals'])->name('deals');
             Route::get('{restaurant}', [RestaurantController::class, 'show'])->name('show');
             Route::get('{restaurant}/menu', [RestaurantController::class, 'menu'])->name('menu');
+            // What people actually wrote. Without this the comment box asks a
+            // customer to write something nobody will ever read.
+            Route::get('{restaurant}/reviews', [RestaurantController::class, 'reviews'])->name('reviews');
 
             // The bookmark on a restaurant card.
             Route::post('{restaurant}/favourite', [FavouriteController::class, 'store'])->name('favourite.store');

@@ -395,4 +395,17 @@ return [
         'free_delivery' => 'Free delivery',
     ],
 
+    'reviews' => [
+        'title' => 'Reviews',
+        'intro' => 'What customers said after their order arrived. Tap a star row to see only those.',
+        'count' => '{0} no ratings|{1} 1 rating|[2,*] :count ratings',
+        'not_published' => 'Not shown to customers yet — a score appears once three people have rated you.',
+        'weakest' => 'Dishes rated lowest',
+        'weakest_hint' => 'The quickest thing to fix. A dish here is one customers ordered and were disappointed by.',
+        'filtered' => 'Showing :stars★ reviews only.',
+        'show_all' => 'Show all',
+        'none' => 'No reviews yet. They appear here as soon as customers start rating delivered orders.',
+        'anonymous' => 'A customer',
+    ],
+
 ];

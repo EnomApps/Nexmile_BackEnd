@@ -30,6 +30,15 @@ class MenuItemResource extends JsonResource
             'is_discounted' => $this->isDiscounted(),
             'gst_rate' => (float) $this->gst_rate,
 
+            /*
+             * Null until enough people have rated the dish. "5.0" off one
+             * review is noise wearing the clothes of a signal, and a
+             * dish-level number is the one a customer trusts most because it
+             * is the most specific.
+             */
+            'rating' => $this->rating === null ? null : (float) $this->rating,
+            'rating_count' => (int) $this->rating_count,
+
             'is_veg' => (bool) $this->is_veg,
             'contains_egg' => (bool) $this->contains_egg,
             'is_available' => (bool) $this->is_available,
