@@ -78,6 +78,98 @@
         </div>
     </div>
 
+    {{-- The storefront carousel. One banner heads a page; it does not sell a
+         place a customer has never visited. --}}
+    <div class="mt-8 {{ $card }}">
+        <h2 class="text-xl font-bold text-white">{{ __('portal.storefront.photos') }}</h2>
+        <p class="mt-1 text-sm text-gray-500">
+            {{ __('portal.storefront.photos_hint', ['limit' => $photoLimit]) }}
+        </p>
+
+        @if ($photos->isNotEmpty())
+            <div class="mt-5 space-y-2">
+                @foreach ($photos as $i => $photo)
+                    <div class="flex flex-wrap items-center gap-4 rounded-xl border border-white/10 bg-black/20 p-3">
+                        <img src="{{ $images->url($photo->image_path) }}" alt="{{ $photo->caption }}"
+                             class="w-24 h-16 rounded-lg object-cover bg-white/5 shrink-0">
+
+                        <div class="flex-1 min-w-[10rem]">
+                            <p class="text-sm text-gray-200">
+                                {{ $photo->caption ?: __('portal.storefront.photo_untitled') }}
+                            </p>
+                            @if ($i === 0)
+                                {{-- The slide most people see, and the only
+                                     ordering decision that really matters. --}}
+                                <p class="text-xs text-brand-green">{{ __('portal.storefront.photo_first') }}</p>
+                            @endif
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            @foreach (['up' => '↑', 'down' => '↓'] as $direction => $arrow)
+                                @php
+                                    $disabled = ($direction === 'up' && $i === 0)
+                                        || ($direction === 'down' && $i === $photos->count() - 1);
+                                @endphp
+                                <form method="POST" action="{{ route('merchants.storefront.photos.move', $photo->id) }}">
+                                    @csrf
+                                    <input type="hidden" name="direction" value="{{ $direction }}">
+                                    <button @disabled($disabled)
+                                            aria-label="{{ __('portal.storefront.photo_move_'.$direction) }}"
+                                            class="w-8 h-8 rounded-lg border border-white/15 text-sm
+                                                   {{ $disabled ? 'text-gray-700' : 'text-gray-300 hover:text-white hover:border-white/30' }}">
+                                        {{ $arrow }}
+                                    </button>
+                                </form>
+                            @endforeach
+
+                            <form method="POST" action="{{ route('merchants.storefront.photos.destroy', $photo->id) }}"
+                                  onsubmit="return confirm('{{ __('portal.storefront.photo_delete_confirm') }}')">
+                                @csrf @method('DELETE')
+                                <button class="text-xs font-semibold text-red-300 hover:text-red-200 px-1">
+                                    {{ __('portal.menu.remove_photo') }}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <p class="mt-5 text-sm text-gray-500">{{ __('portal.storefront.photos_none') }}</p>
+        @endif
+
+        @if ($photos->count() < $photoLimit)
+            <form method="POST" action="{{ route('merchants.storefront.photos.store') }}"
+                  enctype="multipart/form-data" class="mt-6 pt-5 border-t border-white/10 flex flex-wrap items-end gap-4">
+                @csrf
+
+                <div class="flex-1 min-w-[12rem]">
+                    <label for="photo-file" class="block text-xs font-medium mb-1.5 text-gray-400">
+                        {{ __('portal.storefront.photo_file') }}
+                    </label>
+                    <input id="photo-file" name="file" type="file" accept=".jpg,.jpeg,.png,.webp" required
+                           class="w-full rounded-lg bg-white/[0.03] border border-white/15 px-3 py-2 text-sm text-white">
+                </div>
+
+                <div class="flex-1 min-w-[12rem]">
+                    <label for="photo-caption" class="block text-xs font-medium mb-1.5 text-gray-400">
+                        {{ __('portal.storefront.photo_caption') }}
+                    </label>
+                    <input id="photo-caption" name="caption" maxlength="120"
+                           placeholder="{{ __('portal.storefront.photo_caption_example') }}"
+                           class="w-full rounded-lg bg-white/[0.03] border border-white/15 px-3 py-2 text-sm text-white
+                                  focus:border-brand-green focus:ring-1 focus:ring-brand-green outline-none">
+                </div>
+
+                <button class="px-5 py-2.5 rounded-lg bg-brand-green text-black font-bold text-sm hover:bg-lime-400 transition">
+                    {{ __('portal.storefront.photo_add') }}
+                </button>
+            </form>
+        @else
+            <p class="mt-6 pt-5 border-t border-white/10 text-sm text-brand-orange">
+                {{ __('portal.storefront.photos_full', ['limit' => $photoLimit]) }}
+            </p>
+        @endif
+    </div>
     {{-- How the restaurant is listed and filtered. Set by the merchant: they
          know whether their kitchen is pure veg and what two people spend. --}}
     <div class="mt-8 {{ $card }}">

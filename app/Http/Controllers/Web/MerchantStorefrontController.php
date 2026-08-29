@@ -44,6 +44,9 @@ class MerchantStorefrontController extends Controller
             'hours' => $merchant->operatingHours()->get()->keyBy('day_of_week'),
             'days' => self::DAYS,
             'cuisineChoices' => Cuisine::live()->get(),
+            'photos' => $merchant->photos()->get(),
+            'photoLimit' => (int) config('media.max_storefront_photos'),
+            'images' => $this->images,
         ]);
     }
 
@@ -98,6 +101,112 @@ class MerchantStorefrontController extends Controller
         ]);
 
         return back()->with('status', __('portal.storefront.listing_saved'));
+    }
+
+    /**
+     * Add a photo to the storefront carousel.
+     *
+     * One banner heads a page; it does not sell a place. A customer deciding
+     * between two kitchens they have never visited wants the room, the
+     * counter, the food going out.
+     */
+    public function uploadPhoto(Request $request, ImageService $images): RedirectResponse
+    {
+        $data = $request->validate([
+            'file' => ImageService::rules(),
+            'caption' => ['sometimes', 'nullable', 'string', 'max:120'],
+        ], ImageService::messages('file'));
+
+        $merchant = $this->merchant($request);
+        $limit = (int) config('media.max_storefront_photos');
+
+        /*
+         * A cap, because a carousel nobody swipes to the end of is a carousel
+         * that costs data for nothing — and every slide is a signed URL the
+         * app fetches on open.
+         */
+        if ($merchant->photos()->count() >= $limit) {
+            return back()->withErrors([
+                'file' => __('portal.storefront.photos_full', ['limit' => $limit]),
+            ]);
+        }
+
+        /*
+         * The file is stored before the row exists, for the same reason
+         * banners are: image_path is NOT NULL, and a row created first has
+         * nothing to put there. A failed upload should leave no photo rather
+         * than a broken one — or, as here, a constraint violation.
+         */
+        $stored = $images->store('storefront/'.$merchant->id, $request->file('file'));
+
+        $photo = $merchant->photos()->make([
+            'caption' => $data['caption'] ?? null,
+            // Appended, not inserted: a new photo joining the middle of a
+            // carousel the merchant has already arranged is a surprise.
+            'position' => (int) $merchant->photos()->max('position') + 1,
+        ]);
+
+        // forceFill, because image_path is deliberately not mass assignable.
+        $photo->forceFill(['image_path' => $stored])->save();
+
+        return back()->with('status', __('portal.storefront.photo_saved'));
+    }
+
+    public function destroyPhoto(Request $request, int $photo, ImageService $images): RedirectResponse
+    {
+        $model = $this->merchant($request)->photos()->findOrFail($photo);
+
+        // purge, not detach: the record is going away, and image_path cannot
+        // hold null.
+        $images->purge($model->image_path);
+        $model->delete();
+
+        return back()->with('status', __('portal.storefront.photo_removed'));
+    }
+
+    /**
+     * Move a photo one place earlier or later.
+     *
+     * The first slide is the one most people see, so which photo leads is the
+     * only ordering decision that really matters — and it is two clicks away
+     * rather than a drag interaction to build and maintain.
+     */
+    public function movePhoto(Request $request, int $photo): RedirectResponse
+    {
+        $data = $request->validate([
+            'direction' => ['required', 'in:up,down'],
+        ]);
+
+        $merchant = $this->merchant($request);
+        $photos = $merchant->photos()->get();
+
+        $index = $photos->search(fn ($p) => $p->id === $photo);
+
+        abort_if($index === false, 404);
+
+        $swapWith = $data['direction'] === 'up' ? $index - 1 : $index + 1;
+
+        if ($swapWith < 0 || $swapWith >= $photos->count()) {
+            return back();
+        }
+
+        $ordered = $photos->values()->all();
+
+        [$ordered[$index], $ordered[$swapWith]] = [$ordered[$swapWith], $ordered[$index]];
+
+        /*
+         * The whole sequence is renumbered, not just the two rows swapped.
+         * Positions drift after deletions and two rows can end up sharing one,
+         * where swapping a pair of duplicates does nothing and reads as a
+         * broken button.
+         */
+        DB::transaction(function () use ($ordered) {
+            foreach ($ordered as $i => $photo) {
+                $photo->forceFill(['position' => $i + 1])->save();
+            }
+        });
+
+        return back();
     }
 
     public function uploadImage(Request $request): RedirectResponse

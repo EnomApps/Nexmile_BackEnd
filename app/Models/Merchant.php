@@ -114,6 +114,12 @@ class Merchant extends Model
         return $this->hasMany(Category::class);
     }
 
+    /** The storefront carousel, in the order the merchant arranged it. */
+    public function photos(): HasMany
+    {
+        return $this->hasMany(MerchantPhoto::class)->orderBy('position')->orderBy('id');
+    }
+
     /** Ratings left against this restaurant (EP12). */
     public function reviews(): HasMany
     {

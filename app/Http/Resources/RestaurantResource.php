@@ -34,6 +34,19 @@ class RestaurantResource extends JsonResource
             'logo_url' => $images->url($this->logo_path),
             'banner_url' => $images->url($this->banner_path),
 
+            /*
+             * The carousel, present only where the relation was loaded — the
+             * storefront. A nearby list of twenty restaurants does not want
+             * eight signed URLs each for images nobody will scroll to.
+             */
+            'photos' => $this->whenLoaded('photos', fn () => $this->photos
+                ->map(fn ($photo) => [
+                    'id' => $photo->id,
+                    'url' => $images->url($photo->image_path),
+                    'caption' => $photo->caption,
+                ])
+                ->all()),
+
             'is_open' => $this->isOpenNow(),
             // Split out so the app can say *why* it is shut. "Closed for the
             // night" and "temporarily not taking orders" are different

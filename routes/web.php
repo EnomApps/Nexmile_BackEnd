@@ -136,6 +136,14 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
             Route::post('image', [MerchantStorefrontController::class, 'uploadImage'])->name('image.upload');
             Route::delete('image/{type}', [MerchantStorefrontController::class, 'destroyImage'])->name('image.destroy');
             Route::post('hours', [MerchantStorefrontController::class, 'saveHours'])->name('hours');
+
+            /*
+             * The storefront carousel. One banner heads a page; it does not
+             * sell a place a customer has never visited.
+             */
+            Route::post('photos', [MerchantStorefrontController::class, 'uploadPhoto'])->name('photos.store');
+            Route::post('photos/{photo}/move', [MerchantStorefrontController::class, 'movePhoto'])->name('photos.move');
+            Route::delete('photos/{photo}', [MerchantStorefrontController::class, 'destroyPhoto'])->name('photos.destroy');
             // Cuisine, price bracket and pure-veg: without them a restaurant is
             // invisible to the cuisine rail, the VEG toggle and the price filters.
             Route::post('listing', [MerchantStorefrontController::class, 'saveListing'])->name('listing');

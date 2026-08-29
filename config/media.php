@@ -41,4 +41,12 @@ return [
      */
     'banner_mimes' => ['jpg', 'jpeg', 'png', 'webp', 'gif'],
 
+    /*
+     * Slides in a restaurant's carousel.
+     *
+     * A carousel nobody swipes to the end of costs data for nothing, and every
+     * slide is a signed URL the app fetches when the storefront opens.
+     */
+    'max_storefront_photos' => 8,
+
 ];

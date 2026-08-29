@@ -199,7 +199,7 @@ class RestaurantController extends Controller
     {
         return response()->json([
             'data' => new RestaurantResource(
-                $this->findServiceable($restaurant, ['operatingHours']),
+                $this->findServiceable($restaurant, ['operatingHours', 'photos']),
             ),
         ]);
     }
