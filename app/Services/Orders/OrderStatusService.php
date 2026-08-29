@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Services\LiveState\OrderStateService;
 use App\Services\Payments\PaymentService;
+use App\Services\Push\OrderNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -77,6 +78,7 @@ class OrderStatusService
     public function __construct(
         protected OrderStateService $liveState,
         protected PaymentService $payments,
+        protected OrderNotifier $notifier,
     ) {}
 
     /**
@@ -335,6 +337,41 @@ class OrderStatusService
             $this->payments->refund($order, $note ?? 'Order '.$to->value, $actor->id);
         }
 
-        return $order->refresh();
+        $order->refresh();
+
+        /*
+         * Notifications hang off the transition rather than off each caller.
+         * Every status change in the product funnels through here, so a new
+         * path cannot forget to tell anyone — and the alternative was the same
+         * two lines pasted into six methods.
+         *
+         * After the commit and the refresh, because the queued job reads the
+         * order back and would otherwise race the write.
+         */
+        $this->notify($order, $to);
+
+        return $order;
+    }
+
+    /**
+     * Who to tell about this state, if anyone.
+     *
+     * Statuses absent from this list are deliberate. Preparing is not news to
+     * a customer who was told a time when the order was accepted, and a
+     * notification for every step trains people to swipe them away — taking
+     * the rider's order offer with them.
+     */
+    protected function notify(Order $order, OrderStatus $to): void
+    {
+        match ($to) {
+            OrderStatus::Accepted => $this->notifier->accepted($order),
+            OrderStatus::Rejected => $this->notifier->rejected($order),
+            OrderStatus::ReadyForPickup => $this->notifier->readyForPickup($order),
+            OrderStatus::RiderAssigned => $this->notifier->riderAssigned($order),
+            OrderStatus::PickedUp => $this->notifier->pickedUp($order),
+            OrderStatus::Delivered => $this->notifier->delivered($order),
+            OrderStatus::Cancelled => $this->notifier->cancelled($order),
+            default => null,
+        };
     }
 }

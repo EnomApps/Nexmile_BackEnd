@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CollectionController;
+use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\FavouriteController;
 use App\Http\Controllers\Api\V1\FilterController;
 use App\Http\Controllers\Api\V1\HomeController;
@@ -103,6 +104,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('home', [HomeController::class, 'index'])->name('home');
         Route::get('filters', [FilterController::class, 'index'])->name('filters');
         Route::get('collections/{slug}', [CollectionController::class, 'show'])->name('collections.show');
+        /*
+         * Push registration, shared by both apps. A rider's phone is in their
+         * pocket with the screen off, and a suspended app's socket is dead —
+         * this is the only route to someone who is not looking at a screen.
+         */
+        Route::post('devices', [DeviceTokenController::class, 'store'])->name('devices.store');
+        Route::delete('devices', [DeviceTokenController::class, 'destroy'])->name('devices.destroy');
         Route::get('favourites', [FavouriteController::class, 'index'])->name('favourites.index');
 
         Route::prefix('restaurants')->name('restaurants.')->group(function () {

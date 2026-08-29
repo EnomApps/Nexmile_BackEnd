@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Services\LiveState\OrderStateService;
+use App\Services\Push\OrderNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -31,6 +32,7 @@ class PaymentService
     public function __construct(
         protected PaymentGateway $gateway,
         protected OrderStateService $liveState,
+        protected OrderNotifier $notifier,
     ) {}
 
     public static function onlineEnabled(): bool
@@ -220,7 +222,9 @@ class PaymentService
             return $order;
         }
 
-        DB::transaction(function () use ($order, $payment, $paymentId, $signature, $method) {
+        $wasPending = false;
+
+        DB::transaction(function () use ($order, $payment, $paymentId, $signature, $method, &$wasPending) {
             $payment->update([
                 'status' => PaymentStatus::Paid,
                 'gateway_payment_id' => $paymentId,
@@ -232,6 +236,7 @@ class PaymentService
 
             // Only now does the kitchen see it.
             if ($order->status === OrderStatus::PendingPayment) {
+                $wasPending = true;
                 $order->update(['status' => OrderStatus::Placed, 'placed_at' => now()]);
 
                 $order->statusHistory()->create([
@@ -246,7 +251,19 @@ class PaymentService
 
         rescue(fn () => $this->liveState->setStatus($order->id, OrderStatus::Placed), report: true);
 
-        return $order->refresh();
+        $order->refresh();
+
+        /*
+         * An online order reaches the kitchen here rather than at checkout, so
+         * this is where the merchant is told. Guarded on the transition having
+         * actually happened: markPaid is idempotent and a duplicate webhook
+         * must not wake the shop twice.
+         */
+        if ($wasPending) {
+            $this->notifier->placed($order);
+        }
+
+        return $order;
     }
 
     /**

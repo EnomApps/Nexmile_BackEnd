@@ -99,9 +99,22 @@ class ApiDocsTest extends TestCase
         $this->assertContains('/v1/merchant/menu-items', $paths);
         $this->assertContains('/v1/merchant/orders', $paths);
 
-        // Merchants sign in with a password, so the shared OTP auth is not
-        // theirs and would only mislead.
+        /*
+         * Merchants sign in with a password, so the shared OTP auth is not
+         * theirs and would only mislead.
+         *
+         * /v1/devices is the one exception, and a real one: every app
+         * registers a push token the same way, and a merchant document that
+         * omitted it would send an app developer looking for a merchant-shaped
+         * version that does not exist.
+         */
+        $shared = ['/v1/devices'];
+
         foreach ($paths as $path) {
+            if (in_array($path, $shared, true)) {
+                continue;
+            }
+
             $this->assertStringStartsWith('/v1/merchant/', $path);
         }
     }

@@ -3,9 +3,13 @@
 namespace App\Providers;
 
 use App\Contracts\PaymentGateway;
+use App\Contracts\PushSender;
 use App\Contracts\SmsSender;
 use App\Services\Payments\FakeGateway;
 use App\Services\Payments\RazorpayGateway;
+use App\Services\Push\FcmPushSender;
+use App\Services\Push\LogPushSender;
+use App\Services\Push\NullPushSender;
 use App\Services\Sms\LogSmsSender;
 use App\Services\Sms\NullSmsSender;
 use Dedoc\Scramble\Scramble;
@@ -26,6 +30,16 @@ class AppServiceProvider extends ServiceProvider
             return match (config('sms.driver')) {
                 'null' => new NullSmsSender,
                 default => new LogSmsSender,
+            };
+        });
+
+        // Same shape again. With no PUSH_DRIVER the log driver is bound, so
+        // the dispatch chain works end to end without a Firebase project.
+        $this->app->bind(PushSender::class, function () {
+            return match (config('push.driver')) {
+                'fcm' => new FcmPushSender,
+                'null' => new NullPushSender,
+                default => new LogPushSender,
             };
         });
 
@@ -67,7 +81,7 @@ class AppServiceProvider extends ServiceProvider
          * edit the same profile. A merchant does neither — they use
          * /merchant/login with a password.
          */
-        $shared = ['api/v1/auth', 'api/v1/profile'];
+        $shared = ['api/v1/auth', 'api/v1/profile', 'api/v1/devices'];
 
         $apis = [
             'customer' => [
@@ -91,7 +105,7 @@ class AppServiceProvider extends ServiceProvider
                 'description' => "Everything a merchant can do over the API.\n\n".
                     "Merchants sign in with a **password**, not an OTP. Registration happens on the website at nexmile.in/merchants/register.\n\n".
                     '**Menu item updates are POST, not PATCH** — PHP does not parse multipart bodies on PATCH, so a PATCH upload arrives with an empty `$_FILES`.',
-                'prefixes' => ['api/v1/merchant'],
+                'prefixes' => ['api/v1/merchant', 'api/v1/devices'],
             ],
         ];
 

@@ -19,3 +19,9 @@ Schedule::command('nexmile:expire-unpaid')
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->runInBackground();
+
+/*
+ * Uninstalled apps whose tokens FCM still accepts. Each one is a wasted
+ * request on every send, so they are swept weekly rather than left to grow.
+ */
+Schedule::command('nexmile:prune-devices')->weeklyOn(1, '03:30');

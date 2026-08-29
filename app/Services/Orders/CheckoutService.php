@@ -14,6 +14,7 @@ use App\Services\Discovery\NearbyMerchantService;
 use App\Services\LiveState\OrderStateService;
 use App\Services\Menu\SurplusService;
 use App\Services\Payments\PaymentService;
+use App\Services\Push\OrderNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -35,6 +36,7 @@ class CheckoutService
         protected NearbyMerchantService $nearby,
         protected OrderStateService $liveState,
         protected SurplusService $surplus,
+        protected OrderNotifier $notifier,
     ) {}
 
     /**
@@ -139,6 +141,16 @@ class CheckoutService
         });
 
         rescue(fn () => $this->liveState->setStatus($order->id, $order->status), report: true);
+
+        /*
+         * Tell the kitchen, but only once the order is really theirs to cook.
+         * An online order sits in pending_payment until the money lands, and a
+         * merchant woken for an order that may never be paid for is a merchant
+         * who stops trusting the alert.
+         */
+        if ($order->status === OrderStatus::Placed) {
+            $this->notifier->placed($order);
+        }
 
         return $order->load('items.options');
     }
