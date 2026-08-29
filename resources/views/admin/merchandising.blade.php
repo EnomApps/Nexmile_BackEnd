@@ -146,19 +146,48 @@
         </p>
 
         @if ($cuisines->isNotEmpty())
-            <div class="mt-5 flex flex-wrap gap-3">
+            <div class="mt-5 space-y-2">
                 @foreach ($cuisines as $cuisine)
                     <div class="flex items-center gap-3 rounded-xl border border-white/10 px-3 py-2">
                         @if ($cuisine->image_path)
                             <img src="{{ $images->url($cuisine->image_path) }}" alt=""
-                                 class="w-9 h-9 rounded-full object-cover bg-white/5">
+                                 class="w-11 h-11 rounded-full object-cover bg-white/5 shrink-0">
+                        @else
+                            {{-- Dashed, not grey: it reads as something to fill
+                                 in rather than something that failed. --}}
+                            <div class="w-11 h-11 rounded-full border border-dashed border-white/25 shrink-0
+                                        flex items-center justify-center text-gray-600">+</div>
                         @endif
+
                         <div>
                             <p class="text-sm text-gray-200">{{ $cuisine->name }}</p>
                             <p class="text-xs text-gray-600 font-mono">{{ $cuisine->slug }}</p>
                         </div>
+
+                        {{-- Submits on choose. A separate Upload button is the
+                             step people forget, then wonder why nothing saved. --}}
+                        <form method="POST" action="{{ route('admin.merchandising.cuisines.image.upload', $cuisine) }}"
+                              enctype="multipart/form-data">
+                            @csrf
+                            <label class="cursor-pointer">
+                                <span class="sr-only">Icon for {{ $cuisine->name }}</span>
+                                <input type="file" name="image" accept="image/*" onchange="this.form.submit()"
+                                       class="block w-36 text-xs text-gray-500
+                                              file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0
+                                              file:text-xs file:font-semibold file:bg-white/10 file:text-gray-200
+                                              hover:file:bg-white/20 file:cursor-pointer">
+                            </label>
+                        </form>
+
+                        @if ($cuisine->image_path)
+                            <form method="POST" action="{{ route('admin.merchandising.cuisines.image.destroy', $cuisine) }}">
+                                @csrf @method('DELETE')
+                                <button class="text-xs font-semibold text-gray-500 hover:text-red-300">Clear</button>
+                            </form>
+                        @endif
+
                         <form method="POST" action="{{ route('admin.merchandising.cuisines.destroy', $cuisine) }}"
-                              onsubmit="return confirm('Remove {{ $cuisine->name }}?')">
+                              onsubmit="return confirm('Remove {{ $cuisine->name }}? Restaurants filed under this cuisine will stop appearing in it.')">
                             @csrf @method('DELETE')
                             <button class="{{ $danger }}">&times;</button>
                         </form>

@@ -10,6 +10,7 @@ use App\Models\Collection;
 use App\Models\Cuisine;
 use App\Models\Merchant;
 use App\Models\User;
+use App\Services\Media\ImageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -221,5 +222,95 @@ class AdminMerchandisingTest extends TestCase
             'pincode' => '625001',
             'kyc_status' => KycStatus::Verified,
         ]);
+    }
+
+    public function test_a_banner_with_no_stored_image_is_never_served(): void
+    {
+        /*
+         * Rows like this exist from before a failed upload started throwing:
+         * active, inside their dates, and pointing at nothing. The app showed a
+         * hole in the carousel with image_url null and no way to know why.
+         */
+        Banner::create(['image_path' => '', 'alt_text' => 'Broken']);
+        Banner::create(['image_path' => 'banners/real.png', 'alt_text' => 'Fine']);
+
+        $live = Banner::live()->pluck('alt_text')->all();
+
+        $this->assertSame(['Fine'], $live);
+    }
+
+    public function test_a_failed_upload_leaves_no_banner_behind(): void
+    {
+        /*
+         * The row used to be created first with an empty path and filled in
+         * after, so a storage failure produced a permanent blank banner that
+         * looked deliberate. Storing first means a failure produces nothing.
+         */
+        Storage::shouldReceive('disk')->andReturnSelf();
+        Storage::shouldReceive('putFileAs')->andReturnFalse();
+
+        try {
+            $this->actingAs($this->admin())
+                ->post('/admin/home-screen/banners', [
+                    'image' => $this->image(),
+                    'alt_text' => 'Will not survive',
+                    'action_type' => 'none',
+                ]);
+        } catch (\Throwable) {
+            // The failure is the point; what matters is what it left behind.
+        }
+
+        $this->assertSame(0, Banner::count());
+    }
+
+    public function test_an_icon_can_be_added_to_a_cuisine_that_has_none(): void
+    {
+        /*
+         * The icon is optional at creation, so cuisines exist without one. The
+         * only route to an icon used to be deleting the cuisine and remaking
+         * it, which orphans every restaurant already filed under that slug.
+         */
+        $cuisine = Cuisine::create(['slug' => 'biryani', 'name' => 'Biryani']);
+
+        $this->assertNull($cuisine->image_path);
+
+        $this->actingAs($this->admin())
+            ->post("/admin/home-screen/cuisines/{$cuisine->id}/image", ['image' => $this->image()])
+            ->assertRedirect();
+
+        $this->assertNotNull($cuisine->fresh()->image_path);
+    }
+
+    public function test_a_cuisine_icon_can_be_replaced_and_the_old_file_dropped(): void
+    {
+        $cuisine = Cuisine::create(['slug' => 'dosa', 'name' => 'Dosa']);
+
+        $this->actingAs($this->admin())
+            ->post("/admin/home-screen/cuisines/{$cuisine->id}/image", ['image' => $this->image()]);
+
+        $first = $cuisine->fresh()->image_path;
+
+        $this->actingAs($this->admin())
+            ->post("/admin/home-screen/cuisines/{$cuisine->id}/image", ['image' => $this->image('new.png')]);
+
+        $second = $cuisine->fresh()->image_path;
+
+        $this->assertNotSame($first, $second);
+        // An orphaned object is a bill nobody is watching.
+        Storage::disk(config('media.disk'))->assertMissing($first);
+    }
+
+    public function test_the_customer_app_gets_the_icon_once_it_exists(): void
+    {
+        // The whole point: /v1/home was returning image_url null for every
+        // cuisine because none of them had an icon and none could be added.
+        $cuisine = Cuisine::create(['slug' => 'parotta', 'name' => 'Parotta']);
+
+        $this->actingAs($this->admin())
+            ->post("/admin/home-screen/cuisines/{$cuisine->id}/image", ['image' => $this->image()]);
+
+        $this->assertNotNull(
+            app(ImageService::class)->url($cuisine->fresh()->image_path)
+        );
     }
 }

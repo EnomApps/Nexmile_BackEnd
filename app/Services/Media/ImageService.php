@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * Photos that customers see: dish images, storefront logos and banners.
@@ -21,6 +22,29 @@ class ImageService
      * The old object is deleted only after the new path is committed. A failed
      * write leaves the record with its previous photo rather than none.
      */
+    /**
+     * Store a file and return its path, without touching a record.
+     *
+     * For the case where the record cannot exist until the file does — a
+     * banner created with an empty path and filled in afterwards survives a
+     * failed upload as a permanent blank.
+     */
+    public function store(string $directory, UploadedFile $file): string
+    {
+        $name = Str::uuid()->toString().'.'.$file->getClientOriginalExtension();
+
+        $path = $file->storeAs($directory, $name, [
+            'disk' => $this->disk(),
+            'visibility' => 'private',
+        ]);
+
+        if ($path === false || $path === '') {
+            throw new RuntimeException("Could not store the uploaded file in {$directory}.");
+        }
+
+        return $path;
+    }
+
     public function attach(Model $model, string $column, string $directory, UploadedFile $file): Model
     {
         $previous = $model->getAttribute($column);
@@ -33,6 +57,16 @@ class ImageService
             'disk' => $this->disk(),
             'visibility' => 'private',
         ]);
+
+        /*
+         * storeAs returns false when the write fails — a bucket permission, a
+         * full disk, a network blip. Writing that straight to the column left
+         * the record pointing at nothing and reporting success, which is how
+         * banners reached the app with a null image_url and no error anywhere.
+         */
+        if ($path === false || $path === '') {
+            throw new RuntimeException("Could not store the uploaded file in {$directory}.");
+        }
 
         $model->forceFill([$column => $path])->save();
 

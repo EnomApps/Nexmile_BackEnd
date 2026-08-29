@@ -206,10 +206,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
             Route::post('cuisines', [MerchandisingController::class, 'storeCuisine'])->name('cuisines.store');
             Route::delete('cuisines/{cuisine}', [MerchandisingController::class, 'destroyCuisine'])->name('cuisines.destroy');
+            // Icons are optional at creation, so they have to be addable later —
+            // otherwise the only way to get one is deleting the cuisine, which
+            // orphans every restaurant filed under that slug.
+            Route::post('cuisines/{cuisine}/image', [MerchandisingController::class, 'uploadCuisineImage'])->name('cuisines.image.upload');
+            Route::delete('cuisines/{cuisine}/image', [MerchandisingController::class, 'destroyCuisineImage'])->name('cuisines.image.destroy');
 
             Route::post('collections', [MerchandisingController::class, 'storeCollection'])->name('collections.store');
             Route::post('collections/{collection}/merchants', [MerchandisingController::class, 'updateCollectionMerchants'])->name('collections.merchants');
             Route::post('collections/{collection}/toggle', [MerchandisingController::class, 'toggleCollection'])->name('collections.toggle');
+            Route::post('collections/{collection}/image', [MerchandisingController::class, 'uploadCollectionImage'])->name('collections.image.upload');
             Route::delete('collections/{collection}', [MerchandisingController::class, 'destroyCollection'])->name('collections.destroy');
         });
 

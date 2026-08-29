@@ -57,8 +57,18 @@ class MerchandisingController extends Controller
             'ends_at.after' => 'The end of a campaign has to come after its start.',
         ]);
 
-        $banner = Banner::create([
-            'image_path' => '',
+        /*
+         * The file is stored before the row exists.
+         *
+         * Creating the banner first with an empty path and attaching after
+         * meant a failed upload left a permanent banner pointing at nothing —
+         * active, inside its dates, and rendering as a hole in the carousel.
+         * Now a failed write means no banner, which is the honest outcome.
+         */
+        $stored = $images->store('banners', $request->file('image'));
+
+        Banner::create([
+            'image_path' => $stored,
             'alt_text' => $data['alt_text'],
             'action_type' => $data['action_type'],
             'action_value' => $data['action_type'] === 'none' ? null : $data['action_value'],
@@ -66,8 +76,6 @@ class MerchandisingController extends Controller
             'ends_at' => $data['ends_at'] ?? null,
             'position' => $data['position'] ?? 0,
         ]);
-
-        $images->attach($banner, 'image_path', 'banners', $request->file('image'));
 
         return back()->with('status', 'Banner added.');
     }
@@ -115,6 +123,40 @@ class MerchandisingController extends Controller
         }
 
         return back()->with('status', 'Cuisine added.');
+    }
+
+    /**
+     * Add or replace a cuisine icon after the fact.
+     *
+     * The icon is optional at creation — a cuisine is useful for filtering
+     * before anyone has drawn one. Without this, the only route to an icon was
+     * deleting the cuisine and making it again, which breaks every restaurant
+     * already filed under that slug.
+     */
+    public function uploadCuisineImage(Request $request, Cuisine $cuisine, ImageService $images): RedirectResponse
+    {
+        $request->validate(['image' => ImageService::rules()], ImageService::messages('image'));
+
+        $images->attach($cuisine, 'image_path', 'cuisines', $request->file('image'));
+
+        return back()->with('status', 'Cuisine icon saved.');
+    }
+
+    public function destroyCuisineImage(Cuisine $cuisine, ImageService $images): RedirectResponse
+    {
+        $images->detach($cuisine, 'image_path');
+
+        return back()->with('status', 'Cuisine icon removed.');
+    }
+
+    /** Same gap on a collection tile, for the same reason. */
+    public function uploadCollectionImage(Request $request, Collection $collection, ImageService $images): RedirectResponse
+    {
+        $request->validate(['image' => ImageService::rules()], ImageService::messages('image'));
+
+        $images->attach($collection, 'banner_path', 'collections', $request->file('image'));
+
+        return back()->with('status', 'Collection image saved.');
     }
 
     public function destroyCuisine(Cuisine $cuisine, ImageService $images): RedirectResponse

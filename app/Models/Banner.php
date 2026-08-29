@@ -27,6 +27,14 @@ class Banner extends Model
     public function scopeLive(Builder $query): Builder
     {
         return $query->where('is_active', true)
+            /*
+             * A banner with no stored image renders as a hole in the
+             * carousel. Rows like that exist from before attach() started
+             * failing loudly, so the scope skips them rather than trusting
+             * that none were ever created.
+             */
+            ->whereNotNull('image_path')
+            ->where('image_path', '!=', '')
             ->where(fn ($q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
             ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>=', now()))
             ->orderBy('position');
