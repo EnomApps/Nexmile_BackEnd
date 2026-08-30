@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1\Rider;
 
+use App\Enums\OrderStatus;
 use App\Enums\RiderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Rider;
+use App\Services\Discovery\NearbyMerchantService;
 use App\Services\LiveState\RiderLocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -44,6 +46,8 @@ class LocationController extends Controller
             return response()->json(['message' => 'You are offline.', 'data' => ['tracking' => false]]);
         }
 
+        $this->noteArrival($rider, (float) $data['latitude'], (float) $data['longitude']);
+
         rescue(fn () => $this->locations->updateLocation(
             $rider->id,
             (int) ($rider->zone_id ?? 0),
@@ -66,6 +70,42 @@ class LocationController extends Controller
             'message' => 'Location updated.',
             'data' => ['tracking' => true],
         ]);
+    }
+
+    /**
+     * Record the moment a rider reaches the restaurant.
+     *
+     * Waiting is paid by the minute, and the only honest way to measure it is
+     * from arrival. The alternative — an "I have arrived" button — pays
+     * whatever the rider taps, and riders learn that within a shift.
+     *
+     * Read off pings they already send, so it costs nothing extra and cannot
+     * be gamed without actually riding there.
+     */
+    protected function noteArrival(Rider $rider, float $latitude, float $longitude): void
+    {
+        $order = $rider->orders()
+            ->where('status', OrderStatus::RiderAssigned->value)
+            ->whereNull('arrived_at')
+            ->with('merchant:id,latitude,longitude')
+            ->first();
+
+        if ($order === null || $order->merchant?->latitude === null) {
+            return;
+        }
+
+        $metres = app(NearbyMerchantService::class)->distance(
+            $latitude,
+            $longitude,
+            (float) $order->merchant->latitude,
+            (float) $order->merchant->longitude,
+        );
+
+        if ($metres > (float) config('rider_pay.arrival_radius_metres')) {
+            return;
+        }
+
+        $order->forceFill(['arrived_at' => now()])->save();
     }
 
     protected function rider(Request $request): Rider

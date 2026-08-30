@@ -35,6 +35,10 @@ class Order extends Model
             'grand_total' => 'decimal:2',
             'commission_amount' => 'decimal:2',
             'merchant_payout' => 'decimal:2',
+            'rider_payout' => 'decimal:2',
+            'rider_payout_breakdown' => 'array',
+            'accepted_latitude' => 'decimal:7',
+            'accepted_longitude' => 'decimal:7',
             'cancellation_fee' => 'decimal:2',
             'estimated_prep_minutes' => 'integer',
             'placed_at' => 'datetime',
@@ -43,6 +47,7 @@ class Order extends Model
             'assigned_at' => 'datetime',
             'picked_up_at' => 'datetime',
             'delivered_at' => 'datetime',
+            'arrived_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'estimated_delivery_at' => 'datetime',
         ];

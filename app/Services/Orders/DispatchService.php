@@ -10,6 +10,7 @@ use App\Models\Rider;
 use App\Services\Discovery\NearbyMerchantService;
 use App\Services\LiveState\DispatchQueueService;
 use App\Services\LiveState\RiderLocationService;
+use App\Services\Riders\RiderPayoutService;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -27,6 +28,7 @@ class DispatchService
         protected RiderLocationService $locations,
         protected DispatchQueueService $queue,
         protected NearbyMerchantService $geo,
+        protected RiderPayoutService $payouts,
     ) {}
 
     /**
@@ -110,6 +112,29 @@ class DispatchService
 
         $order->refresh();
 
+        /*
+         * Where the rider was when they took it. The first mile is measured
+         * from here and there is no way back to it afterwards: a rider's
+         * position exists only in a Redis set with a TTL, and the next ping
+         * overwrites it.
+         *
+         * The last mile is stored at the same moment because both legs should
+         * come from one consistent view of the world.
+         */
+        [$latitude, $longitude] = $this->positionOf($rider);
+
+        $order->forceFill(array_filter([
+            'accepted_latitude' => $latitude,
+            'accepted_longitude' => $longitude,
+            'first_mile_metres' => $latitude !== null && $order->merchant?->latitude !== null
+                ? (int) round($this->geo->distance(
+                    $latitude, $longitude,
+                    (float) $order->merchant->latitude, (float) $order->merchant->longitude,
+                ))
+                : null,
+            'last_mile_metres' => $order->distance_metres,
+        ], fn ($value) => $value !== null))->save();
+
         $this->status->markAssigned($order, $rider->user);
 
         $rider->update(['duty_status' => RiderStatus::OnOrder]);
@@ -157,6 +182,10 @@ class DispatchService
         $this->guardAssignment($rider, $order);
 
         $delivered = $this->status->markDelivered($order, $rider->user);
+
+        // Settle the payout now, against the facts as they stand. Recomputing
+        // it later from current rates would restate what someone was paid.
+        $this->payouts->settle($delivered);
 
         $rider->update([
             'duty_status' => RiderStatus::Available,

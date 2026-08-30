@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RestaurantController;
 use App\Http\Controllers\Api\V1\ReviewController;
+use App\Http\Controllers\Api\V1\Rider\EarningsController as RiderEarningsController;
 use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
 use App\Http\Controllers\Api\V1\Rider\LocationController as RiderLocationController;
 use App\Http\Controllers\Api\V1\Rider\OrderController as RiderOrderController;
@@ -197,6 +198,13 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         |----------------------------------------------------------------------
         */
         Route::post('location', [RiderLocationController::class, 'store'])->name('location');
+
+        /*
+         * Earnings (EP13). The first question every delivery partner asks at
+         * the end of a shift, and the one the product could not answer at all.
+         */
+        Route::get('earnings', [RiderEarningsController::class, 'index'])->name('earnings');
+        Route::get('orders/{order}/quote', [RiderEarningsController::class, 'quote'])->name('earnings.quote');
 
         Route::prefix('orders')->name('orders.')->group(function () {
             // Fixed segment first, or 'available' is read as an order id.
