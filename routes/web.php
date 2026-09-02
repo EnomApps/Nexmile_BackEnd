@@ -165,6 +165,8 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
 
         Route::prefix('orders')->name('orders.')->group(function () {
             Route::get('/', [MerchantOrderController::class, 'index'])->name('index');
+            // Polled by the queue, before {order} so the literal path stands.
+            Route::get('queue-status', [MerchantOrderController::class, 'queueStatus'])->name('queue-status');
             // Before {order} so the literal path is not read as an id.
             Route::get('{order}/invoice', [MerchantOrderController::class, 'invoice'])->name('invoice');
             // Polled by the detail page: everything after "ready" is done by a

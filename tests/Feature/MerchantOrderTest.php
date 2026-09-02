@@ -502,4 +502,63 @@ class MerchantOrderTest extends TestCase
         // to leave the sound off.
         $this->assertStringContainsString('PREVIEW_MS = 2700', $html);
     }
+
+    public function test_the_queue_polls_rather_than_reloading_itself(): void
+    {
+        /*
+         * The reload was why the alert never sounded. Every reload is a fresh
+         * document, and a browser blocks audio in a document the user has not
+         * yet interacted with — so the tap that unlocked the sound always
+         * happened in the document before, and the ring was reliably silent.
+         */
+        $user = $this->merchantUser();
+        $this->order($user->merchant);
+
+        $html = $this->actingAs($user)->get('/merchants/orders')->assertOk()->getContent();
+
+        $url = trim(json_encode(route('merchants.orders.queue-status')), '"');
+
+        $this->assertStringContainsString($url, $html, false);
+        // No unconditional reload loop left behind.
+        $this->assertStringNotContainsString('elapsed += 1000', $html);
+    }
+
+    public function test_the_queue_status_endpoint_reports_the_newest_live_order(): void
+    {
+        $user = $this->merchantUser();
+
+        $this->actingAs($user)->getJson('/merchants/orders/queue-status')
+            ->assertOk()
+            ->assertJsonPath('newest_order_id', 0);
+
+        $order = $this->order($user->merchant);
+
+        $this->actingAs($user)->getJson('/merchants/orders/queue-status')
+            ->assertOk()
+            ->assertJsonPath('newest_order_id', $order->id);
+    }
+
+    public function test_an_unpaid_order_does_not_ring_the_kitchen(): void
+    {
+        // An order the customer has not paid for is not a kitchen ticket, and
+        // waking a shop for one teaches them to ignore the sound.
+        $user = $this->merchantUser();
+        $this->order($user->merchant, OrderStatus::PendingPayment);
+
+        $this->actingAs($user)->getJson('/merchants/orders/queue-status')
+            ->assertOk()
+            ->assertJsonPath('newest_order_id', 0);
+    }
+
+    public function test_the_queue_status_is_scoped_to_the_merchant(): void
+    {
+        // Otherwise it is a live order counter for anyone with an account.
+        $theirs = $this->merchantUser();
+        $this->order($theirs->merchant);
+
+        $this->actingAs($this->merchantUser())
+            ->getJson('/merchants/orders/queue-status')
+            ->assertOk()
+            ->assertJsonPath('newest_order_id', 0);
+    }
 }

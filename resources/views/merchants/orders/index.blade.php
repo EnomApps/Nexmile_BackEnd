@@ -90,7 +90,7 @@
      doing it under someone mid-type is worse than a list 30 seconds stale. --}}
 <script>
     (function () {
-        const INTERVAL = 30000;
+        const INTERVAL = 10000;
         const KEY = 'nexmile.orders.lastSeen';
         const SOUND_KEY = 'nexmile.orders.sound';
         const marker = document.getElementById('newest-order');
@@ -242,7 +242,7 @@
 
         const lastSeen = Number(localStorage.getItem(KEY) || 0);
 
-        // Only chime for something that arrived after this browser last looked,
+        // Only ring for something that arrived after this browser last looked,
         // never on a merchant's very first visit.
         if (lastSeen > 0 && newest > lastSeen && soundOn()) {
             startRinging();
@@ -250,21 +250,66 @@
 
         if (newest > 0) localStorage.setItem(KEY, String(newest));
 
-        let elapsed = 0;
+        /*
+         * The queue polls rather than reloading itself.
+         *
+         * Reloading was the reason the alert never sounded: every reload is a
+         * fresh document, and a browser blocks audio in a document the user
+         * has not yet interacted with. The tap that unlocked the sound always
+         * happened in the document before, so the ring was reliably silent.
+         *
+         * One long-lived document keeps that permission, and drops the delay
+         * from up to thirty seconds to ten.
+         */
+        let known = newest;
 
-        setInterval(function () {
-            elapsed += 1000;
-            if (elapsed < INTERVAL) return;
+        async function check() {
+            if (document.hidden || ringTimer !== null) return;
 
-            const el = document.activeElement;
-            const typing = el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
+            try {
+                const res = await fetch(@json(route('merchants.orders.queue-status')), {
+                    headers: {'Accept': 'application/json'},
+                });
 
-            // Never mid-ring: a reload kills the audio, and an alert that cuts
-            // off after four seconds is one nobody trusts.
-            if (typing || document.hidden || ringTimer !== null) return;
+                // A signed-out session answers with a redirect to the login
+                // page, not JSON. Reloading lets the merchant sign in again
+                // rather than watching a queue that will never update.
+                if (res.status === 401 || res.status === 419) {
+                    window.location.reload();
 
-            window.location.reload();
-        }, 1000);
+                    return;
+                }
+
+                if (!res.ok) return;
+
+                const latest = Number((await res.json()).newest_order_id || 0);
+
+                if (latest <= known) return;
+
+                known = latest;
+                localStorage.setItem(KEY, String(latest));
+
+                if (soundOn()) startRinging();
+
+                /*
+                 * The list is refreshed only once the ring has finished. A
+                 * reload mid-alert cuts the audio, which is the failure this
+                 * whole change exists to remove.
+                 */
+                setTimeout(function () {
+                    window.location.reload();
+                }, RING_MS + 500);
+            } catch (e) {
+                // A dropped connection in a shop is normal. Try again next tick.
+            }
+        }
+
+        setInterval(check, INTERVAL);
+
+        // Coming back to the tab is exactly when a merchant wants the truth.
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) check();
+        });
     })();
 </script>
 

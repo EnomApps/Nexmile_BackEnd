@@ -80,6 +80,29 @@ class MerchantOrderController extends Controller
     }
 
     /**
+     * The newest live order, for the queue page to poll.
+     *
+     * The page used to detect new orders by reloading itself. Every reload is
+     * a fresh document, and a browser blocks audio in a document the user has
+     * not yet interacted with — so the alert was reliably silent, because the
+     * only tap that ever unlocked it happened in the document before.
+     *
+     * Polling keeps one document alive, which keeps the audio permission with
+     * it, and cuts the delay from up to thirty seconds to ten.
+     */
+    public function queueStatus(Request $request): JsonResponse
+    {
+        $newest = $this->merchant($request)->orders()
+            ->where('status', '!=', OrderStatus::PendingPayment->value)
+            ->active()
+            ->max('id');
+
+        return response()->json([
+            'newest_order_id' => $newest === null ? 0 : (int) $newest,
+        ]);
+    }
+
+    /**
      * The tax invoice for an order.
      *
      * A GST-registered restaurant has to be able to produce one, and every
