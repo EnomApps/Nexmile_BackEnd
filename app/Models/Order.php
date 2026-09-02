@@ -73,6 +73,12 @@ class Order extends Model
         return $this->belongsTo(Zone::class);
     }
 
+    /** Complaints a customer raised about the rider on this order. */
+    public function riderReports(): HasMany
+    {
+        return $this->hasMany(RiderReport::class);
+    }
+
     /** The single rating left against this order (EP12). */
     public function review(): HasOne
     {

@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\Admin\AdminOrderController;
 use App\Http\Controllers\Web\Admin\DashboardController;
 use App\Http\Controllers\Web\Admin\MerchandisingController;
 use App\Http\Controllers\Web\Admin\ReviewModerationController;
+use App\Http\Controllers\Web\Admin\RiderConductController;
 use App\Http\Controllers\Web\LanguageController;
 use App\Http\Controllers\Web\MerchantEarningsController;
 use App\Http\Controllers\Web\MerchantMenuController;
@@ -212,6 +213,18 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('reviews', [ReviewModerationController::class, 'index'])->name('reviews.index');
         Route::post('reviews/{review}/hide', [ReviewModerationController::class, 'hide'])->name('reviews.hide');
         Route::post('reviews/{review}/unhide', [ReviewModerationController::class, 'unhide'])->name('reviews.unhide');
+
+        /*
+         * Rider conduct. The only tool before this was suspension, which is
+         * too blunt to be a first response and so never got used until things
+         * were already bad. A warning is the step that was missing between
+         * "nothing" and "you no longer work here".
+         */
+        Route::get('conduct', [RiderConductController::class, 'index'])->name('conduct.index');
+        Route::get('conduct/riders/{rider}', [RiderConductController::class, 'show'])->name('conduct.rider');
+        Route::post('conduct/reports/{report}/uphold', [RiderConductController::class, 'uphold'])->name('conduct.uphold');
+        Route::post('conduct/reports/{report}/dismiss', [RiderConductController::class, 'dismiss'])->name('conduct.dismiss');
+        Route::post('conduct/riders/{rider}/warn', [RiderConductController::class, 'warn'])->name('conduct.warn');
 
         /*
          * Home screen merchandising. The banners, cuisines and collections

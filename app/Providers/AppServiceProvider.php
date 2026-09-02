@@ -91,7 +91,9 @@ class AppServiceProvider extends ServiceProvider
                     '**Money is a JSON number** and loses its zero fraction: ₹430.00 arrives as `430`. Read it as `num`, never `double`.',
                 'prefixes' => [...$shared, 'api/v1/addresses', 'api/v1/restaurants', 'api/v1/carts', 'api/v1/orders',
                     // Home screen v2: discovery, merchandising and favourites.
-                    'api/v1/home', 'api/v1/filters', 'api/v1/collections', 'api/v1/favourites'],
+                    'api/v1/home', 'api/v1/filters', 'api/v1/collections', 'api/v1/favourites',
+                    // Reporting the rider who brought an order.
+                    'api/v1/report-categories'],
             ],
             'rider' => [
                 'title' => 'Nexmile — Rider app',

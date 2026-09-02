@@ -8,6 +8,7 @@ use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Review;
 use App\Models\ReviewItem;
+use App\Models\Rider;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -96,6 +97,7 @@ class ReviewService
             }
 
             $this->recalculate($order->merchant);
+            $this->recalculateRider($order->rider);
 
             return $review;
         });
@@ -189,11 +191,47 @@ class ReviewService
     private function afterModeration(Review $review): void
     {
         $this->recalculate($review->merchant);
+        $this->recalculateRider($review->rider);
 
         // Every dish it rated moves too, or a hidden review keeps holding a
         // dish average up from behind a curtain.
         foreach ($review->items as $item) {
             $this->recalculateDish($item->menuItem);
         }
+    }
+
+    /**
+     * Recompute a rider's rating from the reviews that mention them.
+     *
+     * rider_rating was collected on every review and never used — the column
+     * existed, the number was captured, and nothing ever wrote it. A rating a
+     * customer takes the trouble to give and nobody reads is worse than not
+     * asking.
+     *
+     * Same threshold as everything else: one bad night should not brand
+     * someone, and a rider is the person here with the least protection from
+     * a number nobody sanity-checks.
+     */
+    public function recalculateRider(?Rider $rider): void
+    {
+        if ($rider === null) {
+            return;
+        }
+
+        $row = Review::query()
+            ->where('rider_id', $rider->id)
+            ->whereNotNull('rider_rating')
+            ->visible()
+            ->selectRaw('COUNT(*) as total, AVG(rider_rating) as average')
+            ->first();
+
+        $count = (int) ($row->total ?? 0);
+
+        $rider->forceFill([
+            'rating_count' => $count,
+            'rating' => $count >= self::MIN_RATINGS_TO_PUBLISH
+                ? round((float) $row->average, 2)
+                : null,
+        ])->save();
     }
 }

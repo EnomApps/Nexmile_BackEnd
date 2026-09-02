@@ -45,6 +45,7 @@ class Rider extends Model
             'last_longitude' => 'decimal:7',
             'completed_deliveries' => 'integer',
             'rating' => 'decimal:2',
+            'rating_count' => 'integer',
         ];
     }
 
@@ -66,6 +67,16 @@ class Rider extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function reports(): HasMany
+    {
+        return $this->hasMany(RiderReport::class);
+    }
+
+    public function warnings(): HasMany
+    {
+        return $this->hasMany(RiderWarning::class);
     }
 
     public function isKycVerified(): bool

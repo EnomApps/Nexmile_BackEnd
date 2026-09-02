@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
 use App\Http\Controllers\Api\V1\Rider\LocationController as RiderLocationController;
 use App\Http\Controllers\Api\V1\Rider\OrderController as RiderOrderController;
 use App\Http\Controllers\Api\V1\Rider\ProfileController as RiderProfileController;
+use App\Http\Controllers\Api\V1\RiderReportController;
 use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -104,6 +105,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
          */
         Route::get('home', [HomeController::class, 'index'])->name('home');
         Route::get('filters', [FilterController::class, 'index'])->name('filters');
+        Route::get('report-categories', [RiderReportController::class, 'categories'])->name('report-categories');
         Route::get('collections/{slug}', [CollectionController::class, 'show'])->name('collections.show');
         /*
          * Push registration, shared by both apps. A rider's phone is in their
@@ -171,6 +173,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
              */
             Route::get('{order}/review', [ReviewController::class, 'show'])->name('review.show');
             Route::post('{order}/review', [ReviewController::class, 'store'])->name('review.store');
+
+            /*
+             * Reporting the rider. A star rating does not carry "he shouted
+             * at me", and there was nowhere else to say it.
+             */
+            Route::post('{order}/report-rider', [RiderReportController::class, 'store'])->name('report-rider');
         });
     });
 

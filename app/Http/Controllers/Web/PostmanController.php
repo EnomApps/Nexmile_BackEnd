@@ -56,8 +56,8 @@ class PostmanController extends Controller
     {
         return view('postman', [
             'collections' => [
-                ['app' => 'customer', 'name' => 'Customer app', 'requests' => 35,
-                    'blurb' => 'Sign in, addresses, restaurants, Food Rescue deals, cart, checkout, tracking, invoices.'],
+                ['app' => 'customer', 'name' => 'Customer app', 'requests' => 40,
+                    'blurb' => 'Sign in, addresses, restaurants, Food Rescue deals, cart, checkout, tracking, invoices, reviews, reporting a delivery.'],
                 ['app' => 'rider', 'name' => 'Rider app', 'requests' => 21,
                     'blurb' => 'Sign in, the onboarding wizard, duty status, location, the order board, pickup and delivery.'],
                 ['app' => 'merchant', 'name' => 'Merchant', 'requests' => 39,
