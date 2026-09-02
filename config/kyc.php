@@ -33,6 +33,13 @@ return [
      * Documents that must be uploaded before an account can be submitted for
      * review. Anything not listed here is optional.
      */
+    /*
+     * How a rider gets around. Walking counts: inside a kilometre it is a
+     * real way to work, and the ones who need it most are often the ones
+     * without a licence.
+     */
+    'vehicle_types' => ['walk', 'bicycle', 'motorcycle', 'scooter', 'ev'],
+
     'required' => [
         'merchant' => [
             DocumentType::FssaiCertificate->value,
@@ -46,6 +53,18 @@ return [
             DocumentType::DrivingLicence->value,
             DocumentType::VehicleRc->value,
             DocumentType::VehicleInsurance->value,
+        ],
+
+        /*
+         * A rider on foot or on a bicycle has no licence, no registration and
+         * no vehicle insurance, because none of those exist for them. Asking
+         * anyway would not be strict — it would make the option unusable and
+         * leave people stuck in onboarding with nothing to upload.
+         */
+        'rider_unmotorised' => [
+            DocumentType::AadhaarFront->value,
+            DocumentType::AadhaarBack->value,
+            DocumentType::PanCard->value,
         ],
     ],
 

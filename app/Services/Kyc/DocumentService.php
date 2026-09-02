@@ -6,6 +6,7 @@ use App\Enums\DocumentStatus;
 use App\Enums\DocumentType;
 use App\Enums\KycStatus;
 use App\Models\KycDocument;
+use App\Models\Rider;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -155,7 +156,16 @@ class DocumentService
      */
     public function missingDocuments(Model $owner, string $role): array
     {
-        $required = config("kyc.required.{$role}", []);
+        /*
+         * A rider on foot or a bicycle is held to a shorter list: there is no
+         * licence, registration or insurance to produce. Asking for them would
+         * leave those riders stuck in onboarding with nothing to upload.
+         */
+        $key = $role === 'rider' && $owner instanceof Rider && ! $owner->isMotorised()
+            ? 'rider_unmotorised'
+            : $role;
+
+        $required = config("kyc.required.{$key}", []);
 
         $uploaded = $owner->kycDocuments()
             ->whereIn('status', [DocumentStatus::Pending->value, DocumentStatus::Approved->value])

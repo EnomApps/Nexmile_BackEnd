@@ -8,6 +8,7 @@ use App\Http\Resources\RiderResource;
 use App\Models\Rider;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * Rider profile (EP2).
@@ -41,7 +42,10 @@ class ProfileController extends Controller
         $data = $request->validate([
             'full_name' => ['sometimes', 'string', 'max:255'],
             'date_of_birth' => ['sometimes', 'date', 'before:-18 years'],
-            'vehicle_type' => ['sometimes', 'in:bicycle,motorcycle,scooter,ev'],
+            // Walking is a real way to work inside a 1 km radius, and excluding it
+            // narrows the pool for no reason in exactly the market where the
+            // distances are short enough.
+            'vehicle_type' => ['sometimes', Rule::in(config('kyc.vehicle_types'))],
             'vehicle_number' => ['sometimes', 'nullable', 'string', 'max:15'],
         ], [
             'date_of_birth.before' => 'Riders must be at least 18 years old.',

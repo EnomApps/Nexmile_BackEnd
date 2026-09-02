@@ -113,13 +113,32 @@ class Rider extends Model
     }
 
     /**
+     * Vehicles that need a licence, a registration and insurance.
+     *
+     * Walking and cycling need none of the three, and there is nothing for
+     * such a rider to produce even if we asked.
+     */
+    public function isMotorised(): bool
+    {
+        return ! in_array($this->vehicle_type, ['walk', 'bicycle'], true);
+    }
+
+    /**
      * A missing expiry counts as expired. The safe reading — an unrecorded
      * licence is not evidence of a current one — but it does mean a rider an
      * admin has just approved can still be blocked by a blank date, so
      * `nexmile:why-offline` names that case explicitly.
+     *
+     * Never applied to someone on foot or a bicycle: they have no licence and
+     * no insurance, so treating the blanks as expired would bar them for good
+     * from work they are perfectly able to do.
      */
     public function hasExpiredDocuments(): bool
     {
+        if (! $this->isMotorised()) {
+            return false;
+        }
+
         return ($this->driving_licence_expiry?->isPast() ?? true)
             || ($this->insurance_expiry?->isPast() ?? true);
     }
