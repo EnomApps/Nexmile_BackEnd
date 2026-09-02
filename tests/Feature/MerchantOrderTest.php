@@ -448,4 +448,39 @@ class MerchantOrderTest extends TestCase
             ->assertOk()
             ->assertDontSee($url($done), false);
     }
+
+    public function test_the_new_order_alert_rings_rather_than_chiming_once(): void
+    {
+        /*
+         * A single chime is missed by a cook at the stove with an extractor
+         * running, and a missed order goes cold while the customer watches a
+         * timer. The queue page is what actually reaches a kitchen today —
+         * there is no merchant app — so this is the alert that matters.
+         */
+        $user = $this->merchantUser();
+        $this->order($user->merchant);
+
+        $html = $this->actingAs($user)->get('/merchants/orders')->assertOk()->getContent();
+
+        $this->assertStringContainsString('RING_MS = 10000', $html);
+        $this->assertStringContainsString('startRinging', $html);
+
+        // It stops the moment anyone touches the screen. An alert that keeps
+        // going after you have seen it is one people learn to mute.
+        foreach (['click', 'touchstart', 'keydown'] as $event) {
+            $this->assertStringContainsString("'{$event}'", $html);
+        }
+    }
+
+    public function test_the_queue_does_not_reload_mid_ring(): void
+    {
+        // A reload kills the audio, and an alert that cuts off after four
+        // seconds is one nobody trusts.
+        $user = $this->merchantUser();
+        $this->order($user->merchant);
+
+        $html = $this->actingAs($user)->get('/merchants/orders')->assertOk()->getContent();
+
+        $this->assertStringContainsString('ringTimer !== null) return', $html);
+    }
 }

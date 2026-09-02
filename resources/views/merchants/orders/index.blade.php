@@ -107,26 +107,106 @@
          * Generated rather than loaded: a two-tone chime needs no asset, no
          * build step, and nothing to 404 on a slow connection in a shop.
          */
+        /*
+         * A new order rings until someone acknowledges it, or for RING_MS.
+         *
+         * A single chime is missed by a cook at the stove with an extractor
+         * running, and a missed order goes cold while the customer watches a
+         * timer. Ringing until it is heard is the point.
+         *
+         * It stops the instant anyone touches the screen. An alert that keeps
+         * going after you have seen it is one people learn to mute, and a
+         * muted alert is worse than a quiet one.
+         */
+        const RING_MS = 10000;
+        const PATTERN_MS = 900;
+
+        let ringTimer = null;
+        let ringStopAt = 0;
+
+        let audio = null;
+
+        /**
+         * One AudioContext for the page.
+         *
+         * Browsers cap how many a page may create — around six in Chrome — so
+         * building one per beep would leave a ten-second ring going silent
+         * partway through. Silence halfway is worse than no alert: the cook
+         * learns the sound is unreliable and stops listening for it.
+         *
+         * Created on first use, because a context made before any user gesture
+         * starts suspended.
+         */
+        function context() {
+            if (audio === null) {
+                audio = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            // A tab left in the background suspends it; resuming is what makes
+            // the alert work when the kitchen comes back to the screen.
+            if (audio.state === 'suspended') {
+                audio.resume();
+            }
+
+            return audio;
+        }
+
+        function beep(ctx, freq, offset) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = freq;
+            const at = ctx.currentTime + offset;
+            gain.gain.setValueAtTime(0.0001, at);
+            gain.gain.exponentialRampToValueAtTime(0.35, at + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+            osc.start(at);
+            osc.stop(at + 0.18);
+        }
+
         function chime() {
             try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                [880, 1320].forEach(function (freq, i) {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.frequency.value = freq;
-                    const at = ctx.currentTime + i * 0.18;
-                    gain.gain.setValueAtTime(0.0001, at);
-                    gain.gain.exponentialRampToValueAtTime(0.3, at + 0.02);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
-                    osc.start(at);
-                    osc.stop(at + 0.18);
-                });
+                const ctx = context();
+                beep(ctx, 880, 0);
+                beep(ctx, 1320, 0.18);
             } catch (e) {
                 // An unsupported browser loses the chime, not the queue.
             }
         }
+
+        function stopRinging() {
+            if (ringTimer !== null) {
+                clearInterval(ringTimer);
+                ringTimer = null;
+            }
+        }
+
+        function startRinging() {
+            stopRinging();
+
+            ringStopAt = Date.now() + RING_MS;
+            chime();
+
+            ringTimer = setInterval(function () {
+                if (Date.now() >= ringStopAt) {
+                    stopRinging();
+
+                    return;
+                }
+
+                chime();
+            }, PATTERN_MS);
+        }
+
+        /*
+         * Any sign of a person stops it. Touch and keydown as well as click,
+         * because a kitchen tablet is tapped rather than clicked and a cook
+         * with wet hands may hit a key instead.
+         */
+        ['click', 'touchstart', 'keydown'].forEach(function (event) {
+            document.addEventListener(event, stopRinging, { passive: true });
+        });
 
         function paint() {
             if (!label) return;
@@ -150,7 +230,7 @@
         // Only chime for something that arrived after this browser last looked,
         // never on a merchant's very first visit.
         if (lastSeen > 0 && newest > lastSeen && soundOn()) {
-            chime();
+            startRinging();
         }
 
         if (newest > 0) localStorage.setItem(KEY, String(newest));
@@ -164,7 +244,9 @@
             const el = document.activeElement;
             const typing = el && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
 
-            if (typing || document.hidden) return;
+            // Never mid-ring: a reload kills the audio, and an alert that cuts
+            // off after four seconds is one nobody trusts.
+            if (typing || document.hidden || ringTimer !== null) return;
 
             window.location.reload();
         }, 1000);
