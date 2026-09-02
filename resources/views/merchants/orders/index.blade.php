@@ -119,6 +119,9 @@
          * muted alert is worse than a quiet one.
          */
         const RING_MS = 10000;
+        // Long enough to recognise as the same alert, short enough that
+        // testing it is not a punishment.
+        const PREVIEW_MS = 2700;
         const PATTERN_MS = 900;
 
         let ringTimer = null;
@@ -182,10 +185,10 @@
             }
         }
 
-        function startRinging() {
+        function startRinging(durationMs) {
             stopRinging();
 
-            ringStopAt = Date.now() + RING_MS;
+            ringStopAt = Date.now() + (durationMs || RING_MS);
             chime();
 
             ringTimer = setInterval(function () {
@@ -217,10 +220,22 @@
             toggle.addEventListener('click', function () {
                 localStorage.setItem(SOUND_KEY, soundOn() ? 'off' : 'on');
                 paint();
-                // Browsers only allow audio after a gesture, so the tap that
-                // turns it on is also what unlocks it. Playing here proves to
-                // the merchant that it works.
-                if (soundOn()) chime();
+                /*
+                 * Browsers only allow audio after a gesture, so the tap that
+                 * turns sound on is also what unlocks it.
+                 *
+                 * It previews the real alert rather than a single chime. This
+                 * button is how a merchant checks the alert works, so it has
+                 * to sound like the alert — a preview that differs from the
+                 * thing it is previewing tells them nothing. Shortened,
+                 * because ten seconds of ringing every time somebody toggles
+                 * the switch is its own reason to leave it off.
+                 *
+                 * Deferred past this very click, because the document listener
+                 * that stops the ring would otherwise catch the toggle tap as
+                 * it bubbles and silence the preview before it is heard.
+                 */
+                if (soundOn()) setTimeout(function () { startRinging(PREVIEW_MS); }, 0);
             });
             paint();
         }

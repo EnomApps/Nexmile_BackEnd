@@ -483,4 +483,23 @@ class MerchantOrderTest extends TestCase
 
         $this->assertStringContainsString('ringTimer !== null) return', $html);
     }
+
+    public function test_the_sound_toggle_previews_the_real_alert(): void
+    {
+        /*
+         * The toggle is how a merchant checks the alert works, so it has to
+         * sound like the alert. A preview that differs from the thing it
+         * previews tells them nothing — and the first report of this was a
+         * merchant pressing it and hearing the old single chime.
+         */
+        $user = $this->merchantUser();
+
+        $html = $this->actingAs($user)->get('/merchants/orders')->assertOk()->getContent();
+
+        $this->assertStringContainsString('startRinging(PREVIEW_MS)', $html);
+
+        // Shortened: ten seconds of ringing on every toggle is its own reason
+        // to leave the sound off.
+        $this->assertStringContainsString('PREVIEW_MS = 2700', $html);
+    }
 }
