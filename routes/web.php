@@ -163,7 +163,7 @@ Route::prefix('merchants')->name('merchants.')->group(function () {
             Route::delete('{item}', [MerchantSurplusController::class, 'destroy'])->name('destroy');
         });
 
-        Route::prefix('orders')->name('orders.')->group(function () {
+        Route::prefix('orders')->name('orders.')->whereNumber('order')->group(function () {
             Route::get('/', [MerchantOrderController::class, 'index'])->name('index');
             // Polled by the queue, before {order} so the literal path stands.
             Route::get('queue-status', [MerchantOrderController::class, 'queueStatus'])->name('queue-status');
@@ -248,7 +248,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('merchants/{id}/terms', [AdminController::class, 'updateTerms'])->name('merchants.terms');
         Route::post('merchants/{id}/compliance', [AdminController::class, 'updateCompliance'])->name('merchants.compliance');
 
-        Route::prefix('orders')->name('orders.')->group(function () {
+        Route::prefix('orders')->name('orders.')->whereNumber('order')->group(function () {
             Route::get('/', [AdminOrderController::class, 'index'])->name('index');
             Route::get('{order}', [AdminOrderController::class, 'show'])->name('show');
             Route::post('{order}/cancel', [AdminOrderController::class, 'cancel'])->name('cancel');

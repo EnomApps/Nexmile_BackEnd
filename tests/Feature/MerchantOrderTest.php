@@ -561,4 +561,32 @@ class MerchantOrderTest extends TestCase
             ->assertOk()
             ->assertJsonPath('newest_order_id', 0);
     }
+
+    public function test_a_mistyped_order_path_is_a_404_not_a_crash(): void
+    {
+        /*
+         * Order ids are numbers. Without the constraint a typo — "queue-statu"
+         * for "queue-status" — falls into {order}, throws on the int cast, and
+         * answers 500. A 500 sends someone hunting for a server fault that is
+         * really a missing letter.
+         */
+        $user = $this->merchantUser();
+
+        foreach (['queue-statu', 'abc', 'status'] as $path) {
+            $this->actingAs($user)
+                ->get("/merchants/orders/{$path}")
+                ->assertNotFound();
+        }
+    }
+
+    public function test_the_real_queue_status_path_still_works(): void
+    {
+        // The constraint must not shadow the literal route beside it.
+        $user = $this->merchantUser();
+
+        $this->actingAs($user)
+            ->getJson('/merchants/orders/queue-status')
+            ->assertOk()
+            ->assertJsonStructure(['newest_order_id']);
+    }
 }
