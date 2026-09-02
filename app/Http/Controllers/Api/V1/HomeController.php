@@ -10,8 +10,10 @@ use App\Models\Cuisine;
 use App\Services\Discovery\NearbyMerchantService;
 use App\Services\Discovery\RestaurantFilters;
 use App\Services\Media\ImageService;
+use App\Support\HomeCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * The customer home screen, as ordered sections.
@@ -51,14 +53,34 @@ class HomeController extends Controller
 
         $images = app(ImageService::class);
 
+        /*
+         * Banners, cuisines and collection tiles are the same for everyone and
+         * change a few times a week, yet they are fetched on every app open.
+         * Cached together under one key so a single admin edit clears all
+         * three rather than leaving a half-stale screen.
+         *
+         * Deliberately not the restaurant sections: those depend on where the
+         * customer is standing, and caching them would show one person another
+         * person's neighbourhood.
+         */
+        $merchandising = Cache::remember(
+            HomeCache::KEY,
+            now()->addSeconds(HomeCache::ttlSeconds()),
+            fn () => [
+                'banners' => $this->banners($images),
+                'cuisines' => $this->cuisines($images),
+                'tiles' => $this->collectionTiles($images),
+            ],
+        );
+
         $sections = [];
 
-        if (($banners = $this->banners($images)) !== []) {
-            $sections[] = ['type' => 'banners', 'items' => $banners];
+        if ($merchandising['banners'] !== []) {
+            $sections[] = ['type' => 'banners', 'items' => $merchandising['banners']];
         }
 
-        if (($cuisines = $this->cuisines($images)) !== []) {
-            $sections[] = ['type' => 'cuisines', 'items' => $cuisines];
+        if ($merchandising['cuisines'] !== []) {
+            $sections[] = ['type' => 'cuisines', 'items' => $merchandising['cuisines']];
         }
 
         /*
@@ -70,7 +92,7 @@ class HomeController extends Controller
             ->search($latitude, $longitude, new RestaurantFilters(perPage: 50))
             ->getCollection();
 
-        foreach ($this->collectionTiles($images) as $tile) {
+        foreach ($merchandising['tiles'] as $tile) {
             $sections[] = $tile;
         }
 

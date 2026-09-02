@@ -46,6 +46,7 @@ class CollectionController extends Controller
         $radius = $this->nearby->radiusFor($latitude, $longitude);
 
         $restaurants = $collection->merchants()
+            ->withLiveSurplusCount()
             ->where('kyc_status', KycStatus::Verified->value)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')

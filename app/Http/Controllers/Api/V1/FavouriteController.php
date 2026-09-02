@@ -20,6 +20,7 @@ class FavouriteController extends Controller
     public function index(Request $request): JsonResponse
     {
         $merchants = $request->user()->favourites()
+            ->withLiveSurplusCount()
             ->where('kyc_status', KycStatus::Verified->value)
             ->orderByDesc('favourites.created_at')
             ->get();

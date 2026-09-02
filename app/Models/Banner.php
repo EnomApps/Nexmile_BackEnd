@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ClearsHomeCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /** A home-screen carousel slide. */
 class Banner extends Model
 {
+    use ClearsHomeCache;
+
     protected $fillable = [
         'image_path', 'alt_text', 'action_type', 'action_value',
         'starts_at', 'ends_at', 'position', 'is_active',

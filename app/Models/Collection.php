@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ClearsHomeCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 /** A curated list of restaurants — "Meals under 250". */
 class Collection extends Model
 {
+    use ClearsHomeCache;
+
     protected $fillable = [
         'slug', 'title', 'subtitle', 'banner_path',
         'position', 'is_active', 'show_on_home',

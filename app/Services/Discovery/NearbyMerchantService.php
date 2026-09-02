@@ -154,6 +154,8 @@ class NearbyMerchantService
 
         return Merchant::query()
             ->with('operatingHours')
+            // One subquery for the page instead of one query per card.
+            ->withLiveSurplusCount()
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             /*

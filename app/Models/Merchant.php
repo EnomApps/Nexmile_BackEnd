@@ -6,6 +6,7 @@ use App\Enums\DocumentStatus;
 use App\Enums\DocumentType;
 use App\Enums\KycStatus;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -118,6 +119,21 @@ class Merchant extends Model
     public function photos(): HasMany
     {
         return $this->hasMany(MerchantPhoto::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
+     * Load the live Food Rescue count alongside the row.
+     *
+     * offers() needs it for every card. Asking per restaurant is one query per
+     * row on the busiest list in the product — invisible with three test
+     * restaurants, and the whole difference between a list that appears and a
+     * list that arrives once a neighbourhood has forty.
+     */
+    public function scopeWithLiveSurplusCount(Builder $query): Builder
+    {
+        return $query->withCount(['menuItems as live_surplus_count' => fn (Builder $q) => $q
+            ->surplusActive()
+            ->available()]);
     }
 
     /** Ratings left against this restaurant (EP12). */
@@ -283,9 +299,16 @@ class Merchant extends Model
     {
         $offers = [];
 
-        // surplusActive + available is exactly what the deals endpoint
-        // offers, so a badge here and an orderable deal there agree.
-        $liveDeals = $this->menuItems()->surplusActive()->available()->count();
+        /*
+         * surplusActive + available is exactly what the deals endpoint offers,
+         * so a badge here and an orderable deal there agree.
+         *
+         * Preloaded by withLiveSurplusCount() wherever a list of cards is
+         * built. The fallback query exists for a single restaurant fetched on
+         * its own, where one extra query is not a list problem.
+         */
+        $liveDeals = $this->live_surplus_count
+            ?? $this->menuItems()->surplusActive()->available()->count();
 
         if ($liveDeals > 0) {
             $offers[] = [

@@ -55,4 +55,19 @@ return [
      */
     'matched_dishes_shown' => 3,
 
+    /*
+     * How long the home screen's banners, cuisines and collection tiles are
+     * held.
+     *
+     * They are identical for every customer and change a few times a week, but
+     * are fetched on every app open. The cache is cleared the moment an admin
+     * edits any of them, so this ceiling only matters if something changes the
+     * rows without going through the admin screen — a database edit, or a
+     * campaign window opening on its own.
+     *
+     * That second case is the real reason it is a minute rather than an hour:
+     * a banner scheduled to start at 6pm should appear at about 6pm.
+     */
+    'home_cache_seconds' => env('HOME_CACHE_SECONDS', 60),
+
 ];

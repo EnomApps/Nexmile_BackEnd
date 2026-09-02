@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ClearsHomeCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /** One tile on the cuisine rail — Biryani, Cake, Dosa. */
 class Cuisine extends Model
 {
+    use ClearsHomeCache;
+
     protected $fillable = ['slug', 'name', 'image_path', 'position', 'is_active'];
 
     protected function casts(): array
