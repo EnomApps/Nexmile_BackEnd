@@ -8,11 +8,13 @@
 
     @include('merchants.partials.nav')
 
-    @if (session('status'))
-        <div class="mt-6 rounded-lg bg-brand-green/10 border border-brand-green/30 text-brand-green px-4 py-3 text-sm">
-            {{ session('status') }}
-        </div>
-    @endif
+    {{-- Also where the script writes, so a tap that no longer reloads the page
+         still says out loud what it did. --}}
+    <div id="flash" role="status" aria-live="polite"
+         class="mt-6 rounded-lg bg-brand-green/10 border border-brand-green/30 text-brand-green px-4 py-3 text-sm
+                {{ session('status') ? '' : 'hidden' }}">
+        {{ session('status') }}
+    </div>
 
     @if ($errors->any())
         <div class="mt-6 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 text-sm space-y-1">
@@ -40,9 +42,12 @@
                 <span id="sound-label">{{ __('portal.orders.sound_off') }}</span>
             </button>
 
+            {{-- A timestamp printed once by the server stops being true the
+                 moment the page stops reloading, and a clock that is wrong
+                 about freshness is worse than none. The script keeps it. --}}
             <p class="text-xs text-gray-600">
-                {{ __('portal.orders.auto_refresh', ['seconds' => 30]) }}
-                · {{ __('portal.orders.updated') }} {{ now()->format('g:i:s a') }}
+                {{ __('portal.orders.updated') }}
+                <span id="updated-at">{{ now()->format('g:i:s a') }}</span>
             </p>
         </div>
     </div>
@@ -50,34 +55,13 @@
     {{-- The highest live order id this page knows about. The script compares it
          with what this browser saw last, so a chime only ever means something
          genuinely new arrived. --}}
-    <span id="newest-order" class="hidden" data-id="{{ $live->max('id') ?? 0 }}"></span>
+    <span id="newest-order" class="hidden" data-id="{{ $newest_order_id }}"></span>
 
-    @if ($live->isEmpty())
-        <p class="mt-3 rounded-2xl border border-white/10 bg-white/[0.02] p-10 text-center text-sm text-gray-500">
-            {{ __('portal.orders.no_live') }}
-        </p>
-    @else
-        <div class="mt-3 space-y-3">
-            @foreach ($live as $order)
-                @include('merchants.orders.partials.card', ['order' => $order, 'actionable' => true])
-            @endforeach
-        </div>
-    @endif
-
-    {{-- History --}}
-    <h2 class="mt-12 text-xl font-bold text-white">{{ __('portal.orders.history') }}</h2>
-
-    @if ($history->isEmpty())
-        <p class="mt-3 rounded-2xl border border-white/10 bg-white/[0.02] p-10 text-center text-sm text-gray-500">
-            {{ __('portal.orders.no_history') }}
-        </p>
-    @else
-        <div class="mt-3 space-y-3">
-            @foreach ($history as $order)
-                @include('merchants.orders.partials.card', ['order' => $order, 'actionable' => false])
-            @endforeach
-        </div>
-    @endif
+    {{-- Everything inside is replaced in place. The document, and with it the
+         permission to make a sound, survives the whole shift. --}}
+    <div id="queue" data-signature="{{ $signature }}">
+        @include('merchants.orders.partials.lists')
+    </div>
 
 </section>
 
@@ -251,58 +235,149 @@
         if (newest > 0) localStorage.setItem(KEY, String(newest));
 
         /*
-         * The queue polls rather than reloading itself.
+         * Nothing below ever reloads the page.
          *
-         * Reloading was the reason the alert never sounded: every reload is a
-         * fresh document, and a browser blocks audio in a document the user
-         * has not yet interacted with. The tap that unlocked the sound always
-         * happened in the document before, so the ring was reliably silent.
+         * Reloading was why the alert stopped working: every reload is a fresh
+         * document, and a browser blocks audio in a document the user has not
+         * yet interacted with. The tap that unlocked the sound had happened in
+         * the document before — so the ring worked once, and the first accept
+         * or the first refresh silenced it for the rest of the shift.
          *
-         * One long-lived document keeps that permission, and drops the delay
-         * from up to thirty seconds to ten.
+         * One document that lives all day keeps that permission. It is also
+         * simply faster: a tap costs a few kilobytes of markup instead of the
+         * whole page, stylesheet and script again over a shop's connection.
          */
+        const queue = document.getElementById('queue');
+        const flash = document.getElementById('flash');
+        const stamp = document.getElementById('updated-at');
+        const csrf = @json(csrf_token());
+
         let known = newest;
 
+        function touched() {
+            if (stamp) stamp.textContent = new Date().toLocaleTimeString();
+        }
+
+        function say(message) {
+            if (!flash || !message) return;
+
+            flash.textContent = message;
+            flash.classList.remove('hidden');
+        }
+
+        /** Swap the lists, if the server sent new ones. */
+        function apply(payload) {
+            if (payload.changed && typeof payload.html === 'string') {
+                queue.innerHTML = payload.html;
+                queue.dataset.signature = payload.signature;
+            }
+
+            touched();
+
+            const latest = Number(payload.newest_order_id || 0);
+
+            /*
+             * Ring only for an order this browser has not seen. Marking one
+             * ready changes the queue too, and a chime for the merchant's own
+             * tap is the kind of noise that gets the sound switched off.
+             */
+            if (latest > known) {
+                known = latest;
+                localStorage.setItem(KEY, String(latest));
+
+                if (soundOn()) startRinging();
+            }
+        }
+
+        /** True when the session has gone and the answer is a login page. */
+        function signedOut(res) {
+            if (res.status !== 401 && res.status !== 419) return false;
+
+            // Reloading lets the merchant sign in again, rather than watching
+            // a queue that will never update.
+            window.location.reload();
+
+            return true;
+        }
+
         async function check() {
-            if (document.hidden || ringTimer !== null) return;
+            if (document.hidden) return;
 
             try {
-                const res = await fetch(@json(route('merchants.orders.queue-status')), {
-                    headers: {'Accept': 'application/json'},
+                const url = @json(route('merchants.orders.queue-status'))
+                    + '?known=' + encodeURIComponent(queue.dataset.signature || '');
+
+                const res = await fetch(url, {headers: {'Accept': 'application/json'}});
+
+                if (signedOut(res) || !res.ok) return;
+
+                apply(await res.json());
+            } catch (e) {
+                // A dropped connection in a shop is normal. Try again next tick.
+            }
+        }
+
+        /*
+         * Accept, start preparing and mark ready, without leaving the page.
+         *
+         * Delegated from the container because the buttons inside it are
+         * replaced every time the queue changes — a listener bound to a button
+         * would not survive the first swap.
+         */
+        queue.addEventListener('submit', async function (event) {
+            const form = event.target;
+
+            if (!(form instanceof HTMLFormElement)) return;
+
+            event.preventDefault();
+
+            const button = form.querySelector('button');
+
+            /*
+             * A cook tapping twice because the first tap looked like nothing
+             * happened would otherwise send the order forward two steps.
+             */
+            if (button) {
+                if (button.disabled) return;
+
+                button.disabled = true;
+                button.classList.add('opacity-50');
+            }
+
+            try {
+                const res = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: new FormData(form),
                 });
 
-                // A signed-out session answers with a redirect to the login
-                // page, not JSON. Reloading lets the merchant sign in again
-                // rather than watching a queue that will never update.
-                if (res.status === 401 || res.status === 419) {
+                if (signedOut(res)) return;
+
+                if (!res.ok) {
+                    // Rare — a status that moved underneath them, usually.
+                    // The page tells the truth after a reload, so let it.
                     window.location.reload();
 
                     return;
                 }
 
-                if (!res.ok) return;
+                const payload = await res.json();
 
-                const latest = Number((await res.json()).newest_order_id || 0);
-
-                if (latest <= known) return;
-
-                known = latest;
-                localStorage.setItem(KEY, String(latest));
-
-                if (soundOn()) startRinging();
-
-                /*
-                 * The list is refreshed only once the ring has finished. A
-                 * reload mid-alert cuts the audio, which is the failure this
-                 * whole change exists to remove.
-                 */
-                setTimeout(function () {
-                    window.location.reload();
-                }, RING_MS + 500);
+                say(payload.message);
+                apply(payload);
             } catch (e) {
-                // A dropped connection in a shop is normal. Try again next tick.
+                // The tap did not land. Give the button back rather than
+                // leaving a dead control in front of a busy kitchen.
+                if (button) {
+                    button.disabled = false;
+                    button.classList.remove('opacity-50');
+                }
             }
-        }
+        });
 
         setInterval(check, INTERVAL);
 

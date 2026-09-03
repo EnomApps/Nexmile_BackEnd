@@ -11,6 +11,7 @@ use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -472,16 +473,140 @@ class MerchantOrderTest extends TestCase
         }
     }
 
-    public function test_the_queue_does_not_reload_mid_ring(): void
+    public function test_the_queue_never_reloads_to_show_a_change(): void
     {
-        // A reload kills the audio, and an alert that cuts off after four
-        // seconds is one nobody trusts.
+        /*
+         * A reload kills the audio, and the alert that cuts off is one nobody
+         * trusts. The queue used to hold the refresh back until the ring had
+         * finished, which protected one alert and silenced every one after it
+         * — the new document had no user gesture, so the sound stayed locked
+         * for the rest of the shift.
+         *
+         * Now nothing reloads: the lists are swapped in place.
+         */
         $user = $this->merchantUser();
         $this->order($user->merchant);
 
         $html = $this->actingAs($user)->get('/merchants/orders')->assertOk()->getContent();
 
-        $this->assertStringContainsString('ringTimer !== null) return', $html);
+        $this->assertStringContainsString('queue.innerHTML = payload.html', $html);
+
+        // The old timer that reloaded once the ring finished is gone.
+        $this->assertStringNotContainsString('RING_MS + 500', $html);
+    }
+
+    public function test_accepting_from_the_queue_does_not_cost_a_page_load(): void
+    {
+        $user = $this->merchantUser();
+        $order = $this->order($user->merchant);
+
+        // The same button, asked for JSON. A cook's tap should cost a few
+        // kilobytes of markup, not the page, the stylesheet and the script
+        // again over a shop's connection.
+        $response = $this->actingAs($user)
+            ->postJson("/merchants/orders/{$order->id}/accept")
+            ->assertOk();
+
+        $response->assertJsonStructure(['message', 'signature', 'newest_order_id', 'changed', 'html']);
+
+        // The queue that comes back already shows the order accepted, so the
+        // page has nothing left to go and ask for.
+        $this->assertStringContainsString(
+            __('portal.status.accepted'),
+            $response->json('html'),
+        );
+    }
+
+    public function test_the_same_button_still_works_without_javascript(): void
+    {
+        // A shop on a browser that fails to run the script should get the old
+        // reload-and-redirect, not a dead button.
+        $user = $this->merchantUser();
+        $order = $this->order($user->merchant);
+
+        $this->actingAs($user)
+            ->post("/merchants/orders/{$order->id}/accept")
+            ->assertRedirect()
+            ->assertSessionHas('status');
+    }
+
+    public function test_a_quiet_poll_costs_one_query(): void
+    {
+        $user = $this->merchantUser();
+
+        foreach (range(1, 15) as $ignored) {
+            $this->order($user->merchant);
+        }
+
+        $known = $this->actingAs($user)->getJson('/merchants/orders/queue-status')->json('signature');
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $this->actingAs($user)
+            ->getJson('/merchants/orders/queue-status?known='.$known)
+            ->assertOk()
+            ->assertJsonPath('changed', false);
+
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        /*
+         * This runs every ten seconds for every kitchen with the page open,
+         * and most of those windows contain no change at all. Building both
+         * lists to discover that would cost more than the reload the swap
+         * replaced. Session and user lookups are the rest of the budget.
+         */
+        $count = count($queries);
+
+        $this->assertLessThan(
+            5,
+            $count,
+            "A poll with nothing to report ran {$count} queries.",
+        );
+    }
+
+    public function test_the_queue_sends_markup_only_when_something_changed(): void
+    {
+        $user = $this->merchantUser();
+        $this->order($user->merchant);
+
+        $first = $this->actingAs($user)->getJson('/merchants/orders/queue-status')->assertOk();
+
+        $this->assertTrue($first->json('changed'));
+        $this->assertNotNull($first->json('html'));
+
+        /*
+         * Most ten-second windows in a kitchen contain no change at all.
+         * Sending the whole queue on every one of them would be the reload
+         * this change exists to remove, wearing a different hat.
+         */
+        $again = $this->actingAs($user)
+            ->getJson('/merchants/orders/queue-status?known='.$first->json('signature'))
+            ->assertOk();
+
+        $this->assertFalse($again->json('changed'));
+        $this->assertNull($again->json('html'));
+    }
+
+    public function test_the_signature_moves_when_an_order_does(): void
+    {
+        $user = $this->merchantUser();
+        $order = $this->order($user->merchant);
+
+        $before = $this->actingAs($user)->getJson('/merchants/orders/queue-status')->json('signature');
+
+        $this->actingAs($user)->post("/merchants/orders/{$order->id}/accept")->assertRedirect();
+
+        $after = $this->actingAs($user)
+            ->getJson('/merchants/orders/queue-status?known='.$before)
+            ->assertOk();
+
+        // Accepting is not a new order, but it is a change the merchant can
+        // see — a queue that only watched for arrivals would show a stale
+        // ticket until someone navigated away.
+        $this->assertTrue($after->json('changed'));
+        $this->assertNotSame($before, $after->json('signature'));
     }
 
     public function test_the_sound_toggle_previews_the_real_alert(): void
