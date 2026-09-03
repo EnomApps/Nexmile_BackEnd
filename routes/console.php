@@ -25,3 +25,11 @@ Schedule::command('nexmile:expire-unpaid')
  * request on every send, so they are swept weekly rather than left to grow.
  */
 Schedule::command('nexmile:prune-devices')->weeklyOn(1, '03:30');
+
+/*
+ * Launch offers whose end date has arrived. Tidying only — orders are priced
+ * from the dates, so the right rate is charged on the right morning whether or
+ * not this runs. It exists so the admin page stops advertising a change that
+ * already happened.
+ */
+Schedule::command('nexmile:apply-commission-changes')->dailyAt('00:15');

@@ -50,7 +50,21 @@ class EarningsService
              * "Why is my payout less than my sales" has one answer and it
              * should be on the same screen as the number that prompts it.
              */
-            'commission_rate' => (float) $merchant->commission_rate,
+            'commission_rate' => $merchant->effectiveCommissionRate(),
+
+            /*
+             * The rise, told in advance and on the screen where the number it
+             * changes already is. A restaurant reconciling a payout and
+             * finding an extra two percent gone is one that leaves, and is
+             * right to — the point of a launch offer is that its end was a
+             * term they agreed to, not something that happened to them.
+             */
+            'upcoming_commission_rate' => $merchant->hasUpcomingCommissionChange()
+                ? (float) $merchant->scheduled_commission_rate
+                : null,
+            'commission_changes_on' => $merchant->hasUpcomingCommissionChange()
+                ? $merchant->commission_changes_on->toDateString()
+                : null,
 
             'cancelled' => Order::where('merchant_id', $merchant->id)
                 ->whereBetween('placed_at', [$from, $to])

@@ -55,6 +55,18 @@
         @endforeach
     </div>
 
+    {{-- Told in advance, on the screen showing the number it changes. The
+         alternative is a restaurant discovering it while reconciling a payout,
+         which is how a launch offer ending turns into a restaurant leaving. --}}
+    @if ($summary['upcoming_commission_rate'] !== null)
+        <p class="mt-4 rounded-lg bg-brand-orange/10 border border-brand-orange/30 text-brand-orange px-4 py-3 text-sm">
+            {{ __('portal.earnings.rate_changes', [
+                'rate' => $summary['upcoming_commission_rate'],
+                'date' => \Illuminate\Support\Carbon::parse($summary['commission_changes_on'])->translatedFormat('j F Y'),
+            ]) }}
+        </p>
+    @endif
+
     <p class="mt-4 text-xs text-gray-600">
         {{ __('portal.earnings.delivered_only') }}
         @if ($summary['cancelled'])

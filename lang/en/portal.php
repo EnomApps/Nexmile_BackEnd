@@ -104,6 +104,7 @@ return [
         'after_commission' => 'after commission',
         'needs_you' => 'need your attention',
         'waiting' => '{1} :count order is waiting for you.|[2,*] :count orders are waiting for you.',
+        'rate_changes' => 'Your commission changes to :rate% on :date.',
     ],
 
     'profile' => [

@@ -50,7 +50,7 @@ class PricingService
          * Commission is charged on food, not on the delivery fee — that fee
          * pays the rider and is not the merchant's revenue to be taxed on.
          */
-        $commissionRate = (float) ($cart->merchant->commission_rate ?? 0);
+        $commissionRate = $cart->merchant?->effectiveCommissionRate() ?? 0.0;
         $commission = $this->round(($itemsTotal + $packaging) * $commissionRate / 100);
 
         return [

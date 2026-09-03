@@ -85,6 +85,8 @@ class Merchant extends Model
             'packaging_fee' => 'decimal:2',
             'min_order_value' => 'decimal:2',
             'commission_rate' => 'decimal:2',
+            'scheduled_commission_rate' => 'decimal:2',
+            'commission_changes_on' => 'date',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'rating' => 'float',
@@ -171,6 +173,45 @@ class Merchant extends Model
     public function isKycVerified(): bool
     {
         return $this->kyc_status === KycStatus::Verified;
+    }
+
+    /**
+     * The rate to charge on an order placed right now.
+     *
+     * Worked out from the dates rather than flipped by a nightly job. The
+     * scheduler needs a crontab line to run at all, and a launch offer that
+     * quietly kept charging 10% because a cron was never installed is a
+     * revenue hole nobody would notice for months. Reading the date is right
+     * whether or not anything ran.
+     */
+    public function effectiveCommissionRate(): float
+    {
+        return $this->commissionChangeIsDue()
+            ? (float) $this->scheduled_commission_rate
+            : (float) $this->commission_rate;
+    }
+
+    /** A scheduled change whose date has arrived. */
+    public function commissionChangeIsDue(): bool
+    {
+        return $this->hasScheduledCommissionChange()
+            && ! $this->commission_changes_on->isFuture();
+    }
+
+    /**
+     * A change still ahead of the merchant — what their earnings page warns
+     * them about, and the only reason the rise is not a surprise.
+     */
+    public function hasUpcomingCommissionChange(): bool
+    {
+        return $this->hasScheduledCommissionChange()
+            && $this->commission_changes_on->isFuture();
+    }
+
+    protected function hasScheduledCommissionChange(): bool
+    {
+        return $this->commission_changes_on !== null
+            && $this->scheduled_commission_rate !== null;
     }
 
     /**

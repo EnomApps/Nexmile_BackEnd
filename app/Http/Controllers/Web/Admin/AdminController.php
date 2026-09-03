@@ -12,6 +12,7 @@ use App\Models\Rider;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -81,24 +82,51 @@ class AdminController extends Controller
      */
     public function updateTerms(Request $request, int $id): RedirectResponse
     {
+        $max = config('checkout.max_commission_rate');
+
         $data = $request->validate([
-            'commission_rate' => ['required', 'numeric', 'between:0,'.config('checkout.max_commission_rate')],
+            'commission_rate' => ['required', 'numeric', 'between:0,'.$max],
+
+            /*
+             * Both together or neither. A date with no rate does nothing when
+             * it arrives, and a rate with no date never applies — either half
+             * on its own is a launch offer that silently never ends.
+             */
+            'scheduled_commission_rate' => ['nullable', 'numeric', 'between:0,'.$max, 'required_with:commission_changes_on'],
+            'commission_changes_on' => ['nullable', 'date', 'after:today', 'required_with:scheduled_commission_rate'],
         ], [
             'commission_rate.between' => 'Commission must be between 0 and '
-                .config('checkout.max_commission_rate').'%. A higher rate would take more than the order is worth.',
+                .$max.'%. A higher rate would take more than the order is worth.',
+            'scheduled_commission_rate.required_with' => 'Give the rate the restaurant changes to, or clear the date.',
+            'commission_changes_on.required_with' => 'Give the date the new rate starts, or clear it.',
+            // Backdating would charge a restaurant more for orders it has
+            // already cooked, on terms it was never shown.
+            'commission_changes_on.after' => 'The new rate has to start in the future — a restaurant cannot be told about it afterwards.',
         ]);
 
         $merchant = Merchant::findOrFail($id);
 
         // forceFill: not mass-assignable anywhere, by design.
-        $merchant->forceFill(['commission_rate' => (float) $data['commission_rate']])->save();
+        $merchant->forceFill([
+            'commission_rate' => (float) $data['commission_rate'],
+            'scheduled_commission_rate' => $data['scheduled_commission_rate'] ?? null,
+            'commission_changes_on' => $data['commission_changes_on'] ?? null,
+        ])->save();
 
         /*
          * Existing orders keep the commission they were placed with. Those
          * figures are already on invoices and payout statements, and a rate
          * change is not retrospective.
          */
-        return back()->with('status', 'Commission set to '.$data['commission_rate'].'%. Existing orders are unchanged.');
+        $message = 'Commission set to '.$data['commission_rate'].'%. Existing orders are unchanged.';
+
+        if (isset($data['commission_changes_on'])) {
+            $message .= ' Changes to '.$data['scheduled_commission_rate'].'% on '
+                .Carbon::parse($data['commission_changes_on'])->format('j M Y')
+                .', and the restaurant can see that from today.';
+        }
+
+        return back()->with('status', $message);
     }
 
     /**

@@ -240,6 +240,30 @@
                     </div>
                 </div>
 
+                {{-- The launch offer's end date, set when the restaurant signs
+                     rather than remembered by whoever opens this page in March.
+                     Both fields or neither: a date with no rate changes nothing
+                     on the day it arrives, which is the worst of both. --}}
+                <div>
+                    <label for="scheduled_commission_rate" class="block text-xs text-gray-500 mb-1.5">Then changes to</label>
+                    <div class="flex items-center gap-2">
+                        <input id="scheduled_commission_rate" name="scheduled_commission_rate" type="number" step="0.01"
+                               min="0" max="{{ config('checkout.max_commission_rate') }}"
+                               value="{{ old('scheduled_commission_rate', $owner->scheduled_commission_rate === null ? '' : (float) $owner->scheduled_commission_rate) }}"
+                               class="rounded-lg bg-white/[0.03] border border-white/15 px-3 py-2.5 text-sm text-white w-32
+                                      focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none">
+                        <span class="text-sm text-gray-500">%</span>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="commission_changes_on" class="block text-xs text-gray-500 mb-1.5">On</label>
+                    <input id="commission_changes_on" name="commission_changes_on" type="date"
+                           value="{{ old('commission_changes_on', $owner->commission_changes_on?->toDateString()) }}"
+                           class="rounded-lg bg-white/[0.03] border border-white/15 px-3 py-2.5 text-sm text-white
+                                  focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none">
+                </div>
+
                 <button class="px-5 py-2.5 rounded-lg bg-brand-orange text-black text-sm font-bold hover:bg-orange-400">
                     Save rate
                 </button>
@@ -247,6 +271,11 @@
                 <p class="w-full text-xs text-gray-600">
                     Applies to new orders only — orders already placed keep the commission they were priced with,
                     because those figures are on invoices and payout statements.
+                    @if ($owner->hasUpcomingCommissionChange())
+                        <span class="block mt-1 text-brand-orange">
+                            The restaurant has been shown this change on their earnings page since it was set.
+                        </span>
+                    @endif
                 </p>
             </form>
         </div>
