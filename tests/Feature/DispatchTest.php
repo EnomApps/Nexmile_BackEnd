@@ -11,8 +11,10 @@ use App\Models\Address;
 use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\Rider;
+use App\Models\RiderReferralBonus;
 use App\Models\User;
 use App\Services\LiveState\RiderLocationService;
+use App\Services\Riders\ReferralService;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
 
@@ -44,14 +46,16 @@ class DispatchTest extends CheckoutTest
     }
 
     /** A rider standing at the restaurant's door, ready to work. */
-    protected function rider(array $attributes = []): Rider
+    protected function rider(array $attributes = [], ?string $phone = null): Rider
     {
         static $n = 0;
         $n++;
 
         $user = User::create([
             'name' => 'Rider '.$n,
-            'phone' => '97910000'.str_pad((string) $n, 2, '0', STR_PAD_LEFT),
+            // Named only where the number itself matters, as it does when a
+            // rider is signing up on a number somebody invited.
+            'phone' => $phone ?? '97910000'.str_pad((string) $n, 2, '0', STR_PAD_LEFT),
             'email' => "rider{$n}@example.in",
             'password' => 'secret',
             'role' => UserRole::Rider,
@@ -144,6 +148,39 @@ class DispatchTest extends CheckoutTest
         $rider->refresh();
         $this->assertSame(RiderStatus::Available, $rider->duty_status);
         $this->assertSame(1, $rider->completed_deliveries);
+    }
+
+    public function test_delivering_pays_whoever_recruited_the_rider(): void
+    {
+        /*
+         * The referral tests exercise the crediting directly. This one goes
+         * through a rider actually tapping Delivered, because a bonus that
+         * only pays when a test calls the service is a bonus that never pays.
+         */
+        config(['referrals.enabled' => true]);
+        config(['referrals.milestones' => [['deliveries' => 1, 'amount' => 500.00]]]);
+
+        $referrer = $this->rider();
+
+        // The friend has to sign up on the invited number, so the rider is
+        // created after the invitation exists.
+        app(ReferralService::class)->invite($referrer, '9876500099', 'Murugan', 'Madurai');
+
+        $friend = $this->rider(phone: '9876500099');
+        $order = $this->readyOrder();
+
+        Sanctum::actingAs($friend->user);
+
+        $this->postJson("/api/v1/rider/orders/{$order->id}/accept")->assertOk();
+        $this->postJson("/api/v1/rider/orders/{$order->id}/pickup", [
+            'pickup_code' => $order->fresh()->pickup_code,
+        ])->assertOk();
+        $this->postJson("/api/v1/rider/orders/{$order->id}/deliver")->assertOk();
+
+        $bonus = RiderReferralBonus::sole();
+
+        $this->assertSame($referrer->id, $bonus->rider_id);
+        $this->assertEqualsWithDelta(500.0, (float) $bonus->amount, 0.01);
     }
 
     public function test_a_rider_is_never_offered_their_own_order(): void

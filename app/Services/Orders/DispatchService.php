@@ -10,6 +10,7 @@ use App\Models\Rider;
 use App\Services\Discovery\NearbyMerchantService;
 use App\Services\LiveState\DispatchQueueService;
 use App\Services\LiveState\RiderLocationService;
+use App\Services\Riders\ReferralService;
 use App\Services\Riders\RiderPayoutService;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -29,6 +30,7 @@ class DispatchService
         protected DispatchQueueService $queue,
         protected NearbyMerchantService $geo,
         protected RiderPayoutService $payouts,
+        protected ReferralService $referrals,
     ) {}
 
     /**
@@ -191,6 +193,17 @@ class DispatchService
             'duty_status' => RiderStatus::Available,
             'completed_deliveries' => $rider->completed_deliveries + 1,
         ]);
+
+        /*
+         * Whatever this delivery earned whoever recruited this rider. After
+         * the count is written, because that count is what the milestones are
+         * measured against.
+         *
+         * Rescued: a referral bonus failing must never fail the delivery. The
+         * rider standing at the door has done their job either way, and the
+         * bonus can be reconciled from the same numbers later.
+         */
+        rescue(fn () => $this->referrals->creditDeliveries($rider->fresh()), report: true);
 
         rescue(fn () => $this->locations->setDutyStatus($rider->id, RiderStatus::Available->value), report: true);
 

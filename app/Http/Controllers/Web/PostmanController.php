@@ -58,8 +58,8 @@ class PostmanController extends Controller
             'collections' => [
                 ['app' => 'customer', 'name' => 'Customer app', 'requests' => 40,
                     'blurb' => 'Sign in, addresses, restaurants, Food Rescue deals, cart, checkout, tracking, invoices, reviews, reporting a delivery.'],
-                ['app' => 'rider', 'name' => 'Rider app', 'requests' => 21,
-                    'blurb' => 'Sign in, the onboarding wizard, duty status, location, the order board, pickup and delivery.'],
+                ['app' => 'rider', 'name' => 'Rider app', 'requests' => 24,
+                    'blurb' => 'Sign in, the onboarding wizard, duty status, location, the order board, pickup and delivery, referrals.'],
                 ['app' => 'merchant', 'name' => 'Merchant', 'requests' => 39,
                     'blurb' => 'Sign in, storefront and hours, KYC, menu, choices, and the order queue.'],
             ],

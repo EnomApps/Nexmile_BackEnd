@@ -99,7 +99,8 @@ class AppServiceProvider extends ServiceProvider
                 'title' => 'Nexmile — Rider app',
                 'description' => "Everything the rider app needs.\n\n".
                     "Auth is identical to the customer app except `intended_role: \"rider\"`. The account comes back `pending` and stays that way until an admin approves the documents, so onboarding is a wizard rather than a single screen.\n\n".
-                    '**There are no push notifications yet** — poll `/rider/orders/available` while the board is on screen.',
+                    "Register for push with `/devices` after signing in, and poll `/rider/orders/available` while the board is on screen — the board is a race between riders, so it is polled rather than pushed.\n\n".
+                    'Referral bonuses pay on deliveries the invited rider completes, never on signing up. See `max_per_referral` for the "earn up to" figure rather than printing an amount into the app.',
                 'prefixes' => [...$shared, 'api/v1/rider'],
             ],
             'merchant' => [

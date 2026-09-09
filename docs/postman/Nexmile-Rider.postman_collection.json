@@ -754,6 +754,97 @@
                     "response": []
                 }
             ]
+        },
+        {
+            "name": "5. Referrals",
+            "item": [
+                {
+                    "name": "My referrals",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/rider/referrals",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "rider",
+                                "referrals"
+                            ]
+                        },
+                        "description": "The whole Refer screen in one call.\n\n`meta.max_per_referral` is the \"Earn up to ₹X\" headline — read it rather than printing an amount into the app, or the banner and the scheme drift apart the first time the numbers change.\n\n`meta.joined` counts people who actually signed up, not invitations sent."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Invite someone",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/rider/referrals",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "rider",
+                                "referrals"
+                            ]
+                        },
+                        "description": "Any phone format — spaces, +91, dashes. Stored as ten digits, so a friend signing up as 9876543210 matches an invite typed as +91 98765 43210.\n\n422 with `errors.phone[0]` for each refusal, and the message says which: your own number, somebody who already has an account, a number another rider has invited, one you already invited, too many open invites, or not ten digits. Show the message as it comes back.\n\nNexmile does not text the number — the rider invites their friend themselves.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"phone\": \"+91 98765 43210\",\n    \"name\": \"Murugan\",\n    \"city\": \"Madurai\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "One referral",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/rider/referrals/{{referral_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "rider",
+                                "referrals",
+                                "{{referral_id}}"
+                            ]
+                        },
+                        "description": "The progress timeline behind one invitation.\n\n`state` is invited / joined / onboarded / working / expired. Use `steps[].remaining` in the UI — \"38 more deliveries\" is a reason to ring your friend; \"not yet\" is not.\n\nThere is deliberately no \"App Installed\" step: the first thing the server can observe is somebody signing up, and a tick claiming otherwise would be a lie on a screen about money."
+                    },
+                    "response": []
+                }
+            ]
         }
     ],
     "variable": [
@@ -788,6 +879,10 @@
         {
             "key": "pickup_code",
             "value": ""
+        },
+        {
+            "key": "referral_id",
+            "value": "1"
         }
     ]
 }

@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Enums\KycStatus;
 use App\Enums\RiderStatus;
+use App\Services\Riders\ReferralService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -67,6 +69,41 @@ class Rider extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    /**
+     * Attach a new rider to whoever invited them.
+     *
+     * On the model rather than in the two controllers that create riders, so
+     * a third way in cannot forget it — and a referral silently not linking
+     * is a bug nobody reports, because the person it costs never knew there
+     * was anything to expect.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (Rider $rider) {
+            rescue(
+                fn () => app(ReferralService::class)->linkOnSignup($rider),
+                report: true,
+            );
+        });
+    }
+
+    /** Invitations this rider sent. */
+    public function referralsMade(): HasMany
+    {
+        return $this->hasMany(RiderReferral::class, 'referrer_rider_id');
+    }
+
+    /** The invitation that brought this rider in, if there was one. */
+    public function referredBy(): HasOne
+    {
+        return $this->hasOne(RiderReferral::class, 'referred_rider_id');
+    }
+
+    public function referralBonuses(): HasMany
+    {
+        return $this->hasMany(RiderReferralBonus::class);
     }
 
     public function reports(): HasMany
