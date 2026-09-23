@@ -39,6 +39,8 @@ class NearbyMerchantService
     /** Mean radius of the Earth, in metres. */
     private const EARTH_RADIUS = 6371000;
 
+    public function __construct(protected RoadDistanceService $roads) {}
+
     /**
      * Restaurants within range of a point, nearest first, open ones above
      * closed ones.
@@ -79,6 +81,22 @@ class NearbyMerchantService
         if ($filters->search !== null) {
             $this->attachMatchedDishes($page->getCollection(), $filters->search);
         }
+
+        /*
+         * How far it is to ride, for the same reason and against the same
+         * page. A restaurant across the river or the far side of a level
+         * crossing is nine hundred metres away and a 1.6 km journey, and the
+         * time the customer is quoted is built on whichever number we give
+         * them.
+         *
+         * Never used to exclude anyone. Road distance is always at least the
+         * straight line, so the haversine filter above has already been the
+         * generous one — the only error left is a restaurant that looks nearer
+         * than it rides, and the honest fix for that is to say so rather than
+         * to hide it. In a town with thirty restaurants, dropping one costs
+         * the customer more than the extra four minutes does.
+         */
+        $this->roads->attach($page->getCollection(), $latitude, $longitude);
 
         return $page;
     }

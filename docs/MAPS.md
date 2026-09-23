@@ -29,8 +29,44 @@ What Google is actually for:
 | Address autocomplete while typing | Places API | Flutter apps, billed |
 
 Straight-line distance between two known points needs no API at all — it is
-arithmetic, and over 1 km the error against road distance is small enough that
-paying per call to improve it is rarely worth it.
+arithmetic, and it is what decides who appears in a search.
+
+**But it is not what should be shown to the customer.** Over most of a 1 km
+radius the error against road distance is small; across the Vaigai or the wrong
+side of a level crossing it is not. A restaurant 900 m away can be a 1.6 km
+ride, and the delivery time a customer is quoted is built on whichever number
+they were given.
+
+## Road distance
+
+`RoadDistanceService` measures the real ride for **the restaurants on the page
+being shown** — never for every candidate. A 1 km search can cross a hundred
+restaurants and Distance Matrix bills per origin-destination pair, so measuring
+them all would cost a hundred times what it is worth to correct a list of
+fifteen. One request covers the whole page.
+
+Three things keep it cheap and safe:
+
+**Cached for a month.** A road network does not change between lunch and
+dinner. Failures are cached for five minutes instead, so one bad afternoon of
+API errors is not remembered over a bridge that has stood for decades.
+
+**The customer's position is rounded onto a ~100 m grid before it becomes a
+cache key.** A deliberate inaccuracy — exact coordinates would mean a fresh
+paid lookup every few metres a phone drifts, and a cache that never hits only
+costs money. Two customers on the same street share an answer.
+
+**It never excludes anyone.** Road distance is always at least the straight
+line, so the haversine filter has already been the generous one. The only error
+left is a restaurant that looks nearer than it rides, and the honest fix is to
+say so rather than to hide it. In a town with thirty restaurants, dropping one
+costs the customer more than four extra minutes does.
+
+Off unless `ROAD_DISTANCE_ENABLED=true` and `ROAD_DISTANCE_DRIVER=google`.
+Without it — or with no key, or with Google unreachable — discovery behaves
+exactly as it did before this existed. The API omits `road_distance_metres`
+rather than sending null, so the app has one rule: use it when it is there,
+fall back to `distance_metres` when it is not.
 
 ## Use separate keys
 

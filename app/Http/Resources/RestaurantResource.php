@@ -100,6 +100,22 @@ class RestaurantResource extends JsonResource
                 fn () => (int) round($this->distance_metres),
             ),
 
+            /*
+             * How far it is to ride, where that could be measured.
+             *
+             * Absent — not null — whenever it could not be: no routing key, a
+             * provider that was down, a destination with no road to it. One
+             * rule for the app either way: show this when it is here, fall
+             * back to distance_metres when it is not.
+             *
+             * Worth showing when it is here. Straight-line distance across a
+             * river sets an expectation nothing can keep.
+             */
+            'road_distance_metres' => $this->when(
+                isset($this->road_distance_metres),
+                fn () => (int) round($this->road_distance_metres),
+            ),
+
             'area' => $this->city,
 
             'operating_hours' => $this->whenLoaded('operatingHours', fn () => $this->operatingHours

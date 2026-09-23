@@ -70,4 +70,63 @@ return [
      */
     'home_cache_seconds' => env('HOME_CACHE_SECONDS', 60),
 
+    /*
+     * How far it is to ride, as opposed to how far it looks.
+     *
+     * Madurai has a river and several level crossings. A restaurant 900 metres
+     * away in a straight line can be a 1.6 km ride, and a customer told "900 m,
+     * 25 minutes" on that basis is being told something we cannot keep.
+     *
+     * Measured only for the restaurants on the page being shown — never for
+     * every candidate. A 1 km search can cross a hundred restaurants and the
+     * provider bills per pair.
+     */
+    'road_distance' => [
+
+        /*
+         * Off by default, including in production until somebody turns it on
+         * with a key in place. Discovery works without it exactly as it did
+         * before — this corrects an answer, it must never withhold one.
+         */
+        'enabled' => env('ROAD_DISTANCE_ENABLED', false),
+
+        // 'google' needs services.google_maps.key. Anything else measures
+        // nothing, and every caller falls back to the straight line.
+        'driver' => env('ROAD_DISTANCE_DRIVER', 'null'),
+
+        /*
+         * A month. Roads do not move, and the answer for a given street and
+         * restaurant is the same in March as in January.
+         */
+        'ttl_seconds' => env('ROAD_DISTANCE_TTL', 2592000),
+
+        /*
+         * A failure is remembered for minutes, not weeks. Otherwise one bad
+         * afternoon of API errors gets cached over a road network that has
+         * not changed since the bridge was built.
+         */
+        'failure_ttl_seconds' => 300,
+
+        /*
+         * Decimal places the customer's position is rounded to before it
+         * becomes a cache key. Three is about a hundred metres.
+         *
+         * A deliberate inaccuracy. Exact coordinates mean a fresh paid lookup
+         * for every few metres a phone drifts, and a cache that never hits is
+         * one that only costs money. Two customers on the same street share an
+         * answer, which over a kilometre is well inside the routing's own
+         * error.
+         */
+        'coordinate_precision' => 3,
+
+        // Google's ceiling for destinations in one Distance Matrix request.
+        'max_destinations_per_call' => 25,
+
+        /*
+         * Short, because this runs inside the busiest screen in the product.
+         * A slow answer is worth less than a fast straight line.
+         */
+        'timeout_seconds' => 4,
+    ],
+
 ];

@@ -4,7 +4,10 @@ namespace App\Providers;
 
 use App\Contracts\PaymentGateway;
 use App\Contracts\PushSender;
+use App\Contracts\RoadDistanceProvider;
 use App\Contracts\SmsSender;
+use App\Services\Discovery\RoadDistance\GoogleDistanceMatrix;
+use App\Services\Discovery\RoadDistance\NullRoadDistance;
 use App\Services\Payments\FakeGateway;
 use App\Services\Payments\RazorpayGateway;
 use App\Services\Push\FcmPushSender;
@@ -40,6 +43,19 @@ class AppServiceProvider extends ServiceProvider
                 'fcm' => new FcmPushSender,
                 'null' => new NullPushSender,
                 default => new LogPushSender,
+            };
+        });
+
+        /*
+         * Road distance. The null driver measures nothing and every caller
+         * falls back to the straight line, which is what discovery did before
+         * this existed — so an unset key degrades the answer rather than
+         * emptying the busiest screen in the product.
+         */
+        $this->app->bind(RoadDistanceProvider::class, function () {
+            return match (config('discovery.road_distance.driver')) {
+                'google' => new GoogleDistanceMatrix,
+                default => new NullRoadDistance,
             };
         });
 
