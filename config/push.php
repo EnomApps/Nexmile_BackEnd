@@ -27,6 +27,16 @@ return [
      */
     'android_channel' => env('FCM_ANDROID_CHANNEL', 'nexmile_orders'),
 
+    /*
+     * iOS names its sound on every message, where Android takes it from the
+     * channel — so this is the only side the server has to say it on.
+     *
+     * Left as the system tone until an iOS build actually ships carrying the
+     * file. Naming an asset the app does not bundle is worse than the default:
+     * iOS plays nothing at all, and a silent alert reads as a missing one.
+     */
+    'ios_sound' => env('FCM_IOS_SOUND', 'default'),
+
     'timeout_seconds' => 10,
 
     /*

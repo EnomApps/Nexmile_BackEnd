@@ -63,9 +63,16 @@ class FcmPushSender implements PushSender
                             'priority' => 'high',
                             'notification' => ['channel_id' => config('push.android_channel')],
                         ],
+                        /*
+                         * iOS takes the sound per message; Android takes it
+                         * from the channel, which is why only this side needs
+                         * naming. A file the build does not bundle plays
+                         * nothing at all, so this stays 'default' until an
+                         * iOS release is actually carrying the asset.
+                         */
                         'apns' => [
                             'headers' => ['apns-priority' => '10'],
-                            'payload' => ['aps' => ['sound' => 'default']],
+                            'payload' => ['aps' => ['sound' => config('push.ios_sound')]],
                         ],
                     ],
                 ]);

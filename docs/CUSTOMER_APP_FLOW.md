@@ -365,7 +365,49 @@ Every order keeps its **own** price breakdown and item names, snapshotted when
 it was placed. A restaurant renaming a dish or changing its price does not
 alter what a past order says.
 
-**Ratings are not built** (EP12).
+---
+
+## Push notifications
+
+Register after sign-in, and again whenever FCM rotates the token:
+
+```
+POST   /v1/devices   { "token": "...", "platform": "android|ios", "app": "customer" }
+DELETE /v1/devices   { "token": "..." }   ← on sign-out, not optional
+```
+
+**The customer app receives seven of the nine order types.** The other two go
+to the merchant and rider apps:
+
+| Type | Customer | Merchant | Rider |
+|---|:--:|:--:|:--:|
+| `order.placed` | | ✅ | |
+| `order.accepted` | ✅ | | |
+| `order.rejected` | ✅ | | |
+| `order.ready` | ✅ | | |
+| `order.offer` | | | ✅ |
+| `order.rider_assigned` | ✅ | ✅ | |
+| `order.picked_up` | ✅ | | |
+| `order.delivered` | ✅ | | |
+| `order.cancelled` | ✅ | | |
+
+Read that table before testing. `order.placed` is the "new order in your
+kitchen" alert and will never reach a customer device — waiting for it produces
+a silent, correct nothing that looks exactly like a broken integration.
+
+**To test:** place an order, then accept it from the merchant portal. That
+fires `order.accepted`.
+
+Every message carries `data.type` and `data.order_id`, both **strings** — FCM
+rejects a data payload with any other scalar. Deep links are built from
+`order_id`.
+
+The Android channel is `nexmile_orders` and must match the channel the app
+creates. A mismatch is silent: the notification arrives with no sound and
+nothing reports an error.
+
+Full detail, including how to diagnose a silent push, is in
+[PUSH.md](PUSH.md).
 
 ---
 
@@ -412,8 +454,16 @@ Suggested order, so each step is testable end to end:
 4. Screens 6–8 — cart, checkout, COD confirmation
 5. Screens 9–10 — tracking and history
 
-The only things you will come back for are an online payment screen and
-ratings, and neither changes anything you build now.
+Then, all now live on the server and none of them changing anything above:
+
+- **Push** — see the section above, and read the audience table first
+- **Ratings and reviews** — leave a rating, read a restaurant's reviews, rate
+  individual dishes from an order
+- **Reporting a rider** — on the finished-order screen, beside the rating
+  rather than instead of it; a star rating cannot carry "he shouted at me"
+
+An online payment screen is the only thing still genuinely waiting on the
+backend.
 
 You can exercise the whole flow yourself with the Postman collection: sign in,
 save an address near a test restaurant, add to cart, check out. The order

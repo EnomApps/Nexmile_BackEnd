@@ -16,8 +16,11 @@ use App\Models\Order;
 use App\Models\Rider;
 use App\Models\User;
 use App\Services\Orders\OrderStatusService;
+use App\Services\Push\FcmPushSender;
 use App\Services\Push\PushService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -300,6 +303,47 @@ class PushNotificationTest extends TestCase
             ['live-token'],
             DeviceToken::where('user_id', $user->id)->pluck('token')->all(),
         );
+    }
+
+    public function test_the_payload_names_the_channel_and_the_sound(): void
+    {
+        config([
+            'push.fcm.project_id' => 'nexmile-e03c1',
+            'push.android_channel' => 'nexmile_orders',
+            'push.ios_sound' => 'nexmile.caf',
+        ]);
+
+        // Seeded so the sender never reaches for the service-account file.
+        // This is about the shape of the message, not about minting OAuth.
+        Cache::put('push.fcm.token', 'test-access-token', now()->addMinutes(50));
+
+        Http::fake(['fcm.googleapis.com/*' => Http::response(['name' => 'sent'])]);
+
+        (new FcmPushSender)->send(['a-token'], 'Title', 'Body', ['type' => 'order.accepted', 'order_id' => 8]);
+
+        Http::assertSent(function ($request) {
+            if (! str_contains($request->url(), 'fcm.googleapis.com')) {
+                return true;
+            }
+
+            $message = $request->data()['message'];
+
+            /*
+             * Both are silent when wrong. Android drops a notification whose
+             * channel it does not know, and iOS plays nothing for a sound file
+             * the app does not bundle — neither reports an error, so only a
+             * test catches a change here.
+             */
+            $this->assertSame('nexmile_orders', $message['android']['notification']['channel_id']);
+            $this->assertSame('nexmile.caf', $message['apns']['payload']['aps']['sound']);
+
+            // FCM rejects a data payload containing any other scalar, and the
+            // app builds its deep link by reading order_id as a string.
+            $this->assertSame('8', $message['data']['order_id']);
+            $this->assertSame('order.accepted', $message['data']['type']);
+
+            return true;
+        });
     }
 
     public function test_a_person_with_no_devices_costs_nothing(): void

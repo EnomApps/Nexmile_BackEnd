@@ -1362,6 +1362,83 @@
                     "response": []
                 }
             ]
+        },
+        {
+            "name": "8. Push notifications",
+            "item": [
+                {
+                    "name": "Register this device",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/devices",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "devices"
+                            ]
+                        },
+                        "description": "Call after sign-in, and again whenever FCM rotates the token — it does on reinstall, on restore to a new phone, and occasionally for no reason. Registering the same token twice is safe.\n\n`app` matters: one person may hold both apps — a rider ordering their own dinner is a customer — and the two installs must not receive each other's alerts.\n\n**Read this before testing.** Each type goes to one app. Testing a device\nagainst a type addressed elsewhere produces a silent, correct nothing that\nlooks exactly like a broken integration.\n\n| Type | Customer | Merchant | Rider |\n| --- | :--: | :--: | :--: |\n| `order.placed` | | yes | |\n| `order.accepted` | yes | | |\n| `order.rejected` | yes | | |\n| `order.ready` | yes | | |\n| `order.offer` | | | yes |\n| `order.rider_assigned` | yes | yes | |\n| `order.picked_up` | yes | | |\n| `order.delivered` | yes | | |\n| `order.cancelled` | yes | | |\n\nThe customer app receives seven of the nine. `order.placed` is the \"new order\nin your kitchen\" alert; `order.offer` is a ready order looking for a rider.\n\n**To test a customer device:** place an order, then accept it from the merchant\nportal. That fires `order.accepted`.\n\nEvery message carries `data.type` and `data.order_id`, both **strings** — FCM\nrejects a data payload containing any other scalar. Deep links are built from\n`order_id`.\n\nAndroid channel is `nexmile_orders` and must match the channel the app creates.\nA mismatch is silent: the notification arrives with no sound and nothing\nreports an error.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"token\": \"<fcm token>\",\n    \"platform\": \"android\",\n    \"app\": \"customer\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Forget this device",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/devices",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "devices"
+                            ]
+                        },
+                        "description": "Call on sign-out. Not optional — without it the phone keeps buzzing for a shift somebody else is working, and that person has no way to stop it.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"token\": \"<fcm token>\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "response": []
+                }
+            ]
         }
     ],
     "variable": [
