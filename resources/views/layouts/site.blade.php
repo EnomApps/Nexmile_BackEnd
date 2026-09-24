@@ -146,6 +146,20 @@
 </main>
 
 <footer class="border-t border-white/10 mt-24">
+    {{-- Four columns of marketing under a live order queue is the same
+         invitation to wander off that the top bar was. What a working
+         merchant might actually want from down here is somebody to email,
+         so that is what is left. --}}
+    @if ($portalUser)
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8 text-sm">
+            <h3 class="font-semibold text-white">{{ __('site.footer.contact') }}</h3>
+            <ul class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-gray-400">
+                @foreach (config('site.email') as $email)
+                    <li><a href="mailto:{{ $email }}" class="hover:text-brand-green break-all">{{ $email }}</a></li>
+                @endforeach
+            </ul>
+        </div>
+    @else
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 text-sm">
         <div>
             <img src="{{ asset('images/nexmile-wordmark.png') }}" alt="Nexmile"
@@ -192,10 +206,14 @@
             </ul>
         </div>
     </div>
+    @endif
 
     {{-- Publicly linked on every page: a customer is entitled to read these
          before ordering, and a payment provider will not activate live
-         payments until it can find them. --}}
+         payments until it can find them.
+
+         Kept for a signed-in merchant too, for the same reason — "every page"
+         means every page, and these are the terms they are trading under. --}}
     <div class="border-t border-white/10 py-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-600">
         <span>&copy; {{ date('Y') }} {{ config('site.company') }}. {{ __('site.footer.rights') }}</span>
 

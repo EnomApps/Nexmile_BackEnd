@@ -55,13 +55,6 @@ class PortalChromeTest extends TestCase
         return $user->fresh();
     }
 
-    /**
-     * Just the top bar.
-     *
-     * The footer carries the same marketing links and is deliberately left
-     * alone — it sits below a full order queue, where nobody lands by
-     * accident mid-shift.
-     */
     private function header(string $html): string
     {
         $from = strpos($html, '<header');
@@ -148,6 +141,56 @@ class PortalChromeTest extends TestCase
 
         $this->assertStringContainsString(route('language.switch', 'ta'), $html);
         $this->assertStringNotContainsString('hidden sm:flex items-center rounded-lg', $html);
+    }
+
+    public function test_the_marketing_footer_goes_as_well(): void
+    {
+        $html = $this->actingAs($this->merchantUser())
+            ->get('/merchants/orders')
+            ->assertOk()
+            ->getContent();
+
+        // Four columns of marketing under a live order queue is the same
+        // invitation to wander off that the top bar was.
+        foreach ([__('site.footer.about'), __('site.footer.investors'), __('site.footer.careers')] as $label) {
+            $this->assertStringNotContainsString($label, $html);
+        }
+    }
+
+    public function test_the_legal_links_stay_wherever_you_are(): void
+    {
+        /*
+         * Not a preference. A customer is entitled to read these before
+         * ordering, a merchant is trading under them, and a payment provider
+         * will not activate live payments until it can find them on every
+         * page — which means every page.
+         */
+        $html = $this->actingAs($this->merchantUser())
+            ->get('/merchants/orders')
+            ->assertOk()
+            ->getContent();
+
+        foreach (['terms', 'privacy', 'refunds'] as $document) {
+            $this->assertStringContainsString(route($document), $html);
+        }
+    }
+
+    public function test_support_is_still_reachable_from_the_portal(): void
+    {
+        // The one thing a working merchant might genuinely want from down
+        // there is somebody to email.
+        $this->actingAs($this->merchantUser())
+            ->get('/merchants/orders')
+            ->assertOk()
+            ->assertSee(config('site.email')[0] ?? '', false);
+    }
+
+    public function test_the_public_footer_is_untouched(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertSee(__('site.footer.investors'), false)
+            ->assertSee(__('site.footer.careers'), false);
     }
 
     public function test_the_menu_script_does_not_run_without_a_menu(): void
