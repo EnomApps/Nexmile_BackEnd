@@ -16,6 +16,14 @@
         <p class="mt-2 text-xs font-semibold tracking-widest uppercase text-gray-500">Admin</p>
     </div>
 
+    {{-- Where a page that sat open too long explains itself, rather than
+         bouncing somebody to a form that says nothing. --}}
+    @if (session('status'))
+        <p class="mt-6 rounded-lg bg-brand-orange/10 border border-brand-orange/30 text-brand-orange px-4 py-3 text-sm">
+            {{ session('status') }}
+        </p>
+    @endif
+
     <form method="POST" action="{{ route('admin.login.submit') }}"
           class="mt-8 rounded-2xl border border-white/10 bg-white/[0.02] p-6 space-y-5">
         @csrf

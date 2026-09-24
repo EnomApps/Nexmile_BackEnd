@@ -14,6 +14,15 @@
     <h1 class="text-3xl font-extrabold tracking-tight text-white">{{ __('portal.login.title') }}</h1>
     <p class="mt-2 text-gray-400">{{ __('portal.login.intro') }}</p>
 
+    {{-- Where a page that sat open too long explains itself. Without this the
+         redirect that replaced the blank 419 screen lands on a form that says
+         nothing, which is the same dead end wearing a friendlier URL. --}}
+    @if (session('status'))
+        <p class="mt-6 rounded-lg bg-brand-orange/10 border border-brand-orange/30 text-brand-orange px-4 py-3 text-sm">
+            {{ session('status') }}
+        </p>
+    @endif
+
     <form method="POST" action="{{ route('merchants.login.submit') }}"
           class="mt-8 rounded-2xl border border-white/10 bg-white/[0.02] p-6 sm:p-8 space-y-5">
         @csrf
