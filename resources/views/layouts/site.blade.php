@@ -40,28 +40,49 @@
     ];
     $locales = config('site.locales');
     $current = app()->getLocale();
+
+    /*
+     * A signed-in merchant gets no marketing nav.
+     *
+     * "Investors" and "Technology" above a live order queue are eight
+     * invitations to leave the portal mid-shift, and the way back is the
+     * browser's Back button onto a page whose CSRF token has since gone stale
+     * — which is a 419 on the next thing they press.
+     *
+     * The portal has its own tabs. This bar only has to get them home, let
+     * them change language, and let them out.
+     */
+    $portalUser = auth()->user()?->role === \App\Enums\UserRole::Merchant ? auth()->user() : null;
 @endphp
 
 <header class="sticky top-0 z-50 bg-black/90 backdrop-blur border-b border-white/10">
     <nav class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-        <a href="{{ route('home') }}" class="shrink-0" aria-label="Nexmile">
+        {{-- Signed in, the wordmark goes to the queue rather than the
+             marketing home page — that is where they were trying to get. --}}
+        <a href="{{ $portalUser ? route('merchants.dashboard') : route('home') }}"
+           class="shrink-0" aria-label="Nexmile">
             <img src="{{ asset('images/nexmile-wordmark.png') }}" alt="Nexmile"
                  width="631" height="128"
                  class="h-7 sm:h-8 w-auto">
         </a>
 
-        <div class="hidden xl:flex items-center gap-5 text-sm font-medium">
-            @foreach ($nav as $route => $label)
-                <a href="{{ route($route) }}"
-                   class="hover:text-brand-green transition {{ request()->routeIs($route) ? 'text-brand-green' : 'text-gray-300' }}">
-                    {{ $label }}
-                </a>
-            @endforeach
-        </div>
+        @unless ($portalUser)
+            <div class="hidden xl:flex items-center gap-5 text-sm font-medium">
+                @foreach ($nav as $route => $label)
+                    <a href="{{ route($route) }}"
+                       class="hover:text-brand-green transition {{ request()->routeIs($route) ? 'text-brand-green' : 'text-gray-300' }}">
+                        {{ $label }}
+                    </a>
+                @endforeach
+            </div>
+        @endunless
 
         <div class="flex items-center gap-2">
-            {{-- Language switcher --}}
-            <div class="hidden sm:flex items-center rounded-lg border border-white/15 overflow-hidden">
+            {{-- Language switcher. Always shown in the portal: the mobile copy
+                 lives in the marketing menu, which a signed-in merchant no
+                 longer has, and a shopkeeper who reads Tamil needs it far more
+                 on a phone behind the counter than on a desktop. --}}
+            <div class="{{ $portalUser ? 'flex' : 'hidden sm:flex' }} items-center rounded-lg border border-white/15 overflow-hidden">
                 @foreach ($locales as $code => $locale)
                     <a href="{{ route('language.switch', $code) }}"
                        title="{{ $locale['name'] }}"
@@ -73,36 +94,51 @@
                 @endforeach
             </div>
 
-            <button type="button" id="navToggle" aria-label="{{ __('site.nav.menu') }}" aria-expanded="false"
-                    class="xl:hidden p-2 -mr-2 text-gray-300 hover:text-white">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/>
-                </svg>
-            </button>
+            @if ($portalUser)
+                {{-- The way out, in the place people look for it. Without a
+                     visible sign-out the only exit is closing the tab, which
+                     leaves the session alive on a shared shop computer. --}}
+                <form method="POST" action="{{ route('merchants.logout') }}">
+                    @csrf
+                    <button type="submit"
+                            class="px-3 py-1.5 rounded-lg border border-white/15 text-xs font-semibold text-gray-400 hover:text-white hover:border-white/30 transition">
+                        {{ __('portal.dashboard.logout') }}
+                    </button>
+                </form>
+            @else
+                <button type="button" id="navToggle" aria-label="{{ __('site.nav.menu') }}" aria-expanded="false"
+                        class="xl:hidden p-2 -mr-2 text-gray-300 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+            @endif
         </div>
     </nav>
 
-    <div id="navMenu" class="hidden xl:hidden border-t border-white/10 bg-black">
-        <div class="px-4 py-3 space-y-1">
-            @foreach ($nav as $route => $label)
-                <a href="{{ route($route) }}"
-                   class="block px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/5 {{ request()->routeIs($route) ? 'text-brand-green' : 'text-gray-300' }}">
-                    {{ $label }}
-                </a>
-            @endforeach
-
-            <div class="sm:hidden flex gap-2 pt-3 mt-2 border-t border-white/10">
-                @foreach ($locales as $code => $locale)
-                    <a href="{{ route('language.switch', $code) }}"
-                       lang="{{ $code }}"
-                       class="px-3 py-1.5 rounded-lg text-xs font-semibold
-                              {{ $current === $code ? 'bg-brand-green text-black' : 'border border-white/15 text-gray-400' }}">
-                        {{ $locale['label'] }}
+    @unless ($portalUser)
+        <div id="navMenu" class="hidden xl:hidden border-t border-white/10 bg-black">
+            <div class="px-4 py-3 space-y-1">
+                @foreach ($nav as $route => $label)
+                    <a href="{{ route($route) }}"
+                       class="block px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/5 {{ request()->routeIs($route) ? 'text-brand-green' : 'text-gray-300' }}">
+                        {{ $label }}
                     </a>
                 @endforeach
+
+                <div class="sm:hidden flex gap-2 pt-3 mt-2 border-t border-white/10">
+                    @foreach ($locales as $code => $locale)
+                        <a href="{{ route('language.switch', $code) }}"
+                           lang="{{ $code }}"
+                           class="px-3 py-1.5 rounded-lg text-xs font-semibold
+                                  {{ $current === $code ? 'bg-brand-green text-black' : 'border border-white/15 text-gray-400' }}">
+                            {{ $locale['label'] }}
+                        </a>
+                    @endforeach
+                </div>
             </div>
         </div>
-    </div>
+    @endunless
 </header>
 
 <main class="flex-1">
@@ -172,11 +208,20 @@
 </footer>
 
 <script>
-    document.getElementById('navToggle').addEventListener('click', function () {
+    // Absent for a signed-in merchant, who has no marketing menu to open.
+    // Without the guard this throws on every portal page, and one dead script
+    // takes every later one on the page down with it.
+    (function () {
+        var toggle = document.getElementById('navToggle');
         var menu = document.getElementById('navMenu');
-        var open = menu.classList.toggle('hidden') === false;
-        this.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
+
+        if (toggle === null || menu === null) return;
+
+        toggle.addEventListener('click', function () {
+            var open = menu.classList.toggle('hidden') === false;
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    })();
 </script>
 
 </body>
