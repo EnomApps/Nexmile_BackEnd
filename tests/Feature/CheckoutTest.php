@@ -8,6 +8,7 @@ use App\Models\Merchant;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 
@@ -309,5 +310,62 @@ class CheckoutTest extends CartTest
             ->assertOk()
             ->assertJsonPath('data.status', 'accepted')
             ->assertJsonPath('data.estimated_prep_minutes', 25);
+    }
+
+    public function test_an_order_carries_both_map_pins(): void
+    {
+        /*
+         * The tracking screen draws a shop pin and a home pin. Without
+         * coordinates the app can only geocode the address text, which costs
+         * money per order and gets a narrow Madurai street wrong often enough
+         * to put the pin on the wrong side of it.
+         */
+        Sanctum::actingAs($customer = $this->customer());
+        $shop = $this->restaurant();
+        $this->fillCart($shop);
+
+        $id = $this->checkout($shop, $this->address($customer, 9.9201, 78.1196))
+            ->assertCreated()->json('data.id');
+
+        $data = $this->getJson("/api/v1/orders/{$id}")->assertOk()->json('data');
+
+        $this->assertEqualsWithDelta(9.9201, $data['delivery_address']['latitude'], 0.0001);
+        $this->assertEqualsWithDelta(78.1196, $data['delivery_address']['longitude'], 0.0001);
+
+        $this->assertSame($shop->id, $data['restaurant']['id']);
+        $this->assertEqualsWithDelta((float) $shop->latitude, $data['restaurant']['latitude'], 0.0001);
+        $this->assertEqualsWithDelta((float) $shop->longitude, $data['restaurant']['longitude'], 0.0001);
+    }
+
+    public function test_the_merchants_own_list_does_not_fetch_itself_per_order(): void
+    {
+        Sanctum::actingAs($customer = $this->customer());
+        $shop = $this->restaurant();
+
+        foreach (range(1, 5) as $ignored) {
+            $this->fillCart($shop);
+            $this->checkout($shop, $this->address($customer))->assertCreated();
+        }
+
+        Sanctum::actingAs($shop->user);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $this->getJson('/api/v1/merchant/orders')->assertOk();
+
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        /*
+         * The restaurant block is whenLoaded, so a merchant reading their own
+         * queue does not fetch their own address once per row to be told
+         * something they already know.
+         */
+        $this->assertLessThan(
+            10,
+            $count,
+            "The merchant order list ran {$count} queries for 5 orders.",
+        );
     }
 }

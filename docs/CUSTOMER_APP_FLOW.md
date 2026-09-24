@@ -297,9 +297,33 @@ shown **verbatim** — the merchant wrote it for the customer.
 Returns `estimated_prep_minutes` once accepted, the lifecycle timestamps, the
 `pickup_code`, and rider name and vehicle number once one is assigned.
 
-**Rider assignment and live rider location are not built yet** (EP8/EP9), so
-`rider` stays null and an order currently stops at `ready_for_pickup`. Nothing
-in your tracking screen needs to change when that lands.
+Rider assignment and live rider location are built. `rider` fills in once one
+accepts the job, and the order runs through to `delivered`.
+
+### Map pins
+
+`GET /orders/{id}` carries the coordinates for both ends, so neither pin needs
+geocoding:
+
+```json
+"delivery_address": {
+  "line1": "4 Gandhi Nagar", "city": "Madurai", "pincode": "625020",
+  "latitude": 9.9201, "longitude": 78.1196
+},
+"restaurant": {
+  "id": 3, "name": "Ponnusamy Hotel",
+  "address": "9 Anna Salai, Madurai", "phone": "…",
+  "latitude": 9.9195, "longitude": 78.1193
+}
+```
+
+Use these rather than geocoding the address text. Geocoding costs per call and
+gets a narrow Madurai street wrong often enough to drop the pin on the wrong
+side of it — and the customer chose that exact point when they saved the
+address.
+
+Both may be null if a merchant has not set their location or an address was
+saved without one. Draw what you have.
 
 ### Cancelling
 
