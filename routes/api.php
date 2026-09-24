@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\Rider\EarningsController as RiderEarningsControl
 use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
 use App\Http\Controllers\Api\V1\Rider\LocationController as RiderLocationController;
 use App\Http\Controllers\Api\V1\Rider\OrderController as RiderOrderController;
+use App\Http\Controllers\Api\V1\Rider\PayoutController as RiderPayoutController;
 use App\Http\Controllers\Api\V1\Rider\ProfileController as RiderProfileController;
 use App\Http\Controllers\Api\V1\Rider\ReferralController as RiderReferralController;
 use App\Http\Controllers\Api\V1\RiderReportController;
@@ -220,6 +221,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
          * is, and every rupee here is attached to deliveries the new rider
          * actually made rather than to an account existing.
          */
+        /*
+         * What actually reached the bank, week by week, and what was taken
+         * out on the way. Earnings have been visible per order for a while;
+         * this is the part a rider checks against their passbook.
+         */
+        Route::get('payouts', [RiderPayoutController::class, 'index'])->name('payouts.index');
+        Route::get('payouts/{payout}', [RiderPayoutController::class, 'show'])->name('payouts.show');
+
         Route::get('referrals', [RiderReferralController::class, 'index'])->name('referrals.index');
         Route::post('referrals', [RiderReferralController::class, 'store'])->name('referrals.store');
         Route::get('referrals/{referral}', [RiderReferralController::class, 'show'])->name('referrals.show');

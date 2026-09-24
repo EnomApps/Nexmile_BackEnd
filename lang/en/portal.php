@@ -107,6 +107,16 @@ return [
         'rate_changes' => 'Your commission changes to :rate% on :date.',
     ],
 
+    /*
+     * The TDS line says where the money went, not just that it left. It has
+     * gone to the government against the rider's PAN and comes back when they
+     * file — saying so is the difference between a deduction and a grievance.
+     */
+    'payouts' => [
+        'tds' => 'TDS deducted at :rate%',
+        'tds_note' => 'Paid to the government against your PAN. You can claim this back when you file your tax return.',
+    ],
+
     'profile' => [
         'title' => 'Restaurant details',
         'business' => 'Business',
