@@ -8,7 +8,13 @@
 
     <title>@yield('title', 'Admin') — Nexmile</title>
 
-    <link rel="icon" href="{{ asset('images/nexmile-mark.png') }}">
+    {{-- Square icons, for the same reason as the public site: the wordmark is
+         430x256 and a browser given a non-square icon draws a letter tile
+         instead. No manifest here — nobody saves the admin panel to a home
+         screen, and offering to install it would be odd. --}}
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/icon-32.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/apple-touch-icon.png') }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>

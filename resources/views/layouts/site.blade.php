@@ -8,7 +8,22 @@
 
     <title>@yield('title', 'Nexmile') — {{ config('site.company') }}</title>
 
-    <link rel="icon" href="{{ asset('images/nexmile-mark.png') }}">
+    {{-- The wordmark is 430x256, and an icon has to be square. Pointed at it,
+         a browser either squashed it or gave up and drew a letter tile with an
+         N in it — which is what Android was showing for the shortcut.
+
+         Small sizes come from a tighter crop without the speed lines: at
+         sixteen pixels they turn to mush and take the legibility of the rest
+         with them. --}}
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/icon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('images/icon-192.png') }}">
+    {{-- iOS composites a transparent icon onto black, so this one is given
+         the background explicitly rather than left to chance. --}}
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/apple-touch-icon.png') }}">
+    {{-- What Android Chrome reads when someone saves the site to their home
+         screen. Without it the icon is whatever the browser guesses. --}}
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
     {{-- Noto Sans Tamil / Devanagari so Tamil and Hindi render cleanly rather
          than falling back to whatever the device happens to ship. --}}
