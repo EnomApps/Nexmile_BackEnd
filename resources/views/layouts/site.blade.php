@@ -230,7 +230,16 @@
          Kept for a signed-in merchant too, for the same reason — "every page"
          means every page, and these are the terms they are trading under. --}}
     <div class="border-t border-white/10 py-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-600">
-        <span>&copy; {{ date('Y') }} {{ config('site.company') }}. {{ __('site.footer.rights') }}</span>
+        {{-- The CIN is not decoration. A company registered under the
+             Companies Act has to display it on its website, and a payment
+             provider looks for it when matching this site against the entity
+             it is about to settle money to. --}}
+        <span>
+            &copy; {{ date('Y') }} {{ config('site.company') }}. {{ __('site.footer.rights') }}
+            @if (config('site.cin'))
+                <span class="block sm:inline sm:ml-1 text-gray-700">CIN {{ config('site.cin') }}</span>
+            @endif
+        </span>
 
         @foreach (['terms', 'privacy', 'refunds'] as $document)
             <a href="{{ route($document) }}" class="hover:text-brand-green">

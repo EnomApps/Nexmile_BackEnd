@@ -27,8 +27,8 @@ return [
      * footer of every page, the page title, the policies and the OTP email.
      *
      * "Nexmile India Pvt. Ltd." was never approved by the MCA. The approved
-     * name is NEXMILE INTEGRATED COMMERCE PRIVATE LIMITED, approved 2026-08-21
-     * and valid until 2026-09-10 for incorporation.
+     * name is NEXMILE INTEGRATED COMMERCE PRIVATE LIMITED, incorporated
+     * 2026-09-09.
      *
      * `company` is the everyday short form; `company_legal` is the full
      * registered form and belongs anywhere the entity is named as a legal
@@ -36,6 +36,16 @@ return [
      */
     'company' => 'Nexmile Integrated Commerce Pvt Ltd',
     'company_legal' => 'Nexmile Integrated Commerce Private Limited',
+
+    /*
+     * The Corporate Identity Number, from the certificate of incorporation.
+     *
+     * Not decoration: a company registered under the Companies Act has to
+     * display its CIN on its website and its business correspondence, and a
+     * payment provider looks for it when matching the site against the entity
+     * it is about to settle money to.
+     */
+    'cin' => env('COMPANY_CIN', 'U53200TZ2026PTC040755'),
 
     /*
      * One place, because these appear on several pages and in the footer.

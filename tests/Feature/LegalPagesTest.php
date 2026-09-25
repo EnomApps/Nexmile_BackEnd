@@ -57,6 +57,28 @@ class LegalPagesTest extends TestCase
             ->assertSee('Grievance Officer');
     }
 
+    public function test_the_cin_is_displayed(): void
+    {
+        /*
+         * A company registered under the Companies Act has to show its CIN on
+         * its website. Razorpay also reads it when matching the site against
+         * the entity it is about to settle money to, so a missing one is a
+         * verification that fails without saying why.
+         */
+        $this->get('/')
+            ->assertOk()
+            ->assertSee(config('site.cin'), false);
+    }
+
+    public function test_a_blank_cin_prints_no_orphan_label(): void
+    {
+        // Same rule as the officer rows: a label with nothing after it reads
+        // as a broken page rather than an absent fact.
+        config(['site.cin' => '']);
+
+        $this->assertStringNotContainsString('CIN', $this->get('/')->assertOk()->getContent());
+    }
+
     public function test_the_officer_block_survives_missing_details(): void
     {
         /*
