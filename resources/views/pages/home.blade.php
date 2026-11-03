@@ -64,7 +64,7 @@
             ['1 km', __('site.home.stat_radius')],
             ['10–15 min', __('site.home.stat_time')],
             [count($services), __('site.home.stat_categories')],
-            [__('site.home.stat_state'), __('site.home.stat_launching')],
+            [count(__('site.cities')), __('site.home.stat_cities')],
         ] as [$stat, $label])
             <div>
                 <div class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-brand-green">{{ $stat }}</div>

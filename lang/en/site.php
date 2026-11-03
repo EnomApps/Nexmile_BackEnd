@@ -56,8 +56,7 @@ return [
         'stat_radius' => 'Delivery radius',
         'stat_time' => 'Target delivery time',
         'stat_categories' => 'Service categories',
-        'stat_launching' => 'Launching first',
-        'stat_state' => 'Tamil Nadu',
+        'stat_cities' => 'Cities at launch',
         'featured_title' => 'Featured services',
         'featured_sub' => 'Everything from your neighbourhood, in one app.',
         'rescue_label' => 'Sustainability',
@@ -70,7 +69,7 @@ return [
         'rescue_planet' => 'Planet',
         'rescue_planet_body' => 'Significantly less food wasted',
         'cities_title' => 'Cities launching soon',
-        'cities_sub' => 'Starting in Tamil Nadu, expanding across India.',
+        'cities_sub' => 'All three launching together, then expanding across India.',
         'cities_more' => 'More cities announced soon',
     ],
 
@@ -264,8 +263,18 @@ return [
         'rights' => 'All rights reserved.',
     ],
 
+    /*
+     * The launch cities, in the order the founder asked for them. All three
+     * open at the same time rather than one leading the others, so nothing on
+     * the site should call any of them "first".
+     *
+     * The home page counts this list for its "Cities at launch" figure, so a
+     * city added here is announced in both places or neither.
+     */
     'cities' => [
+        'Coimbatore',
         'Madurai',
+        'Ooty',
     ],
 
     'legal' => [
