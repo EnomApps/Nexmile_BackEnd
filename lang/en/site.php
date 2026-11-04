@@ -69,8 +69,7 @@ return [
         'rescue_planet' => 'Planet',
         'rescue_planet_body' => 'Significantly less food wasted',
         'cities_title' => 'Cities launching soon',
-        'cities_sub' => 'All three launching together, then expanding across India.',
-        'cities_more' => 'More cities announced soon',
+        'cities_sub' => 'We are coming to your cities.',
     ],
 
     'about' => [
