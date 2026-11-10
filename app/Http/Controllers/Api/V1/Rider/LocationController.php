@@ -9,6 +9,7 @@ use App\Models\Rider;
 use App\Services\Discovery\NearbyMerchantService;
 use App\Services\LiveState\RiderLocationService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 
 /**
@@ -36,6 +37,17 @@ class LocationController extends Controller
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'accuracy_metres' => ['sometimes', 'nullable', 'numeric', 'between:0,10000'],
+            // Compass bearing, so the map marker points the way the bike
+            // is going. 360 is accepted as well as 0; phones report both.
+            'heading' => ['sometimes', 'nullable', 'numeric', 'between:0,360'],
+            // Metres per second, as the platform APIs report it.
+            'speed' => ['sometimes', 'nullable', 'numeric', 'between:0,200'],
+            /*
+             * When the phone took the fix, which is not when it reached
+             * us. Optional so an older build keeps working — it then
+             * falls back to arrival time, which is what it meant before.
+             */
+            'recorded_at' => ['sometimes', 'nullable', 'date'],
         ]);
 
         $rider = $this->rider($request);
@@ -43,17 +55,40 @@ class LocationController extends Controller
         if ($rider->duty_status === RiderStatus::Offline) {
             // Not an error the app should surface — it just stops tracking
             // someone who has clocked off.
-            return response()->json(['message' => 'You are offline.', 'data' => ['tracking' => false]]);
+            return response()->json([
+                'message' => 'You are offline.',
+                'data' => ['tracking' => false, 'accepted' => false],
+            ]);
         }
 
-        $this->noteArrival($rider, (float) $data['latitude'], (float) $data['longitude']);
+        $recordedAt = isset($data['recorded_at'])
+            ? Carbon::parse($data['recorded_at'])
+            : now();
 
-        rescue(fn () => $this->locations->updateLocation(
+        $accepted = rescue(fn () => $this->locations->updateLocation(
             $rider->id,
             (int) ($rider->zone_id ?? 0),
             (float) $data['latitude'],
             (float) $data['longitude'],
-        ), report: true);
+            isset($data['heading']) ? (float) $data['heading'] : null,
+            isset($data['speed']) ? (float) $data['speed'] : null,
+            $recordedAt,
+        ), true, report: true);
+
+        /*
+         * A ping that lost a race with a newer one changes nothing —
+         * not the stored position, and not where the rider was judged
+         * to have arrived. Still a 200: the app did nothing wrong and
+         * there is nothing for it to retry.
+         */
+        if ($accepted === false) {
+            return response()->json([
+                'message' => 'A newer position is already recorded.',
+                'data' => ['tracking' => true, 'accepted' => false],
+            ]);
+        }
+
+        $this->noteArrival($rider, (float) $data['latitude'], (float) $data['longitude']);
 
         /*
          * Also written to MySQL, but only as a fallback for the board after a
@@ -63,12 +98,12 @@ class LocationController extends Controller
         $rider->forceFill([
             'last_latitude' => $data['latitude'],
             'last_longitude' => $data['longitude'],
-            'last_location_at' => now(),
+            'last_location_at' => $recordedAt,
         ])->save();
 
         return response()->json([
             'message' => 'Location updated.',
-            'data' => ['tracking' => true],
+            'data' => ['tracking' => true, 'accepted' => true],
         ]);
     }
 

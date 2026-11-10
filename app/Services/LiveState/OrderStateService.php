@@ -5,6 +5,7 @@ namespace App\Services\LiveState;
 use App\Enums\OrderStatus;
 use App\Support\RedisKeys;
 use Illuminate\Redis\Connections\Connection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redis;
 
 /**
@@ -89,5 +90,16 @@ class OrderStateService
         $redis = $this->redis();
         $redis->srem(RedisKeys::activeOrders(), $orderId);
         $redis->expire(RedisKeys::orderState($orderId), 300);
+
+        /*
+         * The drawn route goes with it. It lives in the cache store rather
+         * than in live state, so it would otherwise outlive the delivery it
+         * belongs to and be drawn on the next screen that asked.
+         *
+         * The rider's own position is deliberately left alone: it is keyed
+         * per rider, not per order, and they are very likely already
+         * carrying the next one.
+         */
+        rescue(fn () => Cache::forget(RedisKeys::orderRoute($orderId)), report: false);
     }
 }

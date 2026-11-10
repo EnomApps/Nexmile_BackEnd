@@ -7,7 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Models\Order;
 use App\Services\LiveState\OrderStateService;
-use App\Services\LiveState\RiderLocationService;
+use App\Services\LiveState\TrackingService;
 use App\Services\Orders\InvoiceService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -66,13 +66,15 @@ class OrderController extends Controller
      * order is in flight, so it reads Redis and falls back to MySQL rather
      * than loading the whole order each time.
      */
-    public function track(Request $request, int $order): JsonResponse
+    public function track(Request $request, int $order, TrackingService $tracking): JsonResponse
     {
-        $model = $this->find($request, $order);
+        $model = $this->find($request, $order, ['items', 'merchant', 'rider.user']);
 
-        $live = rescue(fn () => $this->liveState->get($model->id), [], report: false);
+        $cached = rescue(fn () => $this->liveState->get($model->id), [], report: false);
 
-        $status = OrderStatus::tryFrom($live['status'] ?? '') ?? $model->status;
+        $status = OrderStatus::tryFrom($cached['status'] ?? '') ?? $model->status;
+
+        $live = $tracking->for($model);
 
         return response()->json([
             'data' => [
@@ -88,17 +90,35 @@ class OrderController extends Controller
                 // they can check the right order arrived.
                 'pickup_code' => $model->pickup_code,
                 'cancellation_reason' => $model->cancellation_reason,
-                'rider' => $model->rider_id ? [
-                    'name' => $model->rider?->full_name,
-                    'vehicle_number' => $model->rider?->vehicle_number,
-                    'phone' => $model->rider?->user?->phone,
-                    /*
-                     * Live position, and only while the rider is actually
-                     * carrying this order. Once it is delivered their movements
-                     * are their own business, not the customer's.
-                     */
-                    'location' => $this->riderPosition($model),
-                ] : null,
+
+                /*
+                 * Minutes until the food arrives — not until it is cooked.
+                 * Before pickup it covers the rider's ride to the kitchen,
+                 * the handover and the delivery; after pickup, the ride.
+                 */
+                'estimated_minutes' => $live['estimated_minutes'],
+
+                /*
+                 * Google's encoded overview polyline, ready to draw. Null
+                 * whenever there is no route to give, which the app treats
+                 * as "show the markers, skip the line" rather than an error.
+                 */
+                'route' => $live['route'],
+
+                /*
+                 * Published so both apps and the backend share one idea of
+                 * stale. Past this many seconds since rider.updated_at, the
+                 * map should say the location is updating rather than show a
+                 * rider frozen mid-street.
+                 */
+                'stale_after_seconds' => (int) config('tracking.stale_after_seconds'),
+
+                /*
+                 * Position fields are filled only while this order is being
+                 * carried. Once it is delivered the rider's movements are
+                 * their own business, not the customer's.
+                 */
+                'rider' => $live['rider'],
             ],
         ]);
     }
@@ -168,38 +188,6 @@ class OrderController extends Controller
         ]);
     }
 
-    /**
-     * Where the rider is, if they are still carrying this order.
-     *
-     * @return array{latitude: float, longitude: float, updated_at: string|null}|null
-     */
-    protected function riderPosition(Order $order): ?array
-    {
-        $inFlight = in_array($order->status, [
-            OrderStatus::RiderAssigned,
-            OrderStatus::PickedUp,
-        ], true);
-
-        if (! $inFlight || $order->rider_id === null) {
-            return null;
-        }
-
-        $state = rescue(
-            fn () => app(RiderLocationService::class)->state($order->rider_id),
-            [],
-            report: false,
-        );
-
-        if (! isset($state['latitude'], $state['longitude'])) {
-            return null;
-        }
-
-        return [
-            'latitude' => (float) $state['latitude'],
-            'longitude' => (float) $state['longitude'],
-            'updated_at' => $state['updated_at'] ?? null,
-        ];
-    }
 
     /**
      * @param  list<string>  $with

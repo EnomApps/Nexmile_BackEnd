@@ -35,6 +35,18 @@ final class RedisKeys
         return "order:{$orderId}:state";
     }
 
+    /**
+     * The route drawn on a customer's map, cached.
+     *
+     * Per order rather than per rider: two customers watching the same
+     * rider are waiting on different deliveries, and the line each sees
+     * ends somewhere different.
+     */
+    public static function orderRoute(int $orderId): string
+    {
+        return "order:{$orderId}:route";
+    }
+
     /** Set of order ids currently in flight, for dashboards and recovery. */
     public static function activeOrders(): string
     {

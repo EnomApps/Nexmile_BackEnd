@@ -26,6 +26,7 @@ What Google is actually for:
 | Address typed by a customer → lat/lng | Geocoding API | backend, billed |
 | Road distance and ETA (not crow-flies) | Distance Matrix / Routes | backend, billed |
 | The map the customer looks at | Maps SDK | Flutter apps, billed |
+| The line drawn from rider to door | Directions API | backend, billed |
 | Address autocomplete while typing | Places API | Flutter apps, billed |
 
 Straight-line distance between two known points needs no API at all — it is
@@ -36,6 +37,13 @@ radius the error against road distance is small; across the Vaigai or the wrong
 side of a level crossing it is not. A restaurant 900 m away can be a 1.6 km
 ride, and the delivery time a customer is quoted is built on whichever number
 they were given.
+
+## Live tracking
+
+The route drawn on a customer's tracking map is a Directions call, and it
+is read every few seconds by every waiting customer. It is capped by a
+per-order cache rather than by how often anyone asks — see
+[TRACKING.md](TRACKING.md), which is where the cost decisions live.
 
 ## Road distance
 
@@ -75,7 +83,7 @@ its loosest user.
 
 | Key | Restriction | APIs enabled |
 |---|---|---|
-| Server | **IP address** → the EC2 elastic IP | Geocoding, Distance Matrix |
+| Server | **IP address** → the EC2 elastic IP | Geocoding, Distance Matrix, Directions |
 | Android app | **Package name + SHA-1** | Maps SDK for Android, Places |
 | iOS app | **Bundle ID** | Maps SDK for iOS, Places |
 

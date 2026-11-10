@@ -37,7 +37,7 @@ class DispatchTest extends CheckoutTest
          */
         $this->mock(RiderLocationService::class, function ($mock) {
             $mock->shouldReceive('state')->andReturn([])->byDefault();
-            $mock->shouldReceive('updateLocation')->andReturnNull()->byDefault();
+            $mock->shouldReceive('updateLocation')->andReturnTrue()->byDefault();
             $mock->shouldReceive('setDutyStatus')->andReturnNull()->byDefault();
             $mock->shouldReceive('goOffline')->andReturnNull()->byDefault();
             $mock->shouldReceive('isPresent')->andReturnTrue()->byDefault();
@@ -386,7 +386,7 @@ class DispatchTest extends CheckoutTest
         Sanctum::actingAs($customer);
         $this->getJson("/api/v1/orders/{$order->id}/track")
             ->assertOk()
-            ->assertJsonPath('data.rider.location.latitude', 9.9199);
+            ->assertJsonPath('data.rider.latitude', 9.9199);
 
         Sanctum::actingAs($rider->user);
         $this->postJson("/api/v1/rider/orders/{$order->id}/pickup", ['pickup_code' => $order->fresh()->pickup_code])->assertOk();
@@ -395,7 +395,7 @@ class DispatchTest extends CheckoutTest
         Sanctum::actingAs($customer);
         $this->getJson("/api/v1/orders/{$order->id}/track")
             ->assertOk()
-            ->assertJsonPath('data.rider.location', null);
+            ->assertJsonPath('data.rider.latitude', null);
     }
 
     public function test_a_location_ping_is_stored_and_refuses_other_roles(): void

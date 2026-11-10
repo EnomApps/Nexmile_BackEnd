@@ -5,9 +5,12 @@ namespace App\Providers;
 use App\Contracts\PaymentGateway;
 use App\Contracts\PushSender;
 use App\Contracts\RoadDistanceProvider;
+use App\Contracts\RouteProvider;
 use App\Contracts\SmsSender;
 use App\Services\Discovery\RoadDistance\GoogleDistanceMatrix;
 use App\Services\Discovery\RoadDistance\NullRoadDistance;
+use App\Services\LiveState\Routing\GoogleDirections;
+use App\Services\LiveState\Routing\NullRoute;
 use App\Services\Payments\FakeGateway;
 use App\Services\Payments\RazorpayGateway;
 use App\Services\Push\FcmPushSender;
@@ -56,6 +59,19 @@ class AppServiceProvider extends ServiceProvider
             return match (config('discovery.road_distance.driver')) {
                 'google' => new GoogleDistanceMatrix,
                 default => new NullRoadDistance,
+            };
+        });
+
+        /*
+         * The line drawn on a customer's tracking map. The null driver
+         * draws nothing and the map falls back to a moving marker with an
+         * estimate from the straight line — a missing key must degrade the
+         * map, never blank it while somebody waits for dinner.
+         */
+        $this->app->bind(RouteProvider::class, function () {
+            return match (config('tracking.route.driver')) {
+                'google' => new GoogleDirections,
+                default => new NullRoute,
             };
         });
 
