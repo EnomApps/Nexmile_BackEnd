@@ -253,6 +253,16 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('available', [RiderOrderController::class, 'available'])->name('available');
             Route::get('/', [RiderOrderController::class, 'index'])->name('index');
             Route::get('{order}', [RiderOrderController::class, 'show'])->name('show');
+
+            /*
+             * Turn-by-turn to the restaurant or the customer, so the rider
+             * navigates inside our app rather than being handed to Google
+             * Maps with the order screen left behind it.
+             *
+             * Every call is billed against a ~₹29 delivery fee, which is why
+             * there is a cooldown and a per-order ceiling behind it.
+             */
+            Route::get('{order}/route', [RiderOrderController::class, 'route'])->name('route');
             Route::post('{order}/accept', [RiderOrderController::class, 'accept'])->name('accept');
             Route::post('{order}/pickup', [RiderOrderController::class, 'pickup'])->name('pickup');
             Route::post('{order}/release', [RiderOrderController::class, 'release'])->name('release');

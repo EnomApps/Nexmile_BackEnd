@@ -57,6 +57,42 @@ return [
     ],
 
     /*
+     * Rider turn-by-turn, inside our app rather than handing the rider to
+     * Google Maps.
+     *
+     * The same key and the same billed call as the route above, but asked for
+     * by a rider who may be lost rather than by a customer watching a line.
+     * These two numbers are what stop a 15 minute delivery spending more on
+     * directions than it earns.
+     */
+    'navigation' => [
+
+        /*
+         * Serve the route we already have rather than buying it again. The
+         * app asks at most once every 15 seconds, so this window is set
+         * shorter deliberately: it never blocks a rider who has really gone
+         * off route, and it does catch a retry loop or a second screen.
+         */
+        'cooldown_seconds' => env('NAV_COOLDOWN', 10),
+
+        /*
+         * Billed calls per order, after which the last route is reused.
+         *
+         * An initial route plus fourteen reroutes is already a rider going
+         * badly wrong. Past that the spend stops mattering less than the
+         * delivery fee it comes out of.
+         */
+        'max_per_order' => env('NAV_MAX_PER_ORDER', 15),
+
+        // How long the last good route is kept to serve from.
+        'keep_seconds' => 900,
+
+        // The per-order meter. Longer than any delivery should last, so a
+        // stuck order cannot reset its own ceiling by waiting.
+        'meter_seconds' => 7200,
+    ],
+
+    /*
      * Fallback speed when there is no route to read a duration from.
      *
      * Deliberately pessimistic for a scooter: this is town traffic with

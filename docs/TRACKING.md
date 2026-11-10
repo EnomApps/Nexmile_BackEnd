@@ -141,6 +141,84 @@ The cached route is dropped when the order reaches a terminal status. The
 rider's own position is deliberately left alone — it is keyed per rider, not
 per order, and they are very likely already carrying the next delivery.
 
+## The rider app: navigating
+
+The rider navigates inside our app rather than being handed to Google Maps
+with the order screen left behind it. That means we buy the turns.
+
+```
+GET /v1/rider/orders/{order}/route?latitude=…&longitude=…&target=pickup|dropoff
+```
+
+`latitude` and `longitude` are where the rider is now. `target` is the
+restaurant (`pickup`) or the customer (`dropoff`).
+
+```json
+{ "data": {
+  "target": "dropoff",
+  "polyline": "<encoded polyline of the whole route>",
+  "distance_metres": 2300,
+  "duration_seconds": 540,
+  "steps": [
+    { "instruction": "Turn right onto 3rd Street",
+      "maneuver": "turn-right",
+      "distance_metres": 200, "duration_seconds": 40,
+      "end_latitude": 9.9300, "end_longitude": 78.1200 }
+  ] } }
+```
+
+Instructions are **plain text**. Google sends HTML — street names in `<b>`, and
+a `<div>` with no separator before "Destination will be on the left" — and it
+is stripped here rather than in the app, because an app that renders our
+markup is an app we break by changing providers. Tags become a space, not
+nothing, or "Turn right onto<div>3rd Street" runs two words together.
+
+`maneuver` is **null on the first and last steps**, which are "head north" and
+"arrive" rather than turns. An app that assumes an icon per step draws a wrong
+arrow on the rider's first instruction.
+
+Instructions come in the rider's own language, read off `Accept-Language` and
+allowlisted to the three the platform ships. An API request carries no session,
+so the app is the only thing that knows which one the rider picked.
+
+### Who may ask, and what the refusals mean
+
+| | |
+|---|---|
+| Not the assigned rider | **404** — another rider's order is not something to confirm the existence of, and the drop address is where a customer lives |
+| Delivered, cancelled or rejected | **403** — a finished order's address stops being that rider's business |
+| No maps key configured | **503** — permanent until somebody sets one |
+| No road to the stop, or an address with no coordinates | **422** |
+
+Both 503 and 422 are a dotted straight line in the app, not an error shown to
+the rider.
+
+### Cost control, again
+
+Each call is a billed Directions request set against a delivery fee of about
+₹29. A rider parked just off the route, or an app retrying a failure, can ask
+every few seconds for a quarter of an hour — which spends more on directions
+than the delivery earns.
+
+| Setting | Default | |
+|---|---|---|
+| `NAV_COOLDOWN` | 10s | Serve the route we already have rather than buying it again |
+| `NAV_MAX_PER_ORDER` | 15 | Billed calls per order, after which the last route is reused |
+
+The cooldown is deliberately **shorter than the app's own 15 seconds**, so a
+rider who has genuinely gone off route is never held up by it. What it catches
+is a retry loop, a second device, or two screens open on one order.
+
+Both limits serve a slightly older route rather than refusing. A rider
+mid-delivery with no directions is a worse outcome than a route ten seconds out
+of date, so every limit here degrades to something stale rather than to
+nothing — including a call that fails after a good one, which keeps serving the
+good one rather than dropping the rider onto a straight line mid-junction.
+
+A failed call still costs the cooldown. Otherwise a maps outage is one billed
+request per rider per poll: the failure returns instantly, the app retries, and
+nothing is holding the door.
+
 ## Configuration
 
 ```env
@@ -148,6 +226,9 @@ TRACKING_ROUTE_ENABLED=true
 TRACKING_ROUTE_DRIVER=google
 TRACKING_ROUTE_TTL=45
 TRACKING_ROUTE_MOVED=200
+
+NAV_COOLDOWN=10
+NAV_MAX_PER_ORDER=15
 ```
 
 Off by default. Without it the map still shows a moving rider and an estimate

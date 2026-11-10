@@ -27,6 +27,7 @@ What Google is actually for:
 | Road distance and ETA (not crow-flies) | Distance Matrix / Routes | backend, billed |
 | The map the customer looks at | Maps SDK | Flutter apps, billed |
 | The line drawn from rider to door | Directions API | backend, billed |
+| The turns in the rider app | Directions API | backend, billed |
 | Address autocomplete while typing | Places API | Flutter apps, billed |
 
 Straight-line distance between two known points needs no API at all — it is

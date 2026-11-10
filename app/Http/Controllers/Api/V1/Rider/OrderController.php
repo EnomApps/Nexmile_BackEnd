@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\RiderOrderResource;
 use App\Models\Order;
 use App\Models\Rider;
+use App\Services\LiveState\NavigationService;
 use App\Services\Orders\DispatchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -146,6 +147,99 @@ class OrderController extends Controller
             'message' => 'Delivered. Thanks — you are back online.',
             'data' => new RiderOrderResource($model->load('merchant', 'items')),
         ]);
+    }
+
+    /**
+     * Directions to the next stop
+     *
+     * Turn-by-turn, so the rider navigates inside this app instead of being
+     * handed to Google Maps and losing the order screen behind it.
+     *
+     * `target` is the restaurant (`pickup`) or the customer (`dropoff`), and
+     * the position is where the rider is now. Steps come back in riding order
+     * with plain-text instructions in the rider's own language.
+     *
+     * Each call is a billed Directions request against a ~₹29 delivery fee,
+     * so ask once when navigation starts and again only when the rider has
+     * actually gone off route. The server holds its own cooldown and a
+     * per-order ceiling underneath this, both of which serve a slightly older
+     * route rather than refusing — see config/tracking.php.
+     *
+     * 503 means no maps key is configured, which is permanent until somebody
+     * sets one. 422 means no route to this stop. Both are a dotted straight
+     * line in the app, not an error to show the rider.
+     */
+    public function route(Request $request, int $order, NavigationService $navigation): JsonResponse
+    {
+        $data = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'target' => ['required', 'string', 'in:pickup,dropoff'],
+        ]);
+
+        $model = $this->assigned($request, $order, ['merchant']);
+
+        /*
+         * Only while the order is live. A delivered order's addresses are no
+         * longer the rider's business, and a cancelled one is nobody's — and
+         * a rider app left open on a finished delivery would otherwise keep
+         * buying directions to a doorstep it has already left.
+         */
+        if (! $model->isActive()) {
+            abort(403, 'This order is no longer active.');
+        }
+
+        if (! $navigation->configured()) {
+            return response()->json([
+                'message' => 'Navigation is not available yet.',
+            ], 503);
+        }
+
+        $found = $navigation->to(
+            $model,
+            $data['target'],
+            (float) $data['latitude'],
+            (float) $data['longitude'],
+            $this->language($request),
+        );
+
+        if ($found === null) {
+            return response()->json([
+                'message' => 'We could not find a route to this stop.',
+            ], 422);
+        }
+
+        return response()->json([
+            'data' => [
+                'target' => $data['target'],
+                'polyline' => $found['polyline'],
+                'distance_metres' => $found['distance_metres'],
+                'duration_seconds' => $found['duration_seconds'],
+                'steps' => $found['steps'],
+            ],
+        ]);
+    }
+
+    /**
+     * The rider's language, for the turn instructions.
+     *
+     * Read off Accept-Language rather than from the session — an API request
+     * carries no session, and the rider app is the only thing that knows which
+     * of the three the rider picked.
+     *
+     * Allowlisted rather than passed through: the header is whatever the
+     * client sends, and the languages we actually ship are these three.
+     */
+    protected function language(Request $request): ?string
+    {
+        $supported = array_keys(config('site.locales'));
+
+        $tag = strtolower(substr(trim(explode(',', (string) $request->header('Accept-Language'))[0]), 0, 5));
+
+        // "ta-IN" and "ta" both mean Tamil to Google; "en-GB" means English.
+        $primary = explode('-', $tag)[0];
+
+        return in_array($primary, $supported, true) ? $primary : null;
     }
 
     /**

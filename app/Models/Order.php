@@ -107,13 +107,30 @@ class Order extends Model
         return $this->hasMany(Refund::class);
     }
 
-    public function scopeActive(Builder $query): Builder
+    /**
+     * The statuses an order stops at. Named once so the scope below and
+     * isActive() cannot drift apart and disagree about the same order.
+     *
+     * @return array<int, string>
+     */
+    public static function finishedStatuses(): array
     {
-        return $query->whereNotIn('status', [
+        return [
             OrderStatus::Delivered->value,
             OrderStatus::Cancelled->value,
             OrderStatus::Rejected->value,
-        ]);
+        ];
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->whereNotIn('status', self::finishedStatuses());
+    }
+
+    /** Still in hand: not delivered, not cancelled, not rejected. */
+    public function isActive(): bool
+    {
+        return ! in_array($this->status->value, self::finishedStatuses(), true);
     }
 
     public function isDelivery(): bool

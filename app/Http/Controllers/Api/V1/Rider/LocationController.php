@@ -9,8 +9,8 @@ use App\Models\Rider;
 use App\Services\Discovery\NearbyMerchantService;
 use App\Services\LiveState\RiderLocationService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 /**
  * Rider GPS pings (EP9).
