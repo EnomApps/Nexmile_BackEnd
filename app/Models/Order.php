@@ -132,8 +132,15 @@ class Order extends Model
     /**
      * What the rider collects at the door.
      *
-     * Anything already captured online is deducted, so this is the whole total
-     * for a cash order and zero for a prepaid one.
+     * Anything already paid for is deducted — captured online, or taken from
+     * the customer's wallet balance before the order existed — so this is the
+     * whole total for a cash order and zero for a prepaid one.
+     *
+     * The wallet part has to be deducted explicitly. It is not a payment row:
+     * a part-wallet order is a `cod` payment for the full total, because that
+     * is the method, and the balance moved in the wallet ledger instead. Left
+     * out, a customer who put ₹50 of a ₹220 basket on their balance is asked
+     * for ₹220 at the door and pays the ₹50 twice.
      *
      * Queried rather than read off a loaded relation: getting this wrong costs
      * the rider money out of their own pocket, so it must not depend on what a
@@ -145,6 +152,6 @@ class Order extends Model
             ->where('status', PaymentStatus::Paid->value)
             ->sum('amount');
 
-        return round(max(0, (float) $this->grand_total - $captured), 2);
+        return round(max(0, (float) $this->grand_total - $captured - (float) $this->wallet_amount), 2);
     }
 }

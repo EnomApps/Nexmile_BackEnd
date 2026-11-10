@@ -119,6 +119,13 @@ The order payload carries `wallet_amount` and `cod_amount`. **`cod_amount` is
 what a rider asks for at the door** — stored, not computed from the total, so a
 later refund cannot change the number a rider already read off their screen.
 
+The rider's own payload agrees with it: `collect_cash` comes from
+`Order::cashToCollect()`, which deducts the wallet part as well as any captured
+gateway payment. The wallet part is not a payment row — a part-wallet order is
+a `cod` payment for the full basket, because that is the method, and the money
+moved in the wallet ledger instead. Deducting only captured payments showed the
+rider the whole total and charged the customer their balance twice.
+
 Wallet money cannot be combined with a card or UPI payment. Splitting a basket
 across a balance and a gateway leaves a part-paid order when the card fails,
 and the honest version of that feature is a larger one than this.

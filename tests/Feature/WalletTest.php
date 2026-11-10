@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Http\Resources\RiderOrderResource;
 use App\Models\Address;
 use App\Models\Order;
 use App\Models\User;
@@ -305,6 +306,69 @@ class WalletTest extends CheckoutTest
         );
 
         $this->assertSame('0.00', Wallet::where('user_id', $customer->id)->first()->balance);
+    }
+
+    public function test_the_rider_is_asked_for_the_cash_part_only(): void
+    {
+        /*
+         * The gap the test above could not see. `cod_amount` was right on the
+         * order while the rider's own payload still read the whole total:
+         * cash-to-collect deducted captured gateway payments, and the wallet
+         * part is not one of those. A part-wallet order is a `cod` payment for
+         * the full basket — that is the method — and the balance moves in the
+         * wallet ledger instead.
+         *
+         * So the customer spent ₹50 of their balance and was then asked for
+         * all ₹220 at the door, paying that ₹50 twice, with the rider holding
+         * cash nobody could account for.
+         *
+         * Asserted against the figure the rider's screen is built from, not
+         * just the column, because the column was never wrong.
+         */
+        $shop = $this->restaurant();
+        $customer = $this->customer();
+        $this->fund($customer, 50);
+
+        $order = $this->orderWithWallet($shop, $customer, 'cod');
+
+        $this->assertSame(
+            (float) $order->cod_amount,
+            $order->cashToCollect(),
+            'the rider is asked for a different figure than the order records',
+        );
+
+        $payload = (new RiderOrderResource($order->fresh()))->toArray(request());
+
+        $this->assertSame((float) $order->cod_amount, $payload['collect_cash']);
+        $this->assertLessThan((float) $order->grand_total, $payload['collect_cash']);
+    }
+
+    public function test_a_wallet_paid_order_collects_no_cash_at_all(): void
+    {
+        // Nothing is owed at the door, and a rider shown any figure here
+        // would collect it.
+        $shop = $this->restaurant();
+        $customer = $this->customer();
+        $this->fund($customer, 2000);
+
+        $order = $this->orderWithWallet($shop, $customer, 'wallet');
+
+        $this->assertSame(0.0, $order->cashToCollect());
+        $this->assertSame(0.0, (new RiderOrderResource($order->fresh()))->toArray(request())['collect_cash']);
+    }
+
+    public function test_a_plain_cash_order_still_collects_the_whole_total(): void
+    {
+        // The other side of the same change: no balance involved, so nothing
+        // may be deducted. A rider under-collecting is money out of their own
+        // pocket.
+        $shop = $this->restaurant();
+        $customer = $this->customer();
+
+        $order = $this->orderWithWallet($shop, $customer, 'cod', useWallet: false);
+
+        $this->assertSame('0.00', $order->wallet_amount);
+        $this->assertSame((float) $order->grand_total, $order->cashToCollect());
     }
 
     public function test_claiming_the_wallet_covers_it_when_it_does_not_is_refused(): void
