@@ -22,6 +22,19 @@ interface PaymentGateway
     public function createOrder(Order $order): array;
 
     /**
+     * Open a payment for a bare amount, with no order behind it.
+     *
+     * A wallet top-up is money arriving before anybody has decided what to
+     * spend it on, so there is no order to pass and nothing in the orders
+     * table to point at. `notes` is echoed back on the webhook, which is
+     * how an incoming payment is matched to what it was for.
+     *
+     * @param  array<string, string>  $notes
+     * @return array{gateway_order_id: string, amount_paise: int, currency: string, key: string}
+     */
+    public function createPayment(int $amountPaise, string $receipt, array $notes = []): array;
+
+    /**
      * Whether the signature the app returned genuinely came from the provider.
      *
      * The app saying "it worked" is not evidence — a signature the provider

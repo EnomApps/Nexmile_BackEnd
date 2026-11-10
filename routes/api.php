@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\Rider\PayoutController as RiderPayoutController;
 use App\Http\Controllers\Api\V1\Rider\ProfileController as RiderProfileController;
 use App\Http\Controllers\Api\V1\Rider\ReferralController as RiderReferralController;
 use App\Http\Controllers\Api\V1\RiderReportController;
+use App\Http\Controllers\Api\V1\WalletController;
 use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -147,6 +148,20 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         });
 
         Route::get('carts', [CartController::class, 'index'])->name('carts.index');
+
+        /*
+        |----------------------------------------------------------------------
+        | Wallet
+        |----------------------------------------------------------------------
+        | A closed-loop balance. Money goes in through the gateway and comes
+        | out only as food — there is no withdrawal route here, and adding
+        | one is a legal decision rather than a product one.
+        */
+        Route::prefix('wallet')->name('wallet.')->group(function () {
+            Route::get('/', [WalletController::class, 'show'])->name('show');
+            Route::post('topups', [WalletController::class, 'topup'])->name('topups.store');
+            Route::post('topups/{topup}/verify', [WalletController::class, 'verify'])->name('topups.verify');
+        });
 
         /*
         |----------------------------------------------------------------------

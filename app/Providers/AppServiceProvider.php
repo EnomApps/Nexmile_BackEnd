@@ -120,12 +120,17 @@ class AppServiceProvider extends ServiceProvider
                 'title' => 'Nexmile — Customer app',
                 'description' => "Everything the customer app needs.\n\n".
                     "Sign-up and sign-in are the same two calls — there is no separate registration endpoint, and the account is created on first successful verification.\n\n".
-                    '**Money is a JSON number** and loses its zero fraction: ₹430.00 arrives as `430`. Read it as `num`, never `double`.',
+                    '**Money is a JSON number** and loses its zero fraction: ₹430.00 arrives as `430`. Read it as `num`, never `double`.
+
+'.
+                    'The wallet is closed-loop: money goes in through the gateway and comes out only as food. There is no withdrawal endpoint. Spending a balance works even when online payment is unavailable — topping up does not.',
                 'prefixes' => [...$shared, 'api/v1/addresses', 'api/v1/restaurants', 'api/v1/carts', 'api/v1/orders',
                     // Home screen v2: discovery, merchandising and favourites.
                     'api/v1/home', 'api/v1/filters', 'api/v1/collections', 'api/v1/favourites',
                     // Reporting the rider who brought an order.
-                    'api/v1/report-categories'],
+                    'api/v1/report-categories',
+                    // Wallet: balance, statement and topping up.
+                    'api/v1/wallet'],
             ],
             'rider' => [
                 'title' => 'Nexmile — Rider app',

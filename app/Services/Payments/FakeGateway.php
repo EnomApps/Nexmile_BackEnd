@@ -20,9 +20,18 @@ class FakeGateway implements PaymentGateway
 
     public function createOrder(Order $order): array
     {
+        return $this->createPayment(
+            (int) round((float) $order->grand_total * 100),
+            $order->order_number,
+            ['order_id' => (string) $order->id],
+        );
+    }
+
+    public function createPayment(int $amountPaise, string $receipt, array $notes = []): array
+    {
         return [
             'gateway_order_id' => 'order_'.Str::upper(Str::random(14)),
-            'amount_paise' => (int) round((float) $order->grand_total * 100),
+            'amount_paise' => $amountPaise,
             'currency' => config('payments.currency'),
             'key' => 'rzp_test_fake',
         ];

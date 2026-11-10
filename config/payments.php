@@ -65,4 +65,49 @@ return [
      */
     'currency' => 'INR',
 
+    /*
+    |--------------------------------------------------------------------------
+    | Customer wallet
+    |--------------------------------------------------------------------------
+    | A closed-loop balance: money goes in by card or UPI and comes out only
+    | as food.
+    |
+    | It must never become withdrawable to a bank account. A closed-loop wallet
+    | that cannot be cashed out sits outside the RBI's prepaid payment
+    | instrument licensing regime; one that can does not. Adding a withdraw
+    | button is a legal decision rather than a product one.
+    */
+
+    'wallet' => [
+
+        /*
+         * Topping up needs a gateway, so this follows PAYMENT_GATEWAY by
+         * default: with no gateway configured there is no way to put money in,
+         * and offering the screen anyway is a dead end a customer finds for
+         * themselves.
+         */
+        'enabled' => env('WALLET_ENABLED', true),
+
+        /*
+         * Per top-up. The floor keeps the gateway's own per-transaction cost
+         * from eating the whole amount; the ceiling is a blast radius — a
+         * stolen card tried against this endpoint should not be able to load
+         * ten thousand rupees at a time.
+         */
+        'minimum_topup' => env('WALLET_MIN_TOPUP', 10),
+        'maximum_topup' => env('WALLET_MAX_TOPUP', 10000),
+
+        /*
+         * The most a wallet may hold.
+         *
+         * RBI caps a minimum-detail prepaid instrument at ₹10,000. We are not
+         * issuing one, but a balance that quietly grows past that invites the
+         * question, and a customer cannot spend what they cannot order.
+         */
+        'maximum_balance' => env('WALLET_MAX_BALANCE', 10000),
+
+        // The statement the app shows. Fifty is a long way back for a service
+        // somebody uses twice a week.
+        'statement_size' => 50,
+    ],
 ];

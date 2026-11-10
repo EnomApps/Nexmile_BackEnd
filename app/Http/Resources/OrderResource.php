@@ -73,6 +73,16 @@ class OrderResource extends JsonResource
             'discount_total' => (float) $this->discount_total,
             'tax_total' => (float) $this->tax_total,
             'grand_total' => (float) $this->grand_total,
+
+            /*
+             * How the bill was split. `cod_amount` is the figure a rider
+             * reads off their screen and asks for at the door, so it is
+             * stored rather than worked out from the total — a number
+             * derived from a total that a refund has since touched is a
+             * rider arguing with a customer on a doorstep.
+             */
+            'wallet_amount' => (float) $this->wallet_amount,
+            'cod_amount' => (float) $this->cod_amount,
             // What the merchant is actually paid, after commission.
             'merchant_payout' => (float) $this->merchant_payout,
 

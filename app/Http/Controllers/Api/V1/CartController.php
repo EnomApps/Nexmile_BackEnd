@@ -143,6 +143,8 @@ class CartController extends Controller
             'payment_method' => ['required', 'in:'.implode(',', PaymentMethod::values())],
             'address_id' => ['required_if:fulfilment_type,delivery', 'integer'],
             'note' => ['sometimes', 'nullable', 'string', 'max:500'],
+            // Spend the balance first; cash on delivery covers the rest.
+            'use_wallet' => ['sometimes', 'boolean'],
         ], [
             'address_id.required_if' => 'Choose a delivery address.',
         ]);
@@ -162,6 +164,7 @@ class CartController extends Controller
             PaymentMethod::from($data['payment_method']),
             $address,
             $data['note'] ?? null,
+            (bool) ($data['use_wallet'] ?? false),
         );
 
         return response()->json([

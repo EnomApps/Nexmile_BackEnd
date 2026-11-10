@@ -33,6 +33,8 @@ class Order extends Model
             'discount_total' => 'decimal:2',
             'tax_total' => 'decimal:2',
             'grand_total' => 'decimal:2',
+            'wallet_amount' => 'decimal:2',
+            'cod_amount' => 'decimal:2',
             'commission_amount' => 'decimal:2',
             'merchant_payout' => 'decimal:2',
             'rider_payout' => 'decimal:2',

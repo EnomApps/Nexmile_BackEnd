@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Services\LiveState\OrderStateService;
 use App\Services\LiveState\TrackingService;
 use App\Services\Orders\InvoiceService;
+use App\Services\Payments\WalletService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +24,10 @@ use Illuminate\Support\Facades\DB;
  */
 class OrderController extends Controller
 {
-    public function __construct(protected OrderStateService $liveState) {}
+    public function __construct(
+        protected OrderStateService $liveState,
+        protected WalletService $wallets,
+    ) {}
 
     /**
      * Order history
@@ -178,6 +182,18 @@ class OrderController extends Controller
                 'note' => $data['reason'] ?? null,
                 'created_at' => now(),
             ]);
+
+            /*
+             * Wallet money goes back to the wallet, in the same
+             * transaction that cancels the order — a cancellation that
+             * succeeds without the refund is money quietly kept.
+             *
+             * Only the wallet part. Anything paid by card goes back to
+             * the card: turning somebody's money into store credit
+             * without asking is a complaint even when the figure is
+             * right.
+             */
+            $this->wallets->refundOrder($model, 'Refund for cancelled order '.$model->order_number);
         });
 
         rescue(fn () => $this->liveState->setStatus($model->id, OrderStatus::Cancelled), report: true);
@@ -187,7 +203,6 @@ class OrderController extends Controller
             'data' => new OrderResource($model->fresh('items')),
         ]);
     }
-
 
     /**
      * @param  list<string>  $with

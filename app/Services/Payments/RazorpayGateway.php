@@ -20,28 +20,35 @@ class RazorpayGateway implements PaymentGateway
 {
     public function createOrder(Order $order): array
     {
-        $amount = $this->toPaise((float) $order->grand_total);
-
-        $response = $this->client()->post('/orders', [
-            'amount' => $amount,
-            'currency' => config('payments.currency'),
+        return $this->createPayment(
+            $this->toPaise((float) $order->grand_total),
             /*
-             * Our own order number, so a payment in the Razorpay dashboard can
-             * be traced back without a lookup table. Their receipt field is
-             * capped at 40 characters, which ours is comfortably under.
+             * Our own order number, so a payment in the Razorpay dashboard
+             * can be traced back without a lookup table. Their receipt field
+             * is capped at 40 characters, which ours is comfortably under.
              */
-            'receipt' => $order->order_number,
-            'notes' => [
+            $order->order_number,
+            [
                 'order_id' => (string) $order->id,
                 'merchant' => (string) $order->merchant_id,
             ],
+        );
+    }
+
+    public function createPayment(int $amountPaise, string $receipt, array $notes = []): array
+    {
+        $response = $this->client()->post('/orders', [
+            'amount' => $amountPaise,
+            'currency' => config('payments.currency'),
+            'receipt' => $receipt,
+            'notes' => $notes,
         ]);
 
         $this->guard($response, 'create a payment');
 
         return [
             'gateway_order_id' => $response->json('id'),
-            'amount_paise' => $amount,
+            'amount_paise' => $amountPaise,
             'currency' => config('payments.currency'),
             // The publishable key. The secret never leaves the server.
             'key' => (string) config('payments.razorpay.key'),

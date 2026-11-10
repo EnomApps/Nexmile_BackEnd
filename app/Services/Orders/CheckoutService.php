@@ -14,6 +14,7 @@ use App\Services\Discovery\NearbyMerchantService;
 use App\Services\LiveState\OrderStateService;
 use App\Services\Menu\SurplusService;
 use App\Services\Payments\PaymentService;
+use App\Services\Payments\WalletService;
 use App\Services\Push\OrderNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -37,6 +38,7 @@ class CheckoutService
         protected OrderStateService $liveState,
         protected SurplusService $surplus,
         protected OrderNotifier $notifier,
+        protected WalletService $wallets,
     ) {}
 
     /**
@@ -49,10 +51,12 @@ class CheckoutService
         PaymentMethod $method,
         ?Address $address = null,
         ?string $note = null,
+        bool $useWallet = false,
     ): Order {
         $cart->loadMissing(['merchant', 'items.menuItem', 'items.options.itemOption.group']);
 
         $this->guardPaymentMethod($method);
+        $this->guardWalletUse($method, $useWallet);
         $this->guardCart($cart);
         $this->guardMerchant($cart);
 
@@ -64,7 +68,7 @@ class CheckoutService
 
         $this->guardMinimum($quote);
 
-        $order = DB::transaction(function () use ($user, $cart, $fulfilment, $method, $address, $note, $quote, $distance) {
+        $order = DB::transaction(function () use ($user, $cart, $fulfilment, $method, $address, $note, $quote, $distance, $useWallet) {
             $order = Order::create([
                 'order_number' => $this->orderNumber(),
                 'user_id' => $user->id,
@@ -78,7 +82,7 @@ class CheckoutService
                  * status out: a kitchen must never start on money that has
                  * not moved.
                  */
-                'status' => $method === PaymentMethod::Cod
+                'status' => $this->settledImmediately($method)
                     ? OrderStatus::Placed
                     : OrderStatus::PendingPayment,
                 'fulfilment_type' => $fulfilment,
@@ -101,7 +105,7 @@ class CheckoutService
                 'estimated_prep_minutes' => $cart->merchant->avg_prep_time_minutes,
                 // Stamped when the order actually reaches the kitchen, which
                 // for an online order is when the money lands, not now.
-                'placed_at' => $method === PaymentMethod::Cod ? now() : null,
+                'placed_at' => $this->settledImmediately($method) ? now() : null,
             ]);
 
             /*
@@ -118,12 +122,53 @@ class CheckoutService
 
             $this->snapshotItems($order, $quote['lines']);
 
+            /*
+             * Taken inside the order's own transaction, so anything that
+             * fails after this point takes the debit with it. A customer
+             * charged for an order that does not exist is the worst
+             * outcome available here.
+             *
+             * The balance is read under a lock in WalletService, never
+             * from whatever the app last saw — two phones checking out at
+             * once both believe there is enough.
+             */
+            $fromWallet = $useWallet
+                ? $this->wallets->spend($user, $order, (float) $quote['grand_total'])
+                : 0.0;
+
+            $owing = round((float) $quote['grand_total'] - $fromWallet, 2);
+
+            /*
+             * The app chooses which method to send by reading the balance
+             * first, and it can change between those two calls — another
+             * device, or a refund landing. Refusing sends them back to
+             * re-read it, rather than letting through an order marked
+             * fully paid that is not.
+             */
+            if ($method === PaymentMethod::Wallet && $owing > 0) {
+                $this->fail('use_wallet', 'Your wallet no longer covers this order. Check your balance and try again.');
+            }
+
+            $order->forceFill([
+                'wallet_amount' => $fromWallet,
+                // What the rider actually collects at the door.
+                'cod_amount' => $method === PaymentMethod::Cod ? $owing : 0,
+            ])->save();
+
             $order->payments()->create([
                 'user_id' => $user->id,
                 'method' => $method,
-                // Cash is collected at the door; nothing is captured now.
-                'status' => PaymentStatus::Pending,
+                /*
+                 * A wallet order is settled the moment it is placed: the
+                 * money moved before the order existed. Cash is collected
+                 * at the door and online waits on the provider, so both
+                 * of those stay pending.
+                 */
+                'status' => $method === PaymentMethod::Wallet
+                    ? PaymentStatus::Paid
+                    : PaymentStatus::Pending,
                 'amount' => $quote['grand_total'],
+                'captured_at' => $method === PaymentMethod::Wallet ? now() : null,
             ]);
 
             $order->statusHistory()->create([
@@ -309,6 +354,43 @@ class CheckoutService
     /**
      * @throws ValidationException
      */
+    /**
+     * Can the wallet be combined with this method?
+     *
+     * Wallet plus cash works: the balance covers what it can and the
+     * rider collects the rest. Wallet plus a card does not — splitting a
+     * basket across a balance and a gateway leaves a part-paid order
+     * when the card fails, and the honest version of that feature is a
+     * larger one than this.
+     */
+    protected function guardWalletUse(PaymentMethod $method, bool $useWallet): void
+    {
+        if (! $useWallet) {
+            return;
+        }
+
+        if (! config('payments.wallet.enabled')) {
+            $this->fail('use_wallet', 'The wallet is not available right now.');
+        }
+
+        if (! in_array($method, [PaymentMethod::Wallet, PaymentMethod::Cod], true)) {
+            $this->fail('use_wallet', 'Wallet money can be combined with cash on delivery, not with an online payment.');
+        }
+    }
+
+    /**
+     * Has the money already moved by the time the order exists?
+     *
+     * True for cash, which is collected later but owes nothing now, and
+     * for the wallet, where the balance was debited as the order was
+     * written. An online order waits in pending_payment, because a
+     * kitchen must never start on money that has not moved.
+     */
+    protected function settledImmediately(PaymentMethod $method): bool
+    {
+        return in_array($method, [PaymentMethod::Cod, PaymentMethod::Wallet], true);
+    }
+
     protected function guardPaymentMethod(PaymentMethod $method): void
     {
         if (! in_array($method->value, PaymentService::availableMethods(), true)) {

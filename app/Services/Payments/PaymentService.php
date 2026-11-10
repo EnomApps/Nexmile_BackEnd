@@ -53,7 +53,19 @@ class PaymentService
         $methods = config('payments.methods', [PaymentMethod::Cod->value]);
 
         if (! self::onlineEnabled()) {
-            return array_values(array_intersect($methods, [PaymentMethod::Cod->value]));
+            /*
+             * The wallet survives the gateway being off. Its money moved
+             * when it was topped up, so spending it needs nobody's
+             * permission — and a customer with a balance sitting there
+             * should not be told to pay cash because Razorpay is down.
+             */
+            $offline = [PaymentMethod::Cod->value];
+
+            if (config('payments.wallet.enabled')) {
+                $offline[] = PaymentMethod::Wallet->value;
+            }
+
+            return array_values(array_intersect($methods, $offline));
         }
 
         return array_values($methods);

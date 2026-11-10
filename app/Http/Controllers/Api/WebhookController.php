@@ -6,7 +6,9 @@ use App\Contracts\PaymentGateway;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\WalletTopup;
 use App\Services\Payments\PaymentService;
+use App\Services\Payments\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -50,6 +52,19 @@ class WebhookController extends Controller
         $event = (string) $request->input('event');
         $payment = $request->input('payload.payment.entity', []);
 
+        /*
+         * A wallet top-up has no order behind it, so it is matched on the
+         * gateway's own order id rather than on a note carrying ours — the
+         * note would have to be written before the row it names exists.
+         *
+         * This is the path that matters most. If a customer's network drops
+         * after they pay, the app never calls verify, and this is the only
+         * thing that turns their money into a balance.
+         */
+        if ($event === 'payment.captured' && $this->creditedTopup($payment)) {
+            return response()->json(['message' => 'Handled.']);
+        }
+
         $orderId = (int) ($payment['notes']['order_id'] ?? 0);
         $order = $orderId > 0 ? Order::with('payments')->find($orderId) : null;
 
@@ -79,6 +94,34 @@ class WebhookController extends Controller
          * redeliveries for an order we already dealt with.
          */
         return response()->json(['message' => 'Handled.']);
+    }
+
+    /**
+     * Credit a wallet top-up, if that is what this payment was.
+     *
+     * Idempotent in WalletService: whichever of this and the app's verify
+     * call arrives first credits, and the other finds it done.
+     *
+     * @param  array<string, mixed>  $payment
+     * @return bool whether this was a top-up and has been dealt with
+     */
+    protected function creditedTopup(array $payment): bool
+    {
+        $gatewayOrderId = (string) ($payment['order_id'] ?? '');
+
+        if ($gatewayOrderId === '') {
+            return false;
+        }
+
+        $topup = WalletTopup::where('gateway_order_id', $gatewayOrderId)->first();
+
+        if ($topup === null) {
+            return false;
+        }
+
+        app(WalletService::class)->creditTopup($topup, (string) ($payment['id'] ?? ''), $payment);
+
+        return true;
     }
 
     /**
