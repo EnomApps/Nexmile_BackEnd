@@ -477,8 +477,77 @@ class WalletTest extends CheckoutTest
         $this->postJson('/api/v1/wallet/topups', ['amount' => 100])->assertUnauthorized();
     }
 
+    public function test_topping_up_is_not_a_taxable_supply(): void
+    {
+        /*
+         * Confirmed with the client's accountant: no GST arises on a top-up.
+         *
+         * Adding money is a deposit, not a supply — nothing has been sold yet,
+         * and the tax falls due on the food when the balance eventually buys
+         * some. So ₹500 paid in is ₹500 credited: nothing withheld, nothing
+         * added, and no tax recorded anywhere against it.
+         *
+         * This is a rule somebody could plausibly "fix" by deducting GST on
+         * the way in, which would both short the customer and account for tax
+         * twice on the same money.
+         */
+        $customer = $this->customer();
+        $this->fund($customer, 500);
+
+        $this->assertSame('500.00', Wallet::where('user_id', $customer->id)->first()->balance);
+
+        $row = WalletTransaction::where('type', WalletTransaction::TOPUP)->firstOrFail();
+        $this->assertSame('500.00', $row->amount);
+        $this->assertSame('500.00', $row->balance_after);
+    }
+
+    public function test_paying_from_the_wallet_does_not_change_the_tax(): void
+    {
+        /*
+         * The other half of the same rule. GST is charged on the supply, so
+         * how the customer settled it — balance, cash, card — cannot alter
+         * what is owed on the food.
+         */
+        $shop = $this->restaurant();
+
+        $cash = $this->customer();
+        $paidInCash = $this->orderWithWallet($shop, $cash, 'cod', useWallet: false);
+
+        $funded = $this->customer();
+        $this->fund($funded, 2000);
+        $paidFromWallet = $this->orderWithWallet($shop, $funded, 'wallet');
+
+        $this->assertSame(
+            (string) $paidInCash->tax_total,
+            (string) $paidFromWallet->tax_total,
+            'the wallet changed the GST on an identical basket',
+        );
+
+        $this->assertSame((string) $paidInCash->grand_total, (string) $paidFromWallet->grand_total);
+    }
+
+    public function test_the_invoice_shows_what_came_from_the_balance(): void
+    {
+        /*
+         * An invoice reading "cash on delivery" to somebody who handed over
+         * half the total is a document they cannot reconcile against their own
+         * bank — and the GST on it is unaffected either way.
+         */
+        $shop = $this->restaurant();
+        $customer = $this->customer();
+        $this->fund($customer, 50);
+
+        $order = $this->orderWithWallet($shop, $customer, 'cod');
+
+        Sanctum::actingAs($customer);
+        $html = $this->get("/api/v1/orders/{$order->id}/invoice")->assertOk()->getContent();
+
+        $this->assertStringContainsString('50.00 paid from wallet balance', $html);
+        $this->assertStringContainsString('collected on delivery', $html);
+    }
+
     /** Place an order paying as much as possible from the wallet. */
-    private function orderWithWallet($shop, User $customer, string $method): Order
+    private function orderWithWallet($shop, User $customer, string $method, bool $useWallet = true): Order
     {
         Sanctum::actingAs($customer);
         $address = $this->deliveryAddress($customer);
@@ -492,7 +561,7 @@ class WalletTest extends CheckoutTest
             'fulfilment_type' => 'delivery',
             'payment_method' => $method,
             'address_id' => $address->id,
-            'use_wallet' => true,
+            'use_wallet' => $useWallet,
         ])->assertCreated()->json('data');
 
         return Order::findOrFail($placed['id']);

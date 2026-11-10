@@ -53,6 +53,19 @@ class InvoiceService
             'payment' => [
                 'method' => $order->payments->first()?->method?->value,
                 'status' => $order->payments->first()?->status?->value,
+                /*
+                 * How it was settled, where a balance covered part of it.
+                 * Neither figure touches the tax above — GST is charged on
+                 * the supply, and a top-up is a deposit rather than a
+                 * supply, so paying from a balance changes who holds the
+                 * money and nothing about what is owed on the food.
+                 *
+                 * Shown because an invoice reading "cash on delivery" to
+                 * somebody who handed over half the total is a document
+                 * they cannot reconcile against their own bank.
+                 */
+                'from_wallet' => (float) $order->wallet_amount,
+                'on_delivery' => (float) $order->cod_amount,
             ],
         ];
     }

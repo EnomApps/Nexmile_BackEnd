@@ -17,13 +17,58 @@ it is an engineering one. Refunds go back to the wallet for money that came
 from the wallet, and back to the card for money that came from the card.
 Nothing converts a balance into cash.
 
-Two other things the client's accountant should confirm before this is switched
-on in production:
+## GST arises on the order, not the top-up
 
-- **Where topped-up money is held.** Customer money sitting as a balance is not
-  revenue until it is spent. Whether it needs a separate account is their call.
-- **GST timing** — whether the liability arises on the top-up or on the order
-  it eventually pays for.
+Confirmed with the client's accountant. Adding money is a **deposit, not a
+supply** — nothing has been sold yet — so no GST arises when a customer tops
+up. ₹500 paid in is ₹500 credited: nothing withheld, nothing added.
+
+The tax falls due on the food, when the balance eventually buys some, exactly
+as it does for a cash or card order. How a customer settled a bill cannot
+change what is owed on the supply.
+
+This is a rule somebody could plausibly "fix" later by deducting GST on the
+way in, which would both short the customer and account for the same money
+twice. Two tests in `WalletTest` hold it in place.
+
+The invoice shows the split (`₹120.00 paid from wallet balance, ₹100.00
+collected on delivery`) because an invoice reading "cash on delivery" to
+somebody who handed over half the total is a document they cannot reconcile.
+Neither figure touches the tax above it.
+
+## Customer money is held separately
+
+Decided: topped-up money goes in its own bank account, not the operating one.
+
+It is not revenue. It is money customers have handed over and not yet spent —
+a liability, owed back as food — and it only becomes income when it buys
+something. Mixing it with trading income makes it impossible to say how much of
+the balance in the bank is actually ours.
+
+That account is only worth having if somebody can say what should be in it:
+
+```bash
+php artisan nexmile:wallet-float
+php artisan nexmile:wallet-float --from=2026-11-01 --to=2026-11-30
+```
+
+It prints what was held at the start of the period, what was topped up,
+refunded and spent, and what is held now — the shape a bank statement is
+reconciled against. **It refuses to report a figure when the ledger and the
+balances disagree**, because the one thing worse than no number here is a wrong
+one that gets reconciled against a real account and explained away.
+
+Two things this does not do, both of which are banking decisions rather than
+engineering ones:
+
+- **Nothing routes money to that account automatically.** Razorpay settles to
+  whichever account it is configured with. Either open a second Razorpay
+  account for top-ups that settles to the wallet account, or let everything
+  settle to the operating account and transfer the float across on a schedule,
+  using this report as the figure. The second is simpler and needs no
+  integration; the first is cleaner and needs separate KYC.
+- **Nothing reconciles against Razorpay's settlement report.** The webhook is
+  trusted as the record of what was captured.
 
 ## Limits
 

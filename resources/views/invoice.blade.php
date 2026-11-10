@@ -149,6 +149,14 @@
             Payment: {{ strtoupper($invoice['payment']['method'] ?? '—') }}
             · {{ ucfirst($invoice['payment']['status'] ?? '—') }}
         </div>
+        @if (($invoice['payment']['from_wallet'] ?? 0) > 0)
+            {{-- Only when a balance actually covered part of it. A line
+                 reading "₹0.00 from wallet" on every cash order is noise. --}}
+            <div style="margin-top:6px">
+                &#8377;{{ number_format($invoice['payment']['from_wallet'], 2) }} paid from wallet balance@if (($invoice['payment']['on_delivery'] ?? 0) > 0),
+                    &#8377;{{ number_format($invoice['payment']['on_delivery'], 2) }} collected on delivery@endif.
+            </div>
+        @endif
         <div style="margin-top:6px">
             Supply is intra-state, so GST is shown as CGST and SGST in equal parts.
         </div>
