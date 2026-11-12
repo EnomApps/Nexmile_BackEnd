@@ -67,6 +67,33 @@ bundling the asset — naming a file the app does not carry makes iOS play
 nothing at all, which reads as a missing notification rather than a missing
 sound.
 
+## One notification per order, not one per stage
+
+Every message about an order carries a collapse key of `order-{id}` —
+`android.notification.tag` and `apns-collapse-id`, two names for one idea.
+
+So the stages of a delivery **replace** each other on the lock screen rather
+than stacking: accepted becomes ready, becomes rider assigned, becomes
+delivered. Each one still alerts — Android re-posts and re-buzzes when it
+replaces — so nothing is missed. What is avoided is a customer who left their
+phone alone finding five entries for one delivery with the current one buried
+at the bottom.
+
+Two different orders never collapse into each other, which is why it is keyed
+on the order rather than on the person. A notification with no `order_id`
+behind it — the test one — carries no key and stands on its own.
+
+Both fields are **omitted** rather than sent as null when there is nothing to
+collapse against: FCM rejects the whole message for a null header, so an
+unrelated notification would fail outright rather than simply not collapsing.
+
+### `preparing` deliberately does not notify
+
+Nine stages exist; eight notify. A customer told "accepted, about 20 minutes"
+does not need "now preparing" thirty seconds later, and a notification for
+every status change is how people learn to swipe them all away — taking the
+rider offer with them.
+
 ## The language it arrives in
 
 Every notification is written in the recipient's own language, from

@@ -291,8 +291,13 @@ class PushNotificationTest extends TestCase
 
         $this->app->bind(PushSender::class, fn () => new class implements PushSender
         {
-            public function send(array $tokens, string $title, string $body, array $data = []): array
-            {
+            public function send(
+                array $tokens,
+                string $title,
+                string $body,
+                array $data = [],
+                ?string $collapseKey = null,
+            ): array {
                 return ['dead-token'];
             }
         });
@@ -645,6 +650,132 @@ class PushNotificationTest extends TestCase
         }
     }
 
+    public function test_the_stages_of_one_order_replace_each_other(): void
+    {
+        /*
+         * A customer who leaves their phone alone through a delivery would
+         * otherwise find five notifications for one order — accepted, ready,
+         * rider assigned, picked up, delivered — stacked newest first, with
+         * the current one buried.
+         *
+         * Keyed on the order, so each stage replaces the last. Android still
+         * alerts when it replaces, so every stage is felt; only the pile is
+         * avoided.
+         */
+        $customer = $this->user(UserRole::Customer, 'customer');
+
+        $sent = $this->recordingSender();
+
+        app(PushService::class)->register($customer, 'c-token', 'android', PushService::CUSTOMER);
+
+        $push = app(PushService::class);
+
+        $push->deliver([$customer->id], PushService::CUSTOMER, 'push.customer.accepted',
+            ['restaurant' => 'Ponnusamy Hotel', 'minutes' => 20],
+            ['type' => 'order.accepted', 'order_id' => '41']);
+
+        $push->deliver([$customer->id], PushService::CUSTOMER, 'push.customer.delivered',
+            [], ['type' => 'order.delivered', 'order_id' => '41']);
+
+        $this->assertSame(['order-41', 'order-41'], $sent->collapseKeys);
+    }
+
+    public function test_two_orders_do_not_replace_each_other(): void
+    {
+        // The reason it is keyed on the order and not on the person. A
+        // customer with two deliveries running must see both.
+        $customer = $this->user(UserRole::Customer, 'customer');
+
+        $sent = $this->recordingSender();
+
+        app(PushService::class)->register($customer, 'c-token', 'android', PushService::CUSTOMER);
+
+        $push = app(PushService::class);
+
+        $push->deliver([$customer->id], PushService::CUSTOMER, 'push.customer.ready',
+            [], ['type' => 'order.ready', 'order_id' => '41']);
+
+        $push->deliver([$customer->id], PushService::CUSTOMER, 'push.customer.ready',
+            [], ['type' => 'order.ready', 'order_id' => '42']);
+
+        $this->assertSame(['order-41', 'order-42'], $sent->collapseKeys);
+    }
+
+    public function test_a_notification_about_nothing_in_particular_stands_alone(): void
+    {
+        // The test notification has no order behind it, so there is nothing to
+        // collapse it against and it must not silently replace a real one.
+        $customer = $this->user(UserRole::Customer, 'customer');
+
+        $sent = $this->recordingSender();
+
+        app(PushService::class)->register($customer, 'c-token', 'android', PushService::CUSTOMER);
+
+        app(PushService::class)->deliver([$customer->id], PushService::CUSTOMER, 'push.test', [], ['type' => 'test']);
+
+        $this->assertSame([null], $sent->collapseKeys);
+    }
+
+    public function test_the_payload_carries_the_tag_android_and_ios_each_want(): void
+    {
+        /*
+         * Two names for one idea, and both are silent when missing: Android
+         * stacks, iOS stacks, and nothing reports a problem.
+         */
+        config(['push.fcm.project_id' => 'nexmile-e03c1']);
+
+        Cache::put('push.fcm.token', 'test-access-token', now()->addMinutes(50));
+
+        Http::fake(['fcm.googleapis.com/*' => Http::response(['name' => 'sent'])]);
+
+        (new FcmPushSender)->send(['a-token'], 'Title', 'Body', ['type' => 'order.ready'], 'order-41');
+
+        Http::assertSent(function ($request) {
+            if (! str_contains($request->url(), 'fcm.googleapis.com')) {
+                return true;
+            }
+
+            $message = $request->data()['message'];
+
+            $this->assertSame('order-41', $message['android']['notification']['tag']);
+            $this->assertSame('order-41', $message['apns']['headers']['apns-collapse-id']);
+
+            return true;
+        });
+    }
+
+    public function test_no_collapse_key_leaves_the_fields_out_entirely(): void
+    {
+        /*
+         * Sent as null rather than omitted, FCM rejects the message outright —
+         * so an unrelated notification would fail rather than simply not
+         * collapsing.
+         */
+        config(['push.fcm.project_id' => 'nexmile-e03c1']);
+
+        Cache::put('push.fcm.token', 'test-access-token', now()->addMinutes(50));
+
+        Http::fake(['fcm.googleapis.com/*' => Http::response(['name' => 'sent'])]);
+
+        (new FcmPushSender)->send(['a-token'], 'Title', 'Body', ['type' => 'test']);
+
+        Http::assertSent(function ($request) {
+            if (! str_contains($request->url(), 'fcm.googleapis.com')) {
+                return true;
+            }
+
+            $message = $request->data()['message'];
+
+            $this->assertArrayNotHasKey('tag', $message['android']['notification']);
+            $this->assertArrayNotHasKey('apns-collapse-id', $message['apns']['headers']);
+
+            // And the channel is still there, which the tag sits beside.
+            $this->assertArrayHasKey('channel_id', $message['android']['notification']);
+
+            return true;
+        });
+    }
+
     /** A sender that records what it was asked to deliver. */
     private function recordingSender(): object
     {
@@ -656,10 +787,19 @@ class PushNotificationTest extends TestCase
             /** @var list<string> */
             public array $bodies = [];
 
-            public function send(array $tokens, string $title, string $body, array $data = []): array
-            {
+            /** @var list<string|null> */
+            public array $collapseKeys = [];
+
+            public function send(
+                array $tokens,
+                string $title,
+                string $body,
+                array $data = [],
+                ?string $collapseKey = null,
+            ): array {
                 $this->titles[] = $title;
                 $this->bodies[] = $body;
+                $this->collapseKeys[] = $collapseKey;
 
                 return [];
             }

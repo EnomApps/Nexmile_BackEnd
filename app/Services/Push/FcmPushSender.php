@@ -30,8 +30,13 @@ class FcmPushSender implements PushSender
      * @param  array<string, string>  $data
      * @return list<string>
      */
-    public function send(array $tokens, string $title, string $body, array $data = []): array
-    {
+    public function send(
+        array $tokens,
+        string $title,
+        string $body,
+        array $data = [],
+        ?string $collapseKey = null,
+    ): array {
         if ($tokens === []) {
             return [];
         }
@@ -56,7 +61,7 @@ class FcmPushSender implements PushSender
          * or not. It is why sending is queued.
          */
         foreach ($tokens as $token) {
-            $response = $this->post($url, $accessToken, $token, $title, $body, $data);
+            $response = $this->post($url, $accessToken, $token, $title, $body, $data, $collapseKey);
 
             /*
              * 401 is about us, not the device. The cached token has an hour on
@@ -72,7 +77,7 @@ class FcmPushSender implements PushSender
                 $refreshed = true;
                 $accessToken = $this->accessToken();
 
-                $response = $this->post($url, $accessToken, $token, $title, $body, $data);
+                $response = $this->post($url, $accessToken, $token, $title, $body, $data, $collapseKey);
             }
 
             if ($response->successful()) {
@@ -113,6 +118,7 @@ class FcmPushSender implements PushSender
         string $title,
         string $body,
         array $data,
+        ?string $collapseKey = null,
     ): Response {
         return Http::withToken($accessToken)
             ->timeout((int) config('push.timeout_seconds'))
@@ -127,7 +133,16 @@ class FcmPushSender implements PushSender
                         // A rider needs the sound and the wake. A delivery
                         // offer arriving silently is an offer not seen.
                         'priority' => 'high',
-                        'notification' => ['channel_id' => config('push.android_channel')],
+                        'notification' => array_filter([
+                            'channel_id' => config('push.android_channel'),
+                            /*
+                             * One live notification per order rather than a
+                             * pile of five. Android replaces a notification
+                             * carrying a tag it already has, and alerts again
+                             * while doing it, so each stage is still felt.
+                             */
+                            'tag' => $collapseKey,
+                        ], fn ($value) => $value !== null),
                     ],
                     /*
                      * iOS takes the sound per message; Android takes it from
@@ -137,7 +152,14 @@ class FcmPushSender implements PushSender
                      * actually carrying the asset.
                      */
                     'apns' => [
-                        'headers' => ['apns-priority' => '10'],
+                        'headers' => array_filter([
+                            'apns-priority' => '10',
+                            // iOS calls the same idea a collapse id, and caps
+                            // it at 64 bytes.
+                            'apns-collapse-id' => $collapseKey === null
+                                ? null
+                                : substr($collapseKey, 0, 64),
+                        ], fn ($value) => $value !== null),
                         'payload' => ['aps' => ['sound' => config('push.ios_sound')]],
                     ],
                 ],

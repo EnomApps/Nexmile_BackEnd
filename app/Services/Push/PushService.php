@@ -143,6 +143,7 @@ class PushService
                 __($key.'.title', $replacements, $locale),
                 __($key.'.body', $replacements, $locale),
                 $data,
+                $this->collapseKey($data),
             ));
         }
 
@@ -160,6 +161,28 @@ class PushService
 
         $devices->whereNotIn('token', $dead)
             ->each(fn (DeviceToken $device) => $device->forceFill(['last_used_at' => now()])->save());
+    }
+
+    /**
+     * What this notification is about, so a later one replaces it.
+     *
+     * An order's stages arrive as separate notifications — accepted, ready,
+     * rider assigned, picked up, delivered — and without this a customer who
+     * leaves their phone alone finds five entries for one delivery. Keyed on
+     * the order, so stages replace each other while two different orders stay
+     * apart.
+     *
+     * Read off the data payload the app already routes on rather than passed
+     * separately: a notification with no order behind it is a notification
+     * with nothing to collapse against, and it shows on its own.
+     *
+     * @param  array<string, string>  $data
+     */
+    protected function collapseKey(array $data): ?string
+    {
+        $order = $data['order_id'] ?? null;
+
+        return $order === null || $order === '' ? null : 'order-'.$order;
     }
 
     /**

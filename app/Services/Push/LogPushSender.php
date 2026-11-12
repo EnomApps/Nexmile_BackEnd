@@ -14,13 +14,19 @@ use Illuminate\Support\Facades\Log;
  */
 class LogPushSender implements PushSender
 {
-    public function send(array $tokens, string $title, string $body, array $data = []): array
-    {
+    public function send(
+        array $tokens,
+        string $title,
+        string $body,
+        array $data = [],
+        ?string $collapseKey = null,
+    ): array {
         Log::info('Push (not sent — log driver)', [
             'devices' => count($tokens),
             'title' => $title,
             'body' => $body,
             'data' => $data,
+            'collapse_key' => $collapseKey,
         ]);
 
         // Nothing is dead: a log driver cannot know, and pruning real tokens
