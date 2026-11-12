@@ -13,6 +13,17 @@
 
 return [
 
+    /*
+     * Sent by nexmile:test-push, which is somebody standing next to a
+     * phone checking whether any of this works. Translated like the
+     * rest so that check also proves the recipient's language is being
+     * used, rather than only that a notification arrives.
+     */
+    'test' => [
+        'title' => 'Nexmile test',
+        'body' => 'If you can read this, push notifications are working.',
+    ],
+
     'merchant' => [
         'new_order' => [
             'title' => 'New order',

@@ -3,6 +3,7 @@
 namespace App\Services\Push;
 
 use App\Contracts\PushSender;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -42,40 +43,37 @@ class FcmPushSender implements PushSender
         $dead = [];
 
         /*
+         * A rotated or revoked service account key is only discovered when
+         * Google refuses one of these. Minted once more on the first 401, and
+         * only once: a key that is genuinely gone would otherwise mint a token
+         * per device on every send for as long as nobody noticed.
+         */
+        $refreshed = false;
+
+        /*
          * One request per token. FCM v1 has no multicast — the batch endpoint
          * was part of the legacy API — so this is the shape whether we like it
          * or not. It is why sending is queued.
          */
         foreach ($tokens as $token) {
-            $response = Http::withToken($accessToken)
-                ->timeout((int) config('push.timeout_seconds'))
-                ->post($url, [
-                    'message' => [
-                        'token' => $token,
-                        'notification' => ['title' => $title, 'body' => $body],
-                        // Strings only: FCM rejects a data payload with any
-                        // other scalar type, and a silent 400 is worse than a
-                        // loud one.
-                        'data' => array_map(fn ($v) => (string) $v, $data),
-                        'android' => [
-                            // A rider needs the sound and the wake. A delivery
-                            // offer arriving silently is an offer not seen.
-                            'priority' => 'high',
-                            'notification' => ['channel_id' => config('push.android_channel')],
-                        ],
-                        /*
-                         * iOS takes the sound per message; Android takes it
-                         * from the channel, which is why only this side needs
-                         * naming. A file the build does not bundle plays
-                         * nothing at all, so this stays 'default' until an
-                         * iOS release is actually carrying the asset.
-                         */
-                        'apns' => [
-                            'headers' => ['apns-priority' => '10'],
-                            'payload' => ['aps' => ['sound' => config('push.ios_sound')]],
-                        ],
-                    ],
-                ]);
+            $response = $this->post($url, $accessToken, $token, $title, $body, $data);
+
+            /*
+             * 401 is about us, not the device. The cached token has an hour on
+             * it and is reused for fifty minutes, so without this a key
+             * rotated at six o'clock silently drops every notification until
+             * ten to seven.
+             */
+            if ($response->status() === 401 && ! $refreshed) {
+                Log::warning('FCM rejected the access token; minting a new one.');
+
+                Cache::forget('push.fcm.token');
+
+                $refreshed = true;
+                $accessToken = $this->accessToken();
+
+                $response = $this->post($url, $accessToken, $token, $title, $body, $data);
+            }
 
             if ($response->successful()) {
                 continue;
@@ -104,12 +102,55 @@ class FcmPushSender implements PushSender
     }
 
     /**
+     * One message to one device.
+     *
+     * @param  array<string, string>  $data
+     */
+    private function post(
+        string $url,
+        string $accessToken,
+        string $token,
+        string $title,
+        string $body,
+        array $data,
+    ): Response {
+        return Http::withToken($accessToken)
+            ->timeout((int) config('push.timeout_seconds'))
+            ->post($url, [
+                'message' => [
+                    'token' => $token,
+                    'notification' => ['title' => $title, 'body' => $body],
+                    // Strings only: FCM rejects a data payload with any other
+                    // scalar type, and a silent 400 is worse than a loud one.
+                    'data' => array_map(fn ($v) => (string) $v, $data),
+                    'android' => [
+                        // A rider needs the sound and the wake. A delivery
+                        // offer arriving silently is an offer not seen.
+                        'priority' => 'high',
+                        'notification' => ['channel_id' => config('push.android_channel')],
+                    ],
+                    /*
+                     * iOS takes the sound per message; Android takes it from
+                     * the channel, which is why only this side needs naming.
+                     * A file the build does not bundle plays nothing at all,
+                     * so this stays 'default' until an iOS release is
+                     * actually carrying the asset.
+                     */
+                    'apns' => [
+                        'headers' => ['apns-priority' => '10'],
+                        'payload' => ['aps' => ['sound' => config('push.ios_sound')]],
+                    ],
+                ],
+            ]);
+    }
+
+    /**
      * A short-lived OAuth token, minted from the service account.
      *
      * Cached: it lasts an hour, and minting one per notification would double
      * every send and hit Google's rate limits on a busy evening.
      */
-    private function accessToken(): string
+    protected function accessToken(): string
     {
         return Cache::remember('push.fcm.token', now()->addMinutes(50), function () {
             $credentials = $this->credentials();

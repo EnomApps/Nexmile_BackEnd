@@ -92,18 +92,30 @@ class TestPushCommand extends Command
             return self::SUCCESS;
         }
 
-        $title = 'Nexmile test';
-        $body = 'If you can read this, push notifications are working.';
+        /*
+         * A translation key, like every other notification, so this also
+         * proves the copy arrives in the account's own language rather
+         * than only that something arrives at all.
+         */
+        $key = 'push.test';
         $data = ['type' => 'test'];
+
+        $this->check(
+            true,
+            'Language it will be sent in',
+            $user->preferred_locale ?: config('app.locale'),
+        );
+
+        $this->line('');
 
         try {
             if ($this->option('now')) {
                 // Inline, so a broken key surfaces here rather than in a queue
                 // worker's log where nobody is looking.
-                $push->deliver([$user->id], $app, $title, $body, $data);
+                $push->deliver([$user->id], $app, $key, [], $data);
                 $this->line('  <fg=green;options=bold>Sent.</> Check the device.');
             } else {
-                $push->toUser($user, $app, $title, $body, $data);
+                $push->toUser($user, $app, $key, [], $data);
                 $this->line('  <fg=green;options=bold>Queued.</> It sends when a worker picks it up —');
                 $this->line('  <fg=gray>if nothing arrives, check that queue:work is running.</>');
                 $this->line('  <fg=gray>Use --now to send inline and see the error instead.</>');

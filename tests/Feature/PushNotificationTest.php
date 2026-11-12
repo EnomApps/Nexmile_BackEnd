@@ -297,7 +297,7 @@ class PushNotificationTest extends TestCase
             }
         });
 
-        app(PushService::class)->deliver([$user->id], PushService::CUSTOMER, 'Title', 'Body');
+        app(PushService::class)->deliver([$user->id], PushService::CUSTOMER, 'push.customer.delivered');
 
         $this->assertSame(
             ['live-token'],
@@ -355,8 +355,318 @@ class PushNotificationTest extends TestCase
         $merchant = $this->restaurant();
         $order = $this->order($merchant, $this->user(UserRole::Customer, 'customer'));
 
-        app(PushService::class)->toUser(null, PushService::CUSTOMER, 'Title', 'Body');
+        app(PushService::class)->toUser(null, PushService::CUSTOMER, 'push.customer.delivered');
 
         Queue::assertNothingPushed();
+    }
+
+    public function test_a_notification_is_written_in_the_recipients_language(): void
+    {
+        /*
+         * The whole platform is Tier-2 and Tier-3 Tamil Nadu. A rider who
+         * picked Tamil in the app being sent English on their lock screen is
+         * not a cosmetic miss.
+         *
+         * This was broken for a while in a way nothing would have shown: the
+         * copy was rendered in the request, then sent from a queue worker, so
+         * every notification went out in the worker's own locale — English —
+         * while lang/ta/push.php sat there unused.
+         */
+        $customer = $this->user(UserRole::Customer, 'customer');
+        $customer->forceFill(['preferred_locale' => 'ta'])->save();
+
+        $sent = $this->recordingSender();
+
+        app(PushService::class)->register($customer, 'ta-token', 'android', PushService::CUSTOMER);
+
+        app(PushService::class)->deliver([$customer->id], PushService::CUSTOMER, 'push.customer.delivered');
+
+        $this->assertSame(__('push.customer.delivered.title', [], 'ta'), $sent->titles[0]);
+        $this->assertNotSame(__('push.customer.delivered.title', [], 'en'), $sent->titles[0]);
+    }
+
+    public function test_one_notification_reaches_two_languages_at_once(): void
+    {
+        /*
+         * The rider board is one notification to everybody on duty, and they
+         * do not share a language. Rendering it once — in anybody's locale —
+         * is wrong for whoever did not pick that one.
+         */
+        $tamil = $this->user(UserRole::Rider, 'rider');
+        $tamil->forceFill(['preferred_locale' => 'ta'])->save();
+
+        $hindi = $this->user(UserRole::Rider, 'rider');
+        $hindi->forceFill(['preferred_locale' => 'hi'])->save();
+
+        $push = app(PushService::class);
+        $push->register($tamil, 'ta-token', 'android', PushService::RIDER);
+        $push->register($hindi, 'hi-token', 'android', PushService::RIDER);
+
+        $sent = $this->recordingSender();
+
+        app(PushService::class)->deliver(
+            [$tamil->id, $hindi->id],
+            PushService::RIDER,
+            'push.rider.offer',
+            ['restaurant' => 'Ponnusamy Hotel', 'area' => 'Madurai'],
+        );
+
+        $this->assertCount(2, $sent->titles, 'both languages should have been sent separately');
+
+        $this->assertEqualsCanonicalizing(
+            [__('push.rider.offer.title', [], 'ta'), __('push.rider.offer.title', [], 'hi')],
+            $sent->titles,
+        );
+    }
+
+    public function test_the_replacements_still_land_in_a_translated_body(): void
+    {
+        // A translated string with a dropped placeholder reads as a bug to the
+        // person holding the phone, not as a missing translation.
+        $customer = $this->user(UserRole::Customer, 'customer');
+        $customer->forceFill(['preferred_locale' => 'ta'])->save();
+
+        $sent = $this->recordingSender();
+
+        app(PushService::class)->register($customer, 'ta-token', 'android', PushService::CUSTOMER);
+
+        app(PushService::class)->deliver(
+            [$customer->id],
+            PushService::CUSTOMER,
+            'push.customer.accepted',
+            ['restaurant' => 'Ponnusamy Hotel', 'minutes' => 20],
+        );
+
+        $this->assertStringContainsString('Ponnusamy Hotel', $sent->bodies[0]);
+        $this->assertStringContainsString('20', $sent->bodies[0]);
+        $this->assertStringNotContainsString(':restaurant', $sent->bodies[0]);
+    }
+
+    public function test_a_blank_locale_falls_back_rather_than_sending_nothing(): void
+    {
+        // An older row, or a user created before the column had a default. The
+        // notification still has to be readable.
+        $customer = $this->user(UserRole::Customer, 'customer');
+        $customer->forceFill(['preferred_locale' => ''])->save();
+
+        $sent = $this->recordingSender();
+
+        app(PushService::class)->register($customer, 'blank-token', 'android', PushService::CUSTOMER);
+
+        app(PushService::class)->deliver([$customer->id], PushService::CUSTOMER, 'push.customer.delivered');
+
+        $this->assertSame(__('push.customer.delivered.title', [], config('app.locale')), $sent->titles[0]);
+    }
+
+    public function test_the_queued_job_carries_a_key_not_finished_copy(): void
+    {
+        /*
+         * The guard on the whole fix. If somebody puts rendered text back into
+         * the job, it is rendered in the request's locale again and every
+         * notification quietly returns to English.
+         */
+        Queue::fake();
+
+        $merchant = $this->restaurant();
+        $order = $this->order($merchant, $this->user(UserRole::Customer, 'customer'));
+
+        app(OrderStatusService::class)->accept($order, $merchant->user, 20);
+
+        Queue::assertPushed(SendPushNotification::class, function ($job) {
+            $this->assertSame('push.customer.accepted', $job->key);
+            $this->assertSame(20, $job->replacements['minutes']);
+
+            return true;
+        });
+    }
+
+    public function test_only_the_owner_can_forget_a_device(): void
+    {
+        /*
+         * Otherwise any signed-in account could silence somebody else's phone
+         * with a token it happened to learn — and a rider whose notifications
+         * stop has no way of telling why.
+         */
+        $owner = $this->user(UserRole::Rider, 'rider');
+        $stranger = $this->user(UserRole::Customer, 'customer');
+
+        app(PushService::class)->register($owner, 'owned-token', 'android', PushService::RIDER);
+
+        Sanctum::actingAs($stranger);
+        $this->deleteJson('/api/v1/devices', ['token' => 'owned-token'])->assertOk();
+
+        $this->assertDatabaseHas('device_tokens', ['token' => 'owned-token', 'user_id' => $owner->id]);
+
+        Sanctum::actingAs($owner);
+        $this->deleteJson('/api/v1/devices', ['token' => 'owned-token'])->assertOk();
+
+        $this->assertDatabaseMissing('device_tokens', ['token' => 'owned-token']);
+    }
+
+    public function test_a_rejected_access_token_is_minted_again_and_the_message_retried(): void
+    {
+        /*
+         * The OAuth token lasts an hour and is cached for fifty minutes. A key
+         * rotated or revoked at six o'clock would otherwise drop every
+         * notification on the platform until ten to seven, with nothing but a
+         * log line to say so.
+         */
+        config(['push.fcm.project_id' => 'nexmile-e03c1']);
+
+        Cache::put('push.fcm.token', 'stale-token', now()->addMinutes(50));
+
+        Http::fakeSequence()
+            ->push(['error' => ['status' => 'UNAUTHENTICATED']], 401)
+            ->push(['name' => 'sent'], 200);
+
+        $sender = $this->senderWithCountedTokens();
+
+        $dead = $sender->send(['a-token'], 'Title', 'Body');
+
+        $this->assertSame(2, $sender->minted, 'a 401 did not mint a fresh token');
+
+        // Retried and delivered, and a live token not mistaken for a dead one.
+        $this->assertSame([], $dead);
+
+        // The stale one is gone, so the next send does not start by failing.
+        $this->assertNotSame('stale-token', Cache::get('push.fcm.token'));
+    }
+
+    public function test_a_revoked_key_is_not_minted_against_once_per_device(): void
+    {
+        /*
+         * A key that is genuinely revoked answers 401 to everything. Minting
+         * once per device would turn one broken key into a flood of token
+         * requests at Google, which is how a project gets rate limited on top
+         * of being broken.
+         */
+        config(['push.fcm.project_id' => 'nexmile-e03c1']);
+
+        Http::fake(['fcm.googleapis.com/*' => Http::response(['error' => ['status' => 'UNAUTHENTICATED']], 401)]);
+
+        $sender = $this->senderWithCountedTokens();
+
+        $dead = $sender->send(['one', 'two', 'three'], 'Title', 'Body');
+
+        // One mint at the start, one more after the first 401, and no more.
+        $this->assertSame(2, $sender->minted, 'a revoked key minted a token per device');
+
+        // And nothing was deleted: a 401 is our problem, not the device's.
+        $this->assertSame([], $dead);
+    }
+
+    /**
+     * The real sender with the OAuth mint counted and stubbed.
+     *
+     * Overridden rather than key-generated: the production service account can
+     * notify every install of both apps, so no test goes near it, and
+     * generating a throwaway RSA key needs an openssl.cnf that not every
+     * machine has sitting where PHP expects it.
+     */
+    private function senderWithCountedTokens(): FcmPushSender
+    {
+        return new class extends FcmPushSender
+        {
+            public int $minted = 0;
+
+            protected function accessToken(): string
+            {
+                $this->minted++;
+
+                return 'access-token-'.$this->minted;
+            }
+        };
+    }
+
+    public function test_every_notification_exists_in_all_three_languages(): void
+    {
+        /*
+         * A key missing from ta or hi does not fail — it falls back to
+         * English, which looks exactly like working. So the only way this
+         * stays true is a test that reads the files.
+         *
+         * Asserted both ways round: a key in English and not in Tamil is a
+         * rider reading English, and a key in Tamil and not in English is
+         * copy nobody will ever see.
+         */
+        $flatten = function (array $values, string $prefix = '') use (&$flatten): array {
+            $keys = [];
+
+            foreach ($values as $key => $value) {
+                $path = $prefix === '' ? (string) $key : $prefix.'.'.$key;
+
+                $keys = is_array($value)
+                    ? [...$keys, ...$flatten($value, $path)]
+                    : [...$keys, $path];
+            }
+
+            return $keys;
+        };
+
+        $read = fn (string $locale) => $flatten(require base_path("lang/{$locale}/push.php"));
+
+        $english = $read('en');
+
+        $this->assertNotEmpty($english);
+
+        foreach (['ta', 'hi'] as $locale) {
+            $this->assertEqualsCanonicalizing(
+                $english,
+                $read($locale),
+                "lang/{$locale}/push.php does not hold the same keys as English",
+            );
+        }
+    }
+
+    public function test_every_notification_the_app_sends_has_copy_behind_it(): void
+    {
+        /*
+         * The other half: a key passed by OrderNotifier that does not exist
+         * sends the key itself as the notification — "push.customer.accepted"
+         * on somebody's lock screen — because that is what __() returns when
+         * it finds nothing.
+         */
+        $source = file_get_contents(app_path('Services/Push/OrderNotifier.php'));
+
+        preg_match_all("/'(push\.[a-z_.]+)'/", $source, $matches);
+
+        $keys = array_unique($matches[1]);
+
+        $this->assertNotEmpty($keys, 'no notification keys found — has the notifier changed shape?');
+
+        foreach ($keys as $key) {
+            foreach (['title', 'body'] as $part) {
+                $this->assertNotSame(
+                    "{$key}.{$part}",
+                    __("{$key}.{$part}"),
+                    "{$key}.{$part} has no copy behind it and would be sent as the key",
+                );
+            }
+        }
+    }
+
+    /** A sender that records what it was asked to deliver. */
+    private function recordingSender(): object
+    {
+        $sender = new class implements PushSender
+        {
+            /** @var list<string> */
+            public array $titles = [];
+
+            /** @var list<string> */
+            public array $bodies = [];
+
+            public function send(array $tokens, string $title, string $body, array $data = []): array
+            {
+                $this->titles[] = $title;
+                $this->bodies[] = $body;
+
+                return [];
+            }
+        };
+
+        $this->app->instance(PushSender::class, $sender);
+
+        return $sender;
     }
 }

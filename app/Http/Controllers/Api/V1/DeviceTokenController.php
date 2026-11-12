@@ -47,6 +47,10 @@ class DeviceTokenController extends Controller
      * Call on sign-out. Without it the phone keeps buzzing for a shift
      * somebody else is working, and there is no way for that person to stop
      * it.
+     *
+     * Only the account that registered it can forget it. Otherwise any
+     * signed-in caller could silence somebody else's phone with a token it
+     * happened to learn.
      */
     public function destroy(Request $request): JsonResponse
     {
@@ -54,7 +58,7 @@ class DeviceTokenController extends Controller
             'token' => ['required', 'string', 'max:512'],
         ]);
 
-        $this->push->forget($data['token']);
+        $this->push->forget($request->user(), $data['token']);
 
         return response()->json(['message' => 'Device forgotten.']);
     }

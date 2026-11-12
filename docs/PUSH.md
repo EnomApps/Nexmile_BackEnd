@@ -67,6 +67,39 @@ bundling the asset — naming a file the app does not carry makes iOS play
 nothing at all, which reads as a missing notification rather than a missing
 sound.
 
+## The language it arrives in
+
+Every notification is written in the recipient's own language, from
+`users.preferred_locale` — not the sender's, and not the server default.
+
+This is the one thing in here that is easy to get wrong without noticing. A
+notification is rendered inside a queue worker, long after the request that
+caused it, and a worker has no locale of its own beyond `APP_LOCALE`. So
+rendering the copy at the call site means rendering it in English and posting
+English to a rider who chose Tamil, with `lang/ta/push.php` sitting there
+unused and nothing failing anywhere.
+
+Callers therefore pass a **translation key**, never finished text:
+
+```php
+$push->toUser($order->customer, PushService::CUSTOMER,
+    'push.customer.accepted',
+    ['restaurant' => $name, 'minutes' => 20],
+    ['type' => 'order.accepted', 'order_id' => (string) $order->id]);
+```
+
+The key holds `.title` and `.body`, and `PushService::deliver()` resolves both
+per recipient. Devices are grouped by language first, so a rider board that
+reaches eight riders in two languages is two renders, not eight.
+
+A blank or missing locale falls back to `APP_LOCALE`. A key missing from `ta`
+or `hi` falls back to English, which is why a test asserts all three files hold
+the same keys — a silent fallback is indistinguishable from working.
+
+**If you add a notification, add the key to all three language files.** The
+Tamil and Hindi copy is machine-assisted and still needs a native speaker's
+read before launch; the file headers say so.
+
 ## Registering a device
 
 ```
@@ -80,6 +113,11 @@ token twice is safe.
 
 `DELETE` on sign-out is not optional. Without it the phone keeps buzzing for a
 shift somebody else is working, and that person has no way to stop it.
+
+It only forgets a token belonging to the **calling account**. On sign-out that
+is whoever registered it, so nothing legitimate is lost — and without the
+scope any signed-in account could silence another person's phone with a token
+it happened to learn.
 
 `app` matters. One person may hold both apps — a rider ordering their own
 dinner is a customer — and the two installs must not receive each other's

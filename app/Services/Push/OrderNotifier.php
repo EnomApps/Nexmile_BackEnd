@@ -14,6 +14,11 @@ use App\Models\Rider;
  * swipe them away, and the one that matters — a rider's order offer — then
  * goes with the rest. Each of these is a moment where someone has to act, or
  * has been waiting for news they cannot get any other way.
+ *
+ * Translation keys are passed, never rendered text. The wording depends on
+ * the recipient's own language, and that is not known here: a rider board
+ * goes to several people at once, and all of it is sent from a queue worker
+ * long after the request. Rendering here posted English to everybody.
  */
 class OrderNotifier
 {
@@ -30,8 +35,8 @@ class OrderNotifier
         $this->push->toUser(
             $order->merchant?->user,
             PushService::MERCHANT,
-            __('push.merchant.new_order.title'),
-            __('push.merchant.new_order.body', ['number' => $order->order_number]),
+            'push.merchant.new_order',
+            ['number' => $order->order_number],
             ['type' => 'order.placed', 'order_id' => (string) $order->id],
         );
     }
@@ -42,11 +47,11 @@ class OrderNotifier
         $this->push->toUser(
             $order->customer,
             PushService::CUSTOMER,
-            __('push.customer.accepted.title'),
-            __('push.customer.accepted.body', [
+            'push.customer.accepted',
+            [
                 'restaurant' => $order->merchant?->business_name ?? '',
                 'minutes' => (int) $order->estimated_prep_minutes,
-            ]),
+            ],
             ['type' => 'order.accepted', 'order_id' => (string) $order->id],
         );
     }
@@ -57,8 +62,8 @@ class OrderNotifier
         $this->push->toUser(
             $order->customer,
             PushService::CUSTOMER,
-            __('push.customer.rejected.title'),
-            __('push.customer.rejected.body', ['reason' => $order->cancellation_reason ?? '']),
+            'push.customer.rejected',
+            ['reason' => $order->cancellation_reason ?? ''],
             ['type' => 'order.rejected', 'order_id' => (string) $order->id],
         );
     }
@@ -75,8 +80,8 @@ class OrderNotifier
         $this->push->toUser(
             $order->customer,
             PushService::CUSTOMER,
-            __('push.customer.ready.title'),
-            __('push.customer.ready.body'),
+            'push.customer.ready',
+            [],
             ['type' => 'order.ready', 'order_id' => (string) $order->id],
         );
 
@@ -87,11 +92,11 @@ class OrderNotifier
         $this->push->toUsers(
             $this->ridersToOffer($order),
             PushService::RIDER,
-            __('push.rider.offer.title'),
-            __('push.rider.offer.body', [
+            'push.rider.offer',
+            [
                 'restaurant' => $order->merchant?->business_name ?? '',
                 'area' => $order->delivery_city ?? '',
-            ]),
+            ],
             ['type' => 'order.offer', 'order_id' => (string) $order->id],
         );
     }
@@ -102,20 +107,16 @@ class OrderNotifier
         $this->push->toUser(
             $order->merchant?->user,
             PushService::MERCHANT,
-            __('push.merchant.rider_assigned.title'),
-            __('push.merchant.rider_assigned.body', [
-                'rider' => $order->rider?->full_name ?? '',
-            ]),
+            'push.merchant.rider_assigned',
+            ['rider' => $order->rider?->full_name ?? ''],
             ['type' => 'order.rider_assigned', 'order_id' => (string) $order->id],
         );
 
         $this->push->toUser(
             $order->customer,
             PushService::CUSTOMER,
-            __('push.customer.rider_assigned.title'),
-            __('push.customer.rider_assigned.body', [
-                'rider' => $order->rider?->full_name ?? '',
-            ]),
+            'push.customer.rider_assigned',
+            ['rider' => $order->rider?->full_name ?? ''],
             ['type' => 'order.rider_assigned', 'order_id' => (string) $order->id],
         );
     }
@@ -126,8 +127,8 @@ class OrderNotifier
         $this->push->toUser(
             $order->customer,
             PushService::CUSTOMER,
-            __('push.customer.picked_up.title'),
-            __('push.customer.picked_up.body'),
+            'push.customer.picked_up',
+            [],
             ['type' => 'order.picked_up', 'order_id' => (string) $order->id],
         );
     }
@@ -138,8 +139,8 @@ class OrderNotifier
         $this->push->toUser(
             $order->customer,
             PushService::CUSTOMER,
-            __('push.customer.delivered.title'),
-            __('push.customer.delivered.body'),
+            'push.customer.delivered',
+            [],
             ['type' => 'order.delivered', 'order_id' => (string) $order->id],
         );
     }
@@ -150,8 +151,8 @@ class OrderNotifier
         $this->push->toUser(
             $order->customer,
             PushService::CUSTOMER,
-            __('push.customer.cancelled.title'),
-            __('push.customer.cancelled.body', ['reason' => $order->cancellation_reason ?? '']),
+            'push.customer.cancelled',
+            ['reason' => $order->cancellation_reason ?? ''],
             ['type' => 'order.cancelled', 'order_id' => (string) $order->id],
         );
     }
