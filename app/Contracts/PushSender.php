@@ -27,4 +27,34 @@ interface PushSender
         array $data = [],
         ?string $collapseKey = null,
     ): array;
+
+    /**
+     * Deliver a payload with no notification attached, for the app to act on
+     * itself.
+     *
+     * This is how a ringing order card gets to a rider. A notification
+     * message is drawn by the operating system, which means it draws a line
+     * of text in the tray — there is no notification shape that rings for
+     * thirty seconds, counts down, and dismisses itself when another rider
+     * gets there first. A data message wakes the app instead and lets it put
+     * a full-screen card up, start the ringtone, and take it down again.
+     *
+     * It is also the only way to *withdraw* something already showing.
+     *
+     * `$ttlSeconds` is how long the message is still worth delivering. An
+     * offer card that arrives after its window closed is not a late
+     * notification, it is a wrong one: it would ring for food another rider
+     * is already carrying. Past the TTL, FCM drops it rather than holding it
+     * for a phone that is switched off.
+     *
+     * @param  list<string>  $tokens
+     * @param  array<string, string>  $data
+     * @return list<string> tokens the provider rejected as dead
+     */
+    public function sendData(
+        array $tokens,
+        array $data,
+        ?string $collapseKey = null,
+        ?int $ttlSeconds = null,
+    ): array;
 }

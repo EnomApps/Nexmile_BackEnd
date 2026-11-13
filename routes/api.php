@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AddressController;
+use App\Http\Controllers\Api\V1\Admin\DispatchController as AdminDispatchController;
 use App\Http\Controllers\Api\V1\Admin\KycReviewController;
 use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
 use App\Http\Controllers\Api\V1\CartController;
@@ -25,6 +26,7 @@ use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\Rider\EarningsController as RiderEarningsController;
 use App\Http\Controllers\Api\V1\Rider\KycController as RiderKycController;
 use App\Http\Controllers\Api\V1\Rider\LocationController as RiderLocationController;
+use App\Http\Controllers\Api\V1\Rider\OfferController as RiderOfferController;
 use App\Http\Controllers\Api\V1\Rider\OrderController as RiderOrderController;
 use App\Http\Controllers\Api\V1\Rider\PayoutController as RiderPayoutController;
 use App\Http\Controllers\Api\V1\Rider\ProfileController as RiderProfileController;
@@ -248,6 +250,24 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('referrals', [RiderReferralController::class, 'store'])->name('referrals.store');
         Route::get('referrals/{referral}', [RiderReferralController::class, 'show'])->name('referrals.show');
 
+        /*
+         * Offers — the ringing order card (EP7).
+         *
+         * A data push starts the ring; these are the truth about it. The app
+         * reads \`current\` on cold start and on coming back from the
+         * background, because a data message can be dropped, duplicated, or
+         * land on a phone that was switched off — and a card for an order
+         * somebody else collected ten minutes ago is worse than no card.
+         *
+         * accept answers 409 when another rider was faster and 410 when the
+         * window closed. Those mean different things to the popup.
+         */
+        Route::prefix('offers')->name('offers.')->group(function () {
+            Route::get('current', [RiderOfferController::class, 'current'])->name('current');
+            Route::post('{offer}/accept', [RiderOfferController::class, 'accept'])->name('accept');
+            Route::post('{offer}/reject', [RiderOfferController::class, 'reject'])->name('reject');
+        });
+
         Route::prefix('orders')->name('orders.')->group(function () {
             // Fixed segment first, or 'available' is read as an order id.
             Route::get('available', [RiderOrderController::class, 'available'])->name('available');
@@ -264,7 +284,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
              */
             Route::get('{order}/route', [RiderOrderController::class, 'route'])->name('route');
             Route::post('{order}/accept', [RiderOrderController::class, 'accept'])->name('accept');
+            Route::post('{order}/reached-restaurant', [RiderOrderController::class, 'reachedRestaurant'])->name('reached-restaurant');
             Route::post('{order}/pickup', [RiderOrderController::class, 'pickup'])->name('pickup');
+            Route::post('{order}/reached-customer', [RiderOrderController::class, 'reachedCustomer'])->name('reached-customer');
             Route::post('{order}/release', [RiderOrderController::class, 'release'])->name('release');
             Route::post('{order}/deliver', [RiderOrderController::class, 'deliver'])->name('deliver');
         });
@@ -282,6 +304,19 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::post('kyc/{type}/{id}/verify', [KycReviewController::class, 'verify'])->name('kyc.verify');
         Route::post('kyc/{type}/{id}/reject', [KycReviewController::class, 'reject'])->name('kyc.reject');
         Route::post('kyc/{type}/{id}/status', [KycReviewController::class, 'setUserStatus'])->name('kyc.status');
+
+        /*
+         * Orders dispatch could not place (EP7). \`no_rider_found\` is a real
+         * outcome, and the alternative to a screen for it is a customer
+         * ringing a phone number nobody answers.
+         *
+         * An order \*stuck\* in \`searching\` rather than failed almost always
+         * means the queue worker is not running — every timeout in dispatch
+         * is a delayed job — so the list reports both and says which.
+         */
+        Route::get('dispatch/stranded', [AdminDispatchController::class, 'stranded'])->name('dispatch.stranded');
+        Route::post('dispatch/{order}/retry', [AdminDispatchController::class, 'retry'])->name('dispatch.retry');
+        Route::post('dispatch/{order}/assign', [AdminDispatchController::class, 'assign'])->name('dispatch.assign');
     });
 
     /*

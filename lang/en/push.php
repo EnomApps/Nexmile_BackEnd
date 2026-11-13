@@ -33,6 +33,14 @@ return [
             'title' => 'Rider on the way',
             'body' => ':rider is coming to collect. Have the order ready.',
         ],
+        'rider_waiting' => [
+            'title' => 'Rider is waiting',
+            'body' => ':rider is at your counter for order #:number.',
+        ],
+        'no_rider' => [
+            'title' => 'No rider found',
+            'body' => 'Order #:number still has no delivery partner. Call support before the food goes cold.',
+        ],
     ],
 
     'rider' => [
@@ -41,6 +49,10 @@ return [
             // this is food going cold until somebody's phone buzzes.
             'title' => 'Delivery available',
             'body' => 'Pickup from :restaurant, dropping in :area. Open the app to accept.',
+        ],
+        'auto_offline' => [
+            'title' => 'You are now offline',
+            'body' => 'Three offers went unanswered. Go online again when you are ready to ride.',
         ],
     ],
 
@@ -60,6 +72,10 @@ return [
         'rider_assigned' => [
             'title' => 'On its way soon',
             'body' => ':rider is collecting your order.',
+        ],
+        'rider_outside' => [
+            'title' => 'Your rider is outside',
+            'body' => ':rider has arrived with your order.',
         ],
         'picked_up' => [
             'title' => 'Out for delivery',

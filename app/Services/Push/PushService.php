@@ -3,6 +3,7 @@
 namespace App\Services\Push;
 
 use App\Contracts\PushSender;
+use App\Jobs\SendDataPush;
 use App\Jobs\SendPushNotification;
 use App\Models\DeviceToken;
 use App\Models\User;
@@ -110,6 +111,59 @@ class PushService
     }
 
     /**
+     * Queue a data-only payload — no notification, for the app to act on.
+     *
+     * This is the ringing order card, and its withdrawal. There is no
+     * translation key because there is no text: the app draws the card from
+     * the payload in whatever language it is already running in, which is the
+     * one place localisation belongs to the client rather than to us.
+     *
+     * @param  list<int>|Collection<int, int>  $userIds
+     * @param  array<string, string|int>  $data
+     */
+    public function dataToUsers(array|Collection $userIds, string $app, array $data, ?int $ttlSeconds = null): void
+    {
+        $ids = collect($userIds)->filter()->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        SendDataPush::dispatch($ids->all(), $app, $data, $ttlSeconds);
+    }
+
+    /**
+     * Do the sending for a data payload. Called from the queued job.
+     *
+     * No locale grouping here, and no \`with('user')\`: there is nothing to
+     * translate, so every device gets the identical payload and this is one
+     * query and one send per token rather than per language.
+     *
+     * @param  list<int>  $userIds
+     * @param  array<string, string|int>  $data
+     */
+    public function deliverData(array $userIds, string $app, array $data, ?int $ttlSeconds = null): void
+    {
+        $devices = DeviceToken::query()
+            ->whereIn('user_id', $userIds)
+            ->where('app', $app)
+            ->get();
+
+        if ($devices->isEmpty()) {
+            return;
+        }
+
+        $dead = $this->sender->sendData(
+            $devices->pluck('token')->all(),
+            $data,
+            $this->collapseKey($data),
+            $ttlSeconds,
+        );
+
+        $this->prune($devices, $dead);
+    }
+
+    /**
      * Do the sending. Called from the queued job, not from a request.
      *
      * @param  list<int>  $userIds
@@ -147,11 +201,21 @@ class PushService
             ));
         }
 
-        /*
-         * FCM tells us which tokens are gone. Deleting them is the only thing
-         * that stops the table filling with uninstalled apps and every send
-         * getting slower.
-         */
+        $this->prune($devices, $dead);
+    }
+
+    /**
+     * Delete what the provider rejected, and stamp what it accepted.
+     *
+     * FCM tells us which tokens are gone. Deleting them is the only thing
+     * that stops the table filling with uninstalled apps and every send
+     * getting slower.
+     *
+     * @param  Collection<int, DeviceToken>  $devices
+     * @param  list<string>  $dead
+     */
+    protected function prune(Collection $devices, array $dead): void
+    {
         if ($dead !== []) {
             DeviceToken::whereIn('token_hash', array_map(
                 fn (string $token) => DeviceToken::hash($token),

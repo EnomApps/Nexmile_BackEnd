@@ -3,6 +3,7 @@
 namespace App\Services\Push;
 
 use App\Contracts\PushSender;
+use Closure;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -37,6 +38,43 @@ class FcmPushSender implements PushSender
         array $data = [],
         ?string $collapseKey = null,
     ): array {
+        return $this->deliver(
+            $tokens,
+            fn (string $token) => $this->notificationMessage($token, $title, $body, $data, $collapseKey),
+        );
+    }
+
+    /**
+     * @param  list<string>  $tokens
+     * @param  array<string, string>  $data
+     * @return list<string>
+     */
+    public function sendData(
+        array $tokens,
+        array $data,
+        ?string $collapseKey = null,
+        ?int $ttlSeconds = null,
+    ): array {
+        return $this->deliver(
+            $tokens,
+            fn (string $token) => $this->dataMessage($token, $data, $collapseKey, $ttlSeconds),
+        );
+    }
+
+    /**
+     * Post one message per token, mint a fresh access token if Google refuses
+     * the one we have, and collect the tokens worth deleting.
+     *
+     * Shared by both kinds of message because none of it is about the message
+     * — it is about the transport, and the transport fails the same way
+     * whether the payload draws a notification or wakes the app.
+     *
+     * @param  list<string>  $tokens
+     * @param  Closure(string): array<string, mixed>  $message
+     * @return list<string>
+     */
+    private function deliver(array $tokens, Closure $message): array
+    {
         if ($tokens === []) {
             return [];
         }
@@ -61,7 +99,7 @@ class FcmPushSender implements PushSender
          * or not. It is why sending is queued.
          */
         foreach ($tokens as $token) {
-            $response = $this->post($url, $accessToken, $token, $title, $body, $data, $collapseKey);
+            $response = $this->post($url, $accessToken, $message($token));
 
             /*
              * 401 is about us, not the device. The cached token has an hour on
@@ -77,7 +115,7 @@ class FcmPushSender implements PushSender
                 $refreshed = true;
                 $accessToken = $this->accessToken();
 
-                $response = $this->post($url, $accessToken, $token, $title, $body, $data, $collapseKey);
+                $response = $this->post($url, $accessToken, $message($token));
             }
 
             if ($response->successful()) {
@@ -106,64 +144,142 @@ class FcmPushSender implements PushSender
         return $dead;
     }
 
+    /** @param  array<string, mixed>  $message */
+    private function post(string $url, string $accessToken, array $message): Response
+    {
+        return Http::withToken($accessToken)
+            ->timeout((int) config('push.timeout_seconds'))
+            ->post($url, ['message' => $message]);
+    }
+
     /**
-     * One message to one device.
+     * Something for the operating system to draw.
      *
      * @param  array<string, string>  $data
+     * @return array<string, mixed>
      */
-    private function post(
-        string $url,
-        string $accessToken,
+    private function notificationMessage(
         string $token,
         string $title,
         string $body,
         array $data,
-        ?string $collapseKey = null,
-    ): Response {
-        return Http::withToken($accessToken)
-            ->timeout((int) config('push.timeout_seconds'))
-            ->post($url, [
-                'message' => [
-                    'token' => $token,
-                    'notification' => ['title' => $title, 'body' => $body],
-                    // Strings only: FCM rejects a data payload with any other
-                    // scalar type, and a silent 400 is worse than a loud one.
-                    'data' => array_map(fn ($v) => (string) $v, $data),
-                    'android' => [
-                        // A rider needs the sound and the wake. A delivery
-                        // offer arriving silently is an offer not seen.
-                        'priority' => 'high',
-                        'notification' => array_filter([
-                            'channel_id' => config('push.android_channel'),
-                            /*
-                             * One live notification per order rather than a
-                             * pile of five. Android replaces a notification
-                             * carrying a tag it already has, and alerts again
-                             * while doing it, so each stage is still felt.
-                             */
-                            'tag' => $collapseKey,
-                        ], fn ($value) => $value !== null),
-                    ],
+        ?string $collapseKey,
+    ): array {
+        return [
+            'token' => $token,
+            'notification' => ['title' => $title, 'body' => $body],
+            'data' => $this->strings($data),
+            'android' => [
+                // A rider needs the sound and the wake. A delivery
+                // offer arriving silently is an offer not seen.
+                'priority' => 'high',
+                'notification' => array_filter([
+                    'channel_id' => config('push.android_channel'),
                     /*
-                     * iOS takes the sound per message; Android takes it from
-                     * the channel, which is why only this side needs naming.
-                     * A file the build does not bundle plays nothing at all,
-                     * so this stays 'default' until an iOS release is
-                     * actually carrying the asset.
+                     * One live notification per order rather than a
+                     * pile of five. Android replaces a notification
+                     * carrying a tag it already has, and alerts again
+                     * while doing it, so each stage is still felt.
                      */
-                    'apns' => [
-                        'headers' => array_filter([
-                            'apns-priority' => '10',
-                            // iOS calls the same idea a collapse id, and caps
-                            // it at 64 bytes.
-                            'apns-collapse-id' => $collapseKey === null
-                                ? null
-                                : substr($collapseKey, 0, 64),
-                        ], fn ($value) => $value !== null),
-                        'payload' => ['aps' => ['sound' => config('push.ios_sound')]],
-                    ],
-                ],
-            ]);
+                    'tag' => $collapseKey,
+                ], fn ($value) => $value !== null),
+            ],
+            /*
+             * iOS takes the sound per message; Android takes it from
+             * the channel, which is why only this side needs naming.
+             * A file the build does not bundle plays nothing at all,
+             * so this stays 'default' until an iOS release is
+             * actually carrying the asset.
+             */
+            'apns' => [
+                'headers' => array_filter([
+                    'apns-priority' => '10',
+                    // iOS calls the same idea a collapse id, and caps
+                    // it at 64 bytes.
+                    'apns-collapse-id' => $this->collapseHeader($collapseKey),
+                ], fn ($value) => $value !== null),
+                'payload' => ['aps' => ['sound' => config('push.ios_sound')]],
+            ],
+        ];
+    }
+
+    /**
+     * Something for the app to act on.
+     *
+     * No `notification` key at all, which is what makes it data-only: FCM
+     * decides by presence, and including an empty one would have Android draw
+     * a blank tray entry and never call the app.
+     *
+     * @param  array<string, string>  $data
+     * @return array<string, mixed>
+     */
+    private function dataMessage(
+        string $token,
+        array $data,
+        ?string $collapseKey,
+        ?int $ttlSeconds,
+    ): array {
+        return [
+            'token' => $token,
+            'data' => $this->strings($data),
+            'android' => array_filter([
+                /*
+                 * The thing that makes a ringing card possible. A normal
+                 * priority data message is held until the phone next wakes
+                 * on its own, which on a locked phone in a pocket can be
+                 * minutes — long after the offer expired.
+                 */
+                'priority' => 'high',
+
+                /*
+                 * Delivered to an app that has not been opened since the
+                 * phone was switched on. A rider who reboots at the start of
+                 * a shift and does not open the app would otherwise receive
+                 * nothing at all.
+                 */
+                'direct_boot_ok' => true,
+
+                'ttl' => $ttlSeconds === null ? null : $ttlSeconds.'s',
+            ], fn ($value) => $value !== null),
+
+            /*
+             * iOS will not ring for this. A background push is throttled by
+             * the system and may be held for minutes, so a data message is
+             * the wrong tool for an offer on an iPhone — that needs a
+             * notification with a critical alert entitlement, or the
+             * call-style interface CallKit provides. The rider app ships on
+             * Android, so this side exists to be correct rather than to be
+             * used: `apns-push-type: background` with priority 5 is what
+             * Apple requires for a payload with no alert, and priority 10
+             * here would be rejected outright.
+             */
+            'apns' => [
+                'headers' => array_filter([
+                    'apns-push-type' => 'background',
+                    'apns-priority' => '5',
+                    'apns-expiration' => $ttlSeconds === null ? null : (string) (time() + $ttlSeconds),
+                    'apns-collapse-id' => $this->collapseHeader($collapseKey),
+                ], fn ($value) => $value !== null),
+                'payload' => ['aps' => ['content-available' => 1]],
+            ],
+        ];
+    }
+
+    private function collapseHeader(?string $collapseKey): ?string
+    {
+        return $collapseKey === null ? null : substr($collapseKey, 0, 64);
+    }
+
+    /**
+     * Strings only: FCM rejects a data payload with any other scalar type,
+     * and a silent 400 is worse than a loud one.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, string>
+     */
+    private function strings(array $data): array
+    {
+        return array_map(fn ($value) => (string) $value, $data);
     }
 
     /**

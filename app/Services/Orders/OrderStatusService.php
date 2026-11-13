@@ -2,6 +2,7 @@
 
 namespace App\Services\Orders;
 
+use App\Enums\DispatchStatus;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\User;
@@ -64,15 +65,28 @@ class OrderStatusService
      */
     protected const RIDER_TRANSITIONS = [
         'assign' => [OrderStatus::ReadyForPickup->value],
-        'pickup' => [OrderStatus::RiderAssigned->value],
-        'deliver' => [OrderStatus::PickedUp->value],
+
+        /*
+         * Standing at the counter, and standing at the door. Both are the
+         * rider saying so, not GPS saying so — \`arrived_at\` is the GPS one
+         * and it is what waiting pay is measured from, precisely because a
+         * button pays whatever the rider taps.
+         */
+        'reached_restaurant' => [OrderStatus::RiderAssigned->value],
+        'reached_customer' => [OrderStatus::PickedUp->value],
+
+        // Collectable whether or not the rider announced arriving first.
+        // A rider holding a bag should never be blocked by a button they
+        // did not press.
+        'pickup' => [OrderStatus::RiderAssigned->value, OrderStatus::ReachedRestaurant->value],
+        'deliver' => [OrderStatus::PickedUp->value, OrderStatus::ReachedCustomer->value],
 
         /*
          * Hand the job back — a breakdown, a wrong turn, a shift ending.
          * Only before collection: once the food is in the bag it cannot be
          * returned to a board, and a human has to be involved.
          */
-        'release' => [OrderStatus::RiderAssigned->value],
+        'release' => [OrderStatus::RiderAssigned->value, OrderStatus::ReachedRestaurant->value],
     ];
 
     public function __construct(
@@ -133,9 +147,26 @@ class OrderStatusService
     {
         $this->guard($order, 'ready');
 
-        return $this->transition($order, OrderStatus::ReadyForPickup, $actor, attributes: [
+        $ready = $this->transition($order, OrderStatus::ReadyForPickup, $actor, attributes: [
             'ready_at' => now(),
         ]);
+
+        /*
+         * A rider who accepted while the food was cooking has been waiting
+         * for exactly this, so the order goes straight on to being theirs
+         * rather than sitting in a state that means "waiting for a rider"
+         * when one is standing at the counter.
+         *
+         * Two history rows rather than one, and both are true: the food
+         * became ready, and then the order became a rider's to collect.
+         * Credited to the rider, because they are whose act it was — the
+         * merchant only finished cooking.
+         */
+        if ($ready->rider_id !== null) {
+            return $this->markAssigned($ready, $ready->rider?->user ?? $actor);
+        }
+
+        return $ready;
     }
 
     /**
@@ -182,17 +213,90 @@ class OrderStatusService
     }
 
     /**
-     * Put an accepted-but-not-collected order back on the board.
+     * Hand an order back before collecting it.
+     *
+     * Two shapes, because offer dispatch assigns a rider while the food is
+     * still cooking. If the order was ready, this walks the status back to
+     * ready_for_pickup. If the kitchen never stopped, there is no status to
+     * walk back — the rider is simply removed, and the history row is
+     * written by hand so that "a rider gave this back" is still on the
+     * record. Losing that is losing the only evidence of why a delivery
+     * took twice as long as it should have.
      *
      * @throws ValidationException
      */
     public function releaseByRider(Order $order, User $actor, ?string $reason = null): Order
     {
-        $this->guard($order, 'release', self::RIDER_TRANSITIONS);
+        $note = $reason ?? 'Handed back by the rider.';
 
-        $order->forceFill(['rider_id' => null])->save();
+        $cooking = in_array($order->status, [
+            OrderStatus::Accepted,
+            OrderStatus::Preparing,
+        ], true);
 
-        return $this->transition($order, OrderStatus::ReadyForPickup, $actor, note: $reason ?? 'Returned to the board by the rider.');
+        if (! $cooking) {
+            $this->guard($order, 'release', self::RIDER_TRANSITIONS);
+        }
+
+        $order->forceFill([
+            'rider_id' => null,
+            'assigned_at' => null,
+            'reached_restaurant_at' => null,
+            'dispatch_status' => DispatchStatus::Idle->value,
+        ])->save();
+
+        if (! $cooking) {
+            return $this->transition($order, OrderStatus::ReadyForPickup, $actor, note: $note);
+        }
+
+        $order->statusHistory()->create([
+            'from_status' => $order->status,
+            'to_status' => $order->status,
+            'changed_by_user_id' => $actor->id,
+            'note' => $note,
+            'created_at' => now(),
+        ]);
+
+        return $order->refresh();
+    }
+
+    /**
+     * The rider is at the restaurant.
+     *
+     * Tells the kitchen somebody is waiting, which is the single most
+     * useful thing a merchant can know and the thing they currently find
+     * out by looking up.
+     *
+     * @throws ValidationException
+     */
+    public function markReachedRestaurant(Order $order, User $actor): Order
+    {
+        $this->guard($order, 'reached_restaurant', self::RIDER_TRANSITIONS);
+
+        return $this->transition($order, OrderStatus::ReachedRestaurant, $actor, attributes: [
+            'reached_restaurant_at' => now(),
+            /*
+             * Also stamped as the GPS arrival if nothing has stamped it yet.
+             * Waiting pay starts from the earlier of the two, and a rider
+             * whose phone lost signal on the way in should not lose the
+             * minutes they then spent standing there.
+             */
+            'arrived_at' => $order->arrived_at ?? now(),
+        ]);
+    }
+
+    /**
+     * The rider is at the customer's door.
+     *
+     * @throws ValidationException
+     */
+    public function markReachedCustomer(Order $order, User $actor): Order
+    {
+        $this->guard($order, 'reached_customer', self::RIDER_TRANSITIONS);
+
+        return $this->transition($order, OrderStatus::ReachedCustomer, $actor, attributes: [
+            'reached_customer_at' => now(),
+        ]);
     }
 
     /**
@@ -244,7 +348,14 @@ class OrderStatusService
         $this->guard($order, 'assign', self::RIDER_TRANSITIONS);
 
         return $this->transition($order, OrderStatus::RiderAssigned, $actor, attributes: [
-            'assigned_at' => now(),
+            /*
+             * Kept if it is already set. Under offer dispatch the rider
+             * accepted while the food was still cooking, and overwriting it
+             * here would restate the wait as starting when the kitchen
+             * finished — which is the opposite of what happened, and what
+             * the first mile is paid from.
+             */
+            'assigned_at' => $order->assigned_at ?? now(),
         ]);
     }
 
@@ -272,7 +383,9 @@ class OrderStatusService
     {
         $withRider = in_array($current, [
             OrderStatus::RiderAssigned,
+            OrderStatus::ReachedRestaurant,
             OrderStatus::PickedUp,
+            OrderStatus::ReachedCustomer,
         ], true);
 
         return match (true) {
@@ -350,7 +463,52 @@ class OrderStatusService
          */
         $this->notify($order, $to);
 
+        /*
+         * And the hunt for a rider, for the same reason: every status change
+         * funnels through here, so dispatch cannot be started twice or
+         * forgotten by a new caller.
+         */
+        $this->redirectDispatch($order, $to);
+
         return $order;
+    }
+
+    /**
+     * Start or stop looking for a rider.
+     *
+     * Resolved out of the container rather than injected, because the
+     * dispatch service depends on this one — constructor-injecting it both
+     * ways is a circular dependency Laravel cannot build.
+     *
+     * In board mode this only records the dispatch state — no phone rings,
+     * because riders find orders rather than the other way round.
+     */
+    protected function redirectDispatch(Order $order, OrderStatus $to): void
+    {
+        $offers = app(OfferDispatchService::class);
+
+        rescue(fn () => match (true) {
+            /*
+             * The kitchen has taken it, so start riding. This is the whole
+             * point of dispatching at 'accepted': the rider travels while
+             * the food cooks instead of afterwards.
+             */
+            $to === OrderStatus::Accepted && config('dispatch.start_at') === 'accepted' => $offers->start($order),
+
+            // Either the configured starting point, or the safety net for an
+            // order that is ready and somehow still has nobody.
+            $to === OrderStatus::ReadyForPickup => $offers->start($order),
+
+            /*
+             * Dead order, live phones. Withdrawing the cards matters more
+             * than the cancellation itself here — a rider who accepts an
+             * offer for a cancelled order rides to a restaurant that has
+             * thrown the food away.
+             */
+            in_array($to, [OrderStatus::Cancelled, OrderStatus::Rejected], true) => $offers->cancelOutstanding($order, 'order_cancelled'),
+
+            default => null,
+        }, report: true);
     }
 
     /**
@@ -368,7 +526,9 @@ class OrderStatusService
             OrderStatus::Rejected => $this->notifier->rejected($order),
             OrderStatus::ReadyForPickup => $this->notifier->readyForPickup($order),
             OrderStatus::RiderAssigned => $this->notifier->riderAssigned($order),
+            OrderStatus::ReachedRestaurant => $this->notifier->reachedRestaurant($order),
             OrderStatus::PickedUp => $this->notifier->pickedUp($order),
+            OrderStatus::ReachedCustomer => $this->notifier->reachedCustomer($order),
             OrderStatus::Delivered => $this->notifier->delivered($order),
             OrderStatus::Cancelled => $this->notifier->cancelled($order),
             default => null,

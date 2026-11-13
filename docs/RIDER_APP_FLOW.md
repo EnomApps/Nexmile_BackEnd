@@ -21,21 +21,27 @@ Only **earnings** is unbuilt, and riders can be paid manually until it lands.
 | 6 | Submit + waiting for verification | **Live** |
 | 7 | Duty toggle (go online / offline) | **Live** |
 | 8 | Location ping while on duty | **Live** |
-| 9 | Order board — accept a job | **Live** |
+| 9 | **Incoming order card — rings, counts down, accept or decline** | **Live** |
+| 9b | Order board — accept a job off a list | **Live** |
 | 10 | Pickup — confirm the code | **Live** |
 | 11 | Delivery — confirm handover | **Live** |
 | 12 | Earnings and history | Not built (EP13) |
 
-### One thing that is not built and changes how you design screen 9
+### Two ways an order reaches a rider, and you need both
 
-**There are no push notifications yet.** A rider only sees a new order while
-the app is open and polling. Build screen 9 as a board the rider watches, not
-as an alert that arrives — and poll `/rider/orders/available` every 10–15
-seconds while it is foregrounded.
+**The card** (screen 9) is the one that matters. The order is offered to the
+riders nearest the restaurant, the phone rings, a full-screen card counts down
+from 30 seconds, and the first rider to accept gets it. This is the Swiggy /
+Zomato model and it is what the product needs: nobody reads a list while on a
+bike.
 
-That is workable for a pilot with a few riders. It stops working the moment a
-phone goes in a pocket, so push is coming; the board does not change when it
-does.
+**The board** (screen 9b) is the same orders as a pollable list. Keep it. It is
+the fallback when the server is running `DISPATCH_MODE=board`, it is what a
+rider looks at while idle, and it costs you one screen you have already built.
+
+Which one is live is a **server setting**, not something the app chooses. Build
+both; if offers are switched off, `/offers/current` simply always returns
+`null` and the board fills up instead.
 
 ---
 
@@ -232,7 +238,183 @@ Battery matters more here than anywhere in the customer app — this runs for a
 whole shift. A coarse interval when idle and a fine one while carrying an order
 is the right shape.
 
-## 9. Order board
+## 9. Incoming order card
+
+### The push that starts it
+
+A **data-only, high-priority FCM message**. No `notification` block, so nothing
+is drawn by the system — `onMessageReceived` is called and the app puts the card
+up itself. That is the only way to get something that rings for thirty seconds,
+counts down, and takes itself down again.
+
+```json
+{
+  "type": "ORDER_OFFER",
+  "offer_id": "01JCQ2W8XK3N4P5Q6R7S8T9V0W",
+  "order_id": "41",
+  "order_number": "NX261113ABCD",
+  "expires_at": "2026-11-13T18:42:31+00:00",
+  "seconds_left": "30",
+  "restaurant": "Ponnusamy Hotel",
+  "restaurant_area": "Madurai",
+  "restaurant_latitude": "9.9195",
+  "restaurant_longitude": "78.1193",
+  "pickup_distance_metres": "240",
+  "dropoff_area": "Madurai",
+  "delivery_distance_metres": "620",
+  "item_count": "3",
+  "earnings": "34.50",
+  "collect_cash": "430.00",
+  "wave": "1"
+}
+```
+
+**Every value is a string.** FCM data payloads are string-to-string; parse the
+numbers yourself.
+
+**There is no customer address and no customer phone.** One offer goes to up to
+fifteen riders and fourteen of them will never touch this order. You get both
+the moment the accept returns 200.
+
+**Count down to `expires_at`, not from `seconds_left`.** The server owns expiry.
+`seconds_left` is there only so a phone with a badly wrong clock shows something
+sensible instead of a card that is already over or never ends.
+
+**Dedupe on `offer_id`.** The same offer can arrive twice.
+
+The message carries an FCM TTL equal to the window, so a card that would arrive
+after its window is dropped rather than held for a phone that is switched off.
+
+### Read it back; do not trust the push alone
+
+```
+GET /rider/offers/current
+```
+
+```json
+{
+  "data": {
+    "offer_id": "01JCQ2W8XK3N4P5Q6R7S8T9V0W",
+    "status": "pending",
+    "expires_at": "2026-11-13T18:42:31+00:00",
+    "seconds_left": 24,
+    "wave": 1,
+    "order": {
+      "id": 41, "order_number": "NX261113ABCD", "item_count": 3,
+      "order_value": 430, "collect_cash": 430, "delivery_distance_metres": 620,
+      "customer_note": "No onions",
+      "status": "accepted", "ready_at": null, "estimated_prep_minutes": 20
+    },
+    "pickup": { "name": "Ponnusamy Hotel", "area": "Madurai",
+                "latitude": 9.9195, "longitude": 78.1193,
+                "distance_metres": 240 },
+    "dropoff": { "area": "Madurai" },
+    "earnings": 34.5
+  }
+}
+```
+
+`"data": null` means nothing is ringing. That is a **200**, not a 404 — "you
+have no offer" is a question with an answer.
+
+**Call this on cold start and every time the app resumes.** A data message can
+be dropped by the system, arrive twice, or land on a phone that was switched
+off. A rider staring at a card for an order somebody else collected ten minutes
+ago is worse than a rider who saw no card at all.
+
+Note `order.status` can be `accepted` or `preparing` — **the food may still be
+cooking when the offer goes out**, deliberately, so the rider travels while it
+cooks. `estimated_prep_minutes` is there to tell the rider the wait is expected
+rather than a problem.
+
+### Accepting
+
+```
+POST /rider/offers/{offer_id}/accept
+```
+
+Five answers, and they are different on purpose:
+
+| Code | Means | Do this |
+|---|---|---|
+| **200** | it is yours | open the trip screen; the body is the full order, with the drop address and the customer's phone |
+| **409** | somebody was faster, or the order was cancelled | close the card, show "Order taken by another rider" |
+| **410** | the window closed | close the card **silently** — the countdown already ran out on screen |
+| **422** | the *rider* cannot take it | show `errors.rider[0]` — "Finish your current delivery first", "Go online before accepting orders", "Your licence or insurance has expired" |
+| **404** | not this rider's offer | close the card |
+
+Accepting the **same** offer twice returns 200 both times. A dropped response
+and a retry must not tell a rider they lost an order they are already carrying.
+
+### Declining
+
+```
+POST /rider/offers/{offer_id}/reject   { "reason": "Too far" }
+```
+
+`reason` is optional. Always 200, even for an offer that has already ended.
+
+**Declining does not count against the rider.** Letting it ring out does: three
+in a row and the server takes them off duty and sends
+`type: rider.auto_offline`. Handle that by flipping the duty toggle to off — it
+has already happened server-side, so a toggle that still shows "online" is a
+rider who thinks they are working and is not.
+
+### Withdrawal
+
+```json
+{ "type": "OFFER_CANCELLED", "order_id": "41", "reason": "taken" }
+```
+
+Another data message. Stop the ringtone and dismiss the card for that
+`order_id`, whatever offer it came from. Sent rather than left to expire,
+because twenty-nine seconds of ringtone for an order that is already gone is
+how a rider learns to ignore the sound.
+
+`reason` is `taken`, `order_cancelled` or `assigned_by_ops`.
+
+### Everything Android needs for this to work at all
+
+This is the part that fails silently, and all of it is app-side:
+
+- **Channel `nexmile_orders`** must exist, created by the app, with high
+  importance. A mismatch means every notification is dropped with no error.
+  Give the offer card its own channel too if you want a different sound.
+- **`POST_NOTIFICATIONS`** (API 33+).
+- **Location: fine *and* background** ("Allow all the time"), with a foreground
+  service of type `location` while on duty.
+- **`SYSTEM_ALERT_WINDOW`** for the floating card over other apps.
+- **`USE_FULL_SCREEN_INTENT`** — on API 34+ this is not auto-granted for
+  non-calling apps. Check `canUseFullScreenIntent()` and send the rider to
+  settings if false.
+- **Battery optimisation exemption and autostart** on Xiaomi, Oppo, Vivo,
+  Realme and Samsung, or the service is killed and the rider silently stops
+  receiving work.
+- **Locked phone**: high-importance notification with a full-screen intent to an
+  activity with `setShowWhenLocked(true)` and `setTurnScreenOn(true)` — the
+  incoming-call technique.
+- **Alarm audio stream** for the ringtone, so it plays at low ringer volume.
+- **One card at a time.** The server will not send a second offer to a rider
+  who has one live, but guard it anyway.
+
+Put all of this behind **one guided setup screen** during onboarding. A rider
+who gets through onboarding with two of these missing looks, from the outside,
+exactly like a backend that does not send notifications.
+
+### Mock locations are refused
+
+```
+POST /rider/location   { ..., "is_mock": true }   →  422
+```
+
+Send `is_mock` from `Location.isFromMockProvider`. A faked position would put
+the rider into dispatch near a restaurant they are nowhere near and pay them a
+first mile they never rode, so the server drops the ping and the response
+carries `data.mock_location: true`. Show the rider that mock locations have to
+be off.
+
+## 9b. Order board
+
 
 ```
 GET /rider/orders/available
@@ -281,6 +463,9 @@ First to accept wins. A **422 with `errors.order`** meaning *"Another rider took
 this order"* is expected on a shared board — refresh the list and move on, do
 not show it as a failure.
 
+(The offer card uses a different endpoint and answers **409** for the same
+situation. Both exist; neither replaces the other.)
+
 Other 422s worth handling by message: *"Finish your current delivery first"*,
 *"Go online before accepting orders"*, *"Your licence or insurance has
 expired"*.
@@ -288,8 +473,21 @@ expired"*.
 ## 10. Pickup
 
 ```
+POST /rider/orders/{id}/reached-restaurant      optional
 POST /rider/orders/{id}/pickup   { "pickup_code": "4821" }
 ```
+
+`reached-restaurant` tells the kitchen somebody is waiting, which is the single
+most useful thing a merchant can be told. It moves the order to
+`reached_restaurant`.
+
+**It is optional.** `pickup` works from `rider_assigned` or
+`reached_restaurant` — a rider holding a bag must never be blocked by a button
+they did not press.
+
+It is also not what waiting pay is measured from. That comes from the GPS
+pings the app already sends, deliberately: a button pays whatever the rider
+taps.
 
 The merchant reads out four digits. A wrong code is a 422 on `pickup_code` —
 let the rider retype it rather than bouncing them out of the screen.
@@ -301,8 +499,17 @@ settled with.
 ## 11. Delivery
 
 ```
+POST /rider/orders/{id}/reached-customer        optional
 POST /rider/orders/{id}/deliver
 ```
+
+`reached-customer` notifies the customer that the rider is outside — the one
+notification in the whole set that saves somebody time rather than telling them
+what they could have guessed. A customer who reads it is at the door when the
+rider gets there, instead of the rider standing in a stairwell on the phone.
+
+Optional in the same way: `deliver` works from `picked_up` or
+`reached_customer`.
 
 Closes the order, sets the rider back to `available` and increments
 `completed_deliveries`. Return them to the board.
@@ -348,14 +555,31 @@ will not read English comfortably.
 
 ## What to build now
 
-**All eleven screens, against real endpoints.** Nothing needs stubbing.
+**Every screen, against real endpoints.** Nothing needs stubbing.
 
 1. App shell, token storage with the refresh mutex
 2. Screens 1–6 — sign in and the onboarding wizard
-3. Screen 7 — duty toggle, gated on `can_go_online`
-4. Screens 8–11 — the working shift: ping, board, accept, pickup, deliver
+3. The permission setup screen — channel, notifications, background location,
+   overlay, full-screen intent, battery, autostart. Before screen 7, because
+   none of the rest works without it
+4. Screen 7 — duty toggle, gated on `can_go_online`, with the foreground
+   location service
+5. Screen 9 — the offer card: data message, countdown to `expires_at`,
+   ringtone, accept with 409 / 410 handling, `OFFER_CANCELLED`,
+   `/offers/current` on resume
+6. Screens 9b–11 — board, pickup with the code, the two arrival buttons,
+   deliver
 
 Only earnings is left, and it changes nothing you build now.
+
+### Not built on the server, so do not build against it
+
+- **No WebSocket.** The spec asks for one alongside FCM. There is no broker on
+  this deployment. A high-priority data message plus `/offers/current` on
+  resume covers it; raise it again if a dropped offer turns out to be costing
+  real orders.
+- **No batching.** One order per rider.
+- **No delivery OTP.** The pickup code is at the restaurant end only.
 
 ## Testing the whole thing yourself
 

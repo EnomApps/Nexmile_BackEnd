@@ -33,4 +33,26 @@ class LogPushSender implements PushSender
         // because the fake could not reach them would be worse than useless.
         return [];
     }
+
+    public function sendData(
+        array $tokens,
+        array $data,
+        ?string $collapseKey = null,
+        ?int $ttlSeconds = null,
+    ): array {
+        /*
+         * Logged at info with the payload intact, because this is the only
+         * way to see a dispatch wave go out on a machine with no Firebase
+         * project — and a rider offer that never arrives is the hardest
+         * thing in the product to debug from the outside.
+         */
+        Log::info('Data push (not sent — log driver)', [
+            'devices' => count($tokens),
+            'data' => $data,
+            'collapse_key' => $collapseKey,
+            'ttl_seconds' => $ttlSeconds,
+        ]);
+
+        return [];
+    }
 }

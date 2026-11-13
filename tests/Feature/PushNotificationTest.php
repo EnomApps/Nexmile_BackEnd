@@ -300,6 +300,15 @@ class PushNotificationTest extends TestCase
             ): array {
                 return ['dead-token'];
             }
+
+            public function sendData(
+                array $tokens,
+                array $data,
+                ?string $collapseKey = null,
+                ?int $ttlSeconds = null,
+            ): array {
+                return ['dead-token'];
+            }
         });
 
         app(PushService::class)->deliver([$user->id], PushService::CUSTOMER, 'push.customer.delivered');
@@ -790,6 +799,12 @@ class PushNotificationTest extends TestCase
             /** @var list<string|null> */
             public array $collapseKeys = [];
 
+            /** @var list<array<string, string>> */
+            public array $payloads = [];
+
+            /** @var list<int|null> */
+            public array $ttls = [];
+
             public function send(
                 array $tokens,
                 string $title,
@@ -800,6 +815,19 @@ class PushNotificationTest extends TestCase
                 $this->titles[] = $title;
                 $this->bodies[] = $body;
                 $this->collapseKeys[] = $collapseKey;
+
+                return [];
+            }
+
+            public function sendData(
+                array $tokens,
+                array $data,
+                ?string $collapseKey = null,
+                ?int $ttlSeconds = null,
+            ): array {
+                $this->payloads[] = $data;
+                $this->collapseKeys[] = $collapseKey;
+                $this->ttls[] = $ttlSeconds;
 
                 return [];
             }

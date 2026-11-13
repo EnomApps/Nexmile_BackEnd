@@ -90,6 +90,49 @@ class OrderController extends Controller
     }
 
     /**
+     * Say you have reached the restaurant
+     *
+     * Tells the kitchen somebody is waiting, which is the single most
+     * useful thing a merchant can be told and the thing they currently find
+     * out by looking up from the stove.
+     *
+     * Separate from the GPS arrival the app already causes by pinging its
+     * position: that one is what waiting pay is measured from, deliberately,
+     * because a button pays whatever the rider taps.
+     */
+    public function reachedRestaurant(Request $request, int $order): JsonResponse
+    {
+        $rider = $this->rider($request);
+
+        $model = $this->dispatch->reachRestaurant($rider, $this->assigned($request, $order));
+
+        return response()->json([
+            'message' => 'The restaurant has been told you are here.',
+            'data' => new RiderOrderResource($model->load('merchant', 'items')),
+        ]);
+    }
+
+    /**
+     * Say you have reached the customer
+     *
+     * The one notification in the set that saves somebody time rather than
+     * telling them what they could have guessed: a customer who reads it is
+     * at the door when the rider gets there, instead of the rider standing
+     * in a stairwell on the phone.
+     */
+    public function reachedCustomer(Request $request, int $order): JsonResponse
+    {
+        $rider = $this->rider($request);
+
+        $model = $this->dispatch->reachCustomer($rider, $this->assigned($request, $order));
+
+        return response()->json([
+            'message' => 'The customer has been told you are outside.',
+            'data' => new RiderOrderResource($model->load('merchant', 'items')),
+        ]);
+    }
+
+    /**
      * Confirm pickup
      *
      * The restaurant reads out a four-digit code. It is the evidence that the

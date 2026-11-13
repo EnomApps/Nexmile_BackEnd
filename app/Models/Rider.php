@@ -71,6 +71,26 @@ class Rider extends Model
         return $this->hasMany(Order::class);
     }
 
+    public function offers(): HasMany
+    {
+        return $this->hasMany(RiderOffer::class);
+    }
+
+    /**
+     * Share of offers this rider answered yes to, as a percentage.
+     *
+     * Null rather than zero for a rider who has never been offered one. A
+     * new rider showing 0%% would read as somebody who refuses everything,
+     * which is the opposite of true and exactly the rider dispatch should
+     * be ringing.
+     */
+    public function acceptanceRate(): ?float
+    {
+        return $this->offers_received > 0
+            ? round($this->offers_accepted / $this->offers_received * 100, 1)
+            : null;
+    }
+
     /**
      * Attach a new rider to whoever invited them.
      *

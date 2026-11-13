@@ -47,7 +47,12 @@ class Order extends Model
             'accepted_at' => 'datetime',
             'ready_at' => 'datetime',
             'assigned_at' => 'datetime',
+            'reached_restaurant_at' => 'datetime',
             'picked_up_at' => 'datetime',
+            'reached_customer_at' => 'datetime',
+            'dispatch_started_at' => 'datetime',
+            'dispatch_failed_at' => 'datetime',
+            'dispatch_wave' => 'integer',
             'delivered_at' => 'datetime',
             'arrived_at' => 'datetime',
             'cancelled_at' => 'datetime',
@@ -90,6 +95,18 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    /**
+     * Every rider ever rung about this order, answered or not.
+     *
+     * Kept after the fact rather than cleaned up: this is the record of how
+     * long it took to find somebody and who was asked, which is the only
+     * way to answer "why did this delivery take forty minutes" later.
+     */
+    public function offers(): HasMany
+    {
+        return $this->hasMany(RiderOffer::class);
     }
 
     public function statusHistory(): HasMany

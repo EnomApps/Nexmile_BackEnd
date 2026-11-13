@@ -89,6 +89,17 @@ class OrderNotifier
             return;
         }
 
+        /*
+         * Board mode only. Under offer dispatch the riders chosen for this
+         * order already have a ringing card, and this broadcast would put a
+         * second, duller notification about the same food on every other
+         * rider's phone — the fastest way to teach riders that the sound
+         * means nothing.
+         */
+        if (config('dispatch.mode') === 'push') {
+            return;
+        }
+
         $this->push->toUsers(
             $this->ridersToOffer($order),
             PushService::RIDER,
@@ -118,6 +129,63 @@ class OrderNotifier
             'push.customer.rider_assigned',
             ['rider' => $order->rider?->full_name ?? ''],
             ['type' => 'order.rider_assigned', 'order_id' => (string) $order->id],
+        );
+    }
+
+    /**
+     * A rider took it, but the food is not ready yet.
+     *
+     * The kitchen only. "Somebody is coming, have it bagged" is worth
+     * knowing while you are still cooking; the customer was told a time
+     * when the order was accepted and will be told again the moment it is
+     * really on its way. Sending them both would be the same notification
+     * twice for one delivery.
+     */
+    public function riderAssignedEarly(Order $order): void
+    {
+        $this->push->toUser(
+            $order->merchant?->user,
+            PushService::MERCHANT,
+            'push.merchant.rider_assigned',
+            ['rider' => $order->rider?->full_name ?? ''],
+            ['type' => 'order.rider_assigned', 'order_id' => (string) $order->id],
+        );
+    }
+
+    /**
+     * The rider is standing at the counter.
+     *
+     * The kitchen, not the customer. A merchant who knows somebody is
+     * waiting hands the bag over; a customer who knows it learns only that
+     * their food is sitting on a shelf.
+     */
+    public function reachedRestaurant(Order $order): void
+    {
+        $this->push->toUser(
+            $order->merchant?->user,
+            PushService::MERCHANT,
+            'push.merchant.rider_waiting',
+            ['rider' => $order->rider?->full_name ?? ''],
+            ['type' => 'order.rider_waiting', 'order_id' => (string) $order->id],
+        );
+    }
+
+    /**
+     * The rider is outside.
+     *
+     * The one notification in the set that saves somebody time rather than
+     * telling them something they could have guessed — a customer who reads
+     * this is at the door when the rider gets there, instead of the rider
+     * standing in a stairwell on the phone.
+     */
+    public function reachedCustomer(Order $order): void
+    {
+        $this->push->toUser(
+            $order->customer,
+            PushService::CUSTOMER,
+            'push.customer.rider_outside',
+            ['rider' => $order->rider?->full_name ?? ''],
+            ['type' => 'order.rider_outside', 'order_id' => (string) $order->id],
         );
     }
 

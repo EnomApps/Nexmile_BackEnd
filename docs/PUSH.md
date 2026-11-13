@@ -67,6 +67,91 @@ bundling the asset — naming a file the app does not carry makes iOS play
 nothing at all, which reads as a missing notification rather than a missing
 sound.
 
+## Data messages, for the ringing order card
+
+A notification message is drawn by the operating system, which means it draws
+a line of text in the tray. There is no notification shape that rings for
+thirty seconds, counts down, and takes itself down when another rider gets
+there first — and there is no notification shape that can be *withdrawn*.
+
+So a rider offer is a **data-only message**: no `notification` key at all. FCM
+decides by its presence, and including an empty one would have Android draw a
+blank tray entry and never call the app.
+
+```json
+{
+  "data": {
+    "type": "ORDER_OFFER",
+    "offer_id": "01JCQ2W8XK3N4P5Q6R7S8T9V0W",
+    "order_id": "41",
+    "expires_at": "2026-11-13T18:42:31+00:00",
+    "seconds_left": "30",
+    "restaurant": "Ponnusamy Hotel",
+    "restaurant_latitude": "9.9195",
+    "dropoff_area": "Madurai",
+    "earnings": "34.50",
+    "collect_cash": "420.00"
+  },
+  "android": { "priority": "high", "direct_boot_ok": true, "ttl": "30s" },
+  "apns": {
+    "headers": { "apns-push-type": "background", "apns-priority": "5" },
+    "payload": { "aps": { "content-available": 1 } }
+  }
+}
+```
+
+`PushSender::sendData()`, via `PushService::dataToUsers()` and the
+`SendDataPush` job.
+
+**`priority: high` is what makes a ringing card possible.** A normal-priority
+data message is held until the phone next wakes on its own, which on a locked
+phone in a pocket can be minutes — long after the offer expired.
+
+**`direct_boot_ok`** delivers to an app that has not been opened since the
+phone was switched on. A rider who reboots at the start of a shift and does not
+open the app would otherwise receive nothing at all.
+
+**`ttl` is the offer window.** Past it, FCM drops the message rather than
+holding it for a phone that is switched off. A card delivered after its window
+is not late, it is wrong: it would ring for food another rider has collected.
+
+**`SendDataPush` has `tries = 1`**, unlike `SendPushNotification`'s three. A
+notification thirty seconds late is merely late. A ringing card thirty seconds
+late rings for an order somebody else has. The dispatch waves *are* the retry.
+
+### iOS will not ring for this
+
+A background push is throttled by the system and may be held for minutes, so a
+data message is the wrong tool for an offer on an iPhone. That needs a
+notification with a critical alert entitlement, or the call-style interface
+CallKit provides.
+
+The rider app ships on Android. The `apns` block above exists to be correct
+rather than to be used — `apns-push-type: background` with priority 5 is what
+Apple requires for a payload with no alert, and priority 10 there is rejected
+outright.
+
+### What the app has to do with it
+
+The data message **starts** the ring. It is not the source of truth about it:
+
+```
+GET /v1/rider/offers/current   →  { "data": null }  or the live card
+```
+
+Read on cold start and on resume from the background, because a data message
+can be dropped by the system, arrive twice, or land on a phone that was
+switched off. A rider staring at a card for an order somebody else collected
+ten minutes ago is worse than a rider who saw no card at all.
+
+Withdrawal is its own message:
+
+```json
+{ "type": "OFFER_CANCELLED", "order_id": "41", "reason": "taken" }
+```
+
+Dedupe on `offer_id`, and act on `OFFER_CANCELLED` for `order_id` whatever the
+card on screen came from.
 ## One notification per order, not one per stage
 
 Every message about an order carries a collapse key of `order-{id}` —

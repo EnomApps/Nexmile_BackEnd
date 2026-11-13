@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources;
 
-use App\Enums\OrderStatus;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -74,14 +73,21 @@ class RiderOrderResource extends JsonResource
              */
             'collect_cash' => $this->cashToCollect(),
 
-            // Only useful once assigned; it is what the merchant reads out.
-            'pickup_code_required' => $this->status === OrderStatus::RiderAssigned,
+            /*
+             * Only useful once assigned; it is what the merchant reads out.
+             * True from the moment the order is theirs until it is in the
+             * bag, including while the kitchen is still cooking — a rider
+             * who arrives early still collects with a code.
+             */
+            'pickup_code_required' => $this->rider_id !== null && $this->picked_up_at === null,
 
             'customer_note' => $this->customer_note,
             'placed_at' => $this->placed_at,
             'ready_at' => $this->ready_at,
             'assigned_at' => $this->assigned_at,
+            'reached_restaurant_at' => $this->reached_restaurant_at,
             'picked_up_at' => $this->picked_up_at,
+            'reached_customer_at' => $this->reached_customer_at,
             'delivered_at' => $this->delivered_at,
         ];
     }

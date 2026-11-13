@@ -2,6 +2,7 @@
 
 namespace App\Services\Orders;
 
+use App\Enums\DispatchStatus;
 use App\Enums\FulfilmentType;
 use App\Enums\OrderStatus;
 use App\Enums\RiderStatus;
@@ -31,6 +32,7 @@ class DispatchService
         protected NearbyMerchantService $geo,
         protected RiderPayoutService $payouts,
         protected ReferralService $referrals,
+        protected OfferDispatchService $offers,
     ) {}
 
     /**
@@ -104,7 +106,13 @@ class DispatchService
             ->whereKey($order->id)
             ->whereNull('rider_id')
             ->where('status', OrderStatus::ReadyForPickup->value)
-            ->update(['rider_id' => $rider->id]);
+            ->update([
+                'rider_id' => $rider->id,
+                // Written here too, so the customer's "finding a delivery
+                // partner" reads the same field whichever dispatch mode is
+                // running.
+                'dispatch_status' => DispatchStatus::Assigned->value,
+            ]);
 
         if ($claimed !== 1) {
             throw ValidationException::withMessages([
@@ -147,6 +155,30 @@ class DispatchService
     }
 
     /**
+     * The rider is at the restaurant.
+     *
+     * @throws ValidationException
+     */
+    public function reachRestaurant(Rider $rider, Order $order): Order
+    {
+        $this->guardAssignment($rider, $order);
+
+        return $this->status->markReachedRestaurant($order, $rider->user);
+    }
+
+    /**
+     * The rider is at the customer's door.
+     *
+     * @throws ValidationException
+     */
+    public function reachCustomer(Rider $rider, Order $order): Order
+    {
+        $this->guardAssignment($rider, $order);
+
+        return $this->status->markReachedCustomer($order, $rider->user);
+    }
+
+    /**
      * @throws ValidationException
      */
     public function pickUp(Rider $rider, Order $order, string $code): Order
@@ -173,7 +205,20 @@ class DispatchService
         $rider->update(['duty_status' => RiderStatus::Available]);
         rescue(fn () => $this->locations->setDutyStatus($rider->id, RiderStatus::Available->value), report: true);
 
-        return $released;
+        /*
+         * Straight back out to other riders. On the board this needs nothing
+         * — the order reappears on a list people are already polling. With
+         * offers, nobody is looking at anything, so an order handed back and
+         * not re-offered is an order that stops existing until a human
+         * notices.
+         *
+         * Rescued: the rider has handed the job back either way, and their
+         * screen must not show an error for something that is now our
+         * problem to solve.
+         */
+        rescue(fn () => $this->offers->redispatch($released->refresh()), report: true);
+
+        return $released->refresh();
     }
 
     /**

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1\Rider;
 
-use App\Enums\OrderStatus;
 use App\Enums\RiderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Rider;
@@ -11,6 +10,7 @@ use App\Services\LiveState\RiderLocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Rider GPS pings (EP9).
@@ -48,9 +48,41 @@ class LocationController extends Controller
              * falls back to arrival time, which is what it meant before.
              */
             'recorded_at' => ['sometimes', 'nullable', 'date'],
+
+            /*
+             * Android will tell us when a fix came from a mock provider,
+             * which is a rider sitting at home moving a pin down a road.
+             * Trusted from the client because there is nowhere else to
+             * learn it from — a determined faker can lie about this too,
+             * but they then have to patch the app rather than install one
+             * off the Play Store, which is a different kind of person.
+             */
+            'is_mock' => ['sometimes', 'boolean'],
         ]);
 
         $rider = $this->rider($request);
+
+        if ($data['is_mock'] ?? false) {
+            /*
+             * Dropped, not stored. A faked position would put this rider in
+             * dispatch near a restaurant they are nowhere near, and pay them
+             * a first mile they never rode.
+             *
+             * Logged at warning with the rider id, because one ping is a
+             * developer with a GPS spoofer still installed and a hundred is
+             * something to act on.
+             */
+            Log::warning('Rejected a mock GPS ping.', [
+                'rider_id' => $rider->id,
+                'latitude' => $data['latitude'],
+                'longitude' => $data['longitude'],
+            ]);
+
+            return response()->json([
+                'message' => 'Turn off mock locations to go on duty.',
+                'data' => ['tracking' => false, 'accepted' => false, 'mock_location' => true],
+            ], 422);
+        }
 
         if ($rider->duty_status === RiderStatus::Offline) {
             // Not an error the app should surface — it just stops tracking
@@ -119,9 +151,18 @@ class LocationController extends Controller
      */
     protected function noteArrival(Rider $rider, float $latitude, float $longitude): void
     {
+        /*
+         * Any order this rider is holding that has not been collected yet.
+         * Not keyed on \`rider_assigned\` any more: offer dispatch assigns a
+         * rider while the food is still cooking, so the order they are
+         * riding towards is often still \`preparing\` — and that is exactly
+         * the case where they wait at the counter and the waiting is worth
+         * the most to measure.
+         */
         $order = $rider->orders()
-            ->where('status', OrderStatus::RiderAssigned->value)
+            ->active()
             ->whereNull('arrived_at')
+            ->whereNull('picked_up_at')
             ->with('merchant:id,latitude,longitude')
             ->first();
 

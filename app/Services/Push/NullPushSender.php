@@ -16,4 +16,13 @@ class NullPushSender implements PushSender
     ): array {
         return [];
     }
+
+    public function sendData(
+        array $tokens,
+        array $data,
+        ?string $collapseKey = null,
+        ?int $ttlSeconds = null,
+    ): array {
+        return [];
+    }
 }
