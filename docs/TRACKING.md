@@ -56,16 +56,39 @@ worth of buffered positions is not news.
 {
   "status": "picked_up",
   "status_label": "On the way",
+  "dispatch_status": "assigned",
+  "dispatch_label": "Delivery partner assigned",
   "estimated_minutes": 8,
   "stale_after_seconds": 45,
   "route": "yzlcAkr}bMpG}C...",
   "rider": {
     "name": "Ravi", "phone": "98...", "vehicle_number": "TN58...",
+    "vehicle_type": "scooter",
     "latitude": 9.92, "longitude": 78.12, "heading": 135,
     "updated_at": "2026-11-09T10:15:30Z"
   }
 }
 ```
+
+### `dispatch_status` is a second column, not a later stage
+
+Where the search for a rider stands — `searching`, `assigned`,
+`no_rider_found`, `idle` — and a different question from where the food is. An
+order is `preparing` and `searching` at the same moment, because dispatch
+starts when the kitchen accepts.
+
+Null before dispatch has started, and null throughout when offers are switched
+off. `dispatch_label` is the same fact already translated.
+
+**`no_rider_found` is the one an app must not swallow.** The food is getting
+cold and nobody is coming for it. A customer watching a spinner will never
+learn that on their own, and the spinner looks exactly like `searching`.
+
+There is no rider photo and no vehicle model to show. `vehicle_type` is one of
+`bicycle`, `motorcycle`, `scooter`, `ev` — enough for the right icon. Rider
+photographs exist only as KYC documents in a private bucket, next to their
+Aadhaar; showing one to a customer would need a separate profile photo that a
+rider uploads for that purpose.
 
 **`rider.updated_at` is the fix time**, not the time of the request. Past
 `stale_after_seconds` since then, show "location updating" rather than a rider
@@ -76,18 +99,30 @@ Only the order's own customer may read it. Anyone else gets a 404.
 
 ### When the position is filled
 
-While the order is `rider_assigned` or `picked_up`, and not otherwise. After
-delivery the rider is still named and callable — a customer with a problem
-needs that — but `latitude`, `longitude` and `heading` go null and
-`estimated_minutes` goes null with them. Where a rider goes next is their own
-business.
+While the order is `rider_assigned`, `reached_restaurant`, `picked_up` or
+`reached_customer`, and not otherwise. After delivery the rider is still named
+and callable — a customer with a problem needs that — but `latitude`,
+`longitude` and `heading` go null and `estimated_minutes` goes null with them.
+Where a rider goes next is their own business.
+
+**The two arrival statuses are in that list deliberately.** They sit either
+side of pickup, and leaving them out made the rider vanish from the map for
+exactly as long as they stood at the counter and then again at the door — the
+two moments a customer watching a late delivery most wants to see somebody
+there.
 
 ### Which leg `route` draws
 
 | Order status | Line drawn | Why |
 |---|---|---|
 | Before pickup | restaurant → customer | The rider is riding the *other* way, to the kitchen. Drawing their path would show a line moving away from the person watching it. |
-| `picked_up` | rider → customer | Now they are the same journey. |
+| After pickup | rider → customer | Now they are the same journey. |
+
+Keyed on `picked_up_at` being set rather than on the status being `picked_up`,
+because `reached_customer` is also after pickup. Matching the one status sent a
+rider already standing at the door back through "ride to the kitchen, plus
+handover, plus the delivery", adding minutes to an estimate at the exact moment
+it should have been counting down to zero.
 
 `route` is Google's encoded overview polyline — the string form every map SDK
 draws directly. **Null is an ordinary answer**, not an error: routing switched

@@ -363,6 +363,17 @@ return [
         'cancelled' => 'ரத்து செய்யப்பட்டது',
     ],
 
+    /*
+     | Where the search for a rider stands. Separate from the order status
+     | on purpose: the kitchen and the dispatcher work at the same time.
+     */
+    'dispatch' => [
+        'searching' => 'டெலிவரி பார்ட்னரைத் தேடுகிறோம்',
+        'assigned' => 'டெலிவரி பார்ட்னர் ஒதுக்கப்பட்டார்',
+        'no_rider_found' => 'தற்போது டெலிவரி பார்ட்னர் கிடைக்கவில்லை',
+        'idle' => 'தேடவில்லை',
+    ],
+
     'surplus' => [
         'title' => 'உணவு மீட்பு',
         'intro' => 'மீதமான உணவை வீணாக்காமல் தள்ளுபடியில் விற்கவும். விலை, மீதமுள்ள அளவு, நேரம் ஆகியவற்றை அமைக்கவும் — வாடிக்கையாளர்களுக்கு நேரம் தெரியும், நேரம் முடிந்ததும் தானாக நிற்கும்.',

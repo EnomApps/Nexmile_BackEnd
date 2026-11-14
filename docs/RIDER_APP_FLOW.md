@@ -263,6 +263,8 @@ counts down, and takes itself down again.
   "dropoff_area": "Madurai",
   "delivery_distance_metres": "620",
   "item_count": "3",
+  "order_status": "accepted",
+  "estimated_prep_minutes": "20",
   "earnings": "34.50",
   "collect_cash": "430.00",
   "wave": "1"
@@ -270,7 +272,14 @@ counts down, and takes itself down again.
 ```
 
 **Every value is a string.** FCM data payloads are string-to-string; parse the
-numbers yourself.
+numbers yourself. An empty string is how a null arrives — `""` rather than the
+key being absent — because FCM has no null.
+
+**These are the same field names `GET /offers/current` returns**, so one parser
+reads both. That response is flat, holds every field above under the same name,
+and adds a few more. The only difference is the types: real numbers there,
+strings here. Parse through something tolerant of both rather than asserting a
+type, and the two paths stay one code path.
 
 **There is no customer address and no customer phone.** One offer goes to up to
 fifteen riders and fourteen of them will never touch this order. You get both
@@ -296,23 +305,34 @@ GET /rider/offers/current
   "data": {
     "offer_id": "01JCQ2W8XK3N4P5Q6R7S8T9V0W",
     "status": "pending",
+    "order_id": 41,
+    "order_number": "NX261113ABCD",
     "expires_at": "2026-11-13T18:42:31+00:00",
     "seconds_left": 24,
     "wave": 1,
-    "order": {
-      "id": 41, "order_number": "NX261113ABCD", "item_count": 3,
-      "order_value": 430, "collect_cash": 430, "delivery_distance_metres": 620,
-      "customer_note": "No onions",
-      "status": "accepted", "ready_at": null, "estimated_prep_minutes": 20
-    },
-    "pickup": { "name": "Ponnusamy Hotel", "area": "Madurai",
-                "latitude": 9.9195, "longitude": 78.1193,
-                "distance_metres": 240 },
-    "dropoff": { "area": "Madurai" },
-    "earnings": 34.5
+    "restaurant": "Ponnusamy Hotel",
+    "restaurant_area": "Madurai",
+    "restaurant_latitude": 9.9195,
+    "restaurant_longitude": 78.1193,
+    "pickup_distance_metres": 240,
+    "dropoff_area": "Madurai",
+    "delivery_distance_metres": 620,
+    "item_count": 3,
+    "order_status": "accepted",
+    "estimated_prep_minutes": 20,
+    "earnings": 34.5,
+    "collect_cash": 430,
+    "order_value": 430,
+    "ready_at": null,
+    "customer_note": "No onions"
   }
 }
 ```
+
+**Flat, and the same names as the push.** The last three are the only fields
+the push does not carry — a `customer_note` can be long and a push has a 4 KB
+ceiling. Everything else is field-for-field identical, and a test in the
+backend suite fails the build if that stops being true.
 
 `"data": null` means nothing is ringing. That is a **200**, not a 404 — "you
 have no offer" is a question with an answer.
@@ -322,10 +342,11 @@ be dropped by the system, arrive twice, or land on a phone that was switched
 off. A rider staring at a card for an order somebody else collected ten minutes
 ago is worse than a rider who saw no card at all.
 
-Note `order.status` can be `accepted` or `preparing` — **the food may still be
+Note `order_status` can be `accepted` or `preparing` — **the food may still be
 cooking when the offer goes out**, deliberately, so the rider travels while it
 cooks. `estimated_prep_minutes` is there to tell the rider the wait is expected
-rather than a problem.
+rather than a problem; it is in the push too, so the card can say it before
+anything is fetched.
 
 ### Accepting
 
@@ -409,9 +430,26 @@ POST /rider/location   { ..., "is_mock": true }   →  422
 
 Send `is_mock` from `Location.isFromMockProvider`. A faked position would put
 the rider into dispatch near a restaurant they are nowhere near and pay them a
-first mile they never rode, so the server drops the ping and the response
-carries `data.mock_location: true`. Show the rider that mock locations have to
-be off.
+first mile they never rode, so the server drops the ping.
+
+```json
+{
+  "message": "Turn off mock locations to go on duty.",
+  "errors": { "is_mock": ["Turn off mock locations to go on duty."] },
+  "data": { "tracking": false, "accepted": false, "mock_location": true }
+}
+```
+
+Shaped like every other 422 this API returns as well as carrying the flag, so
+no special case is needed to read it. Test `data.mock_location` if you want to
+tell this apart from an ordinary validation failure.
+
+**The rider is left on duty.** The ping is dropped, so their position goes
+stale and their geo entry expires on its own — which takes them out of
+dispatch without taking them off a shift they may be honestly working. A
+spoofer app left installed from last week looks exactly like this. Show the
+rider that mock locations have to be off; they will otherwise sit online
+receiving nothing and have no idea why.
 
 ## 9b. Order board
 
@@ -549,9 +587,19 @@ mid-shift loses an active delivery.
 `403` carries a `message` written to be shown verbatim — "Your licence or
 insurance has expired" cannot be guessed from the status code.
 
-**Language.** `Accept-Language: ta`, `hi` or `en`; persist via
-`PATCH /profile` → `preferred_locale`. Tamil matters most here — many riders
-will not read English comfortably.
+**Language — you have to do both.** `Accept-Language: ta`, `hi` or `en` sets
+the language of API responses (`status_label`, error messages). `PATCH
+/profile` → `preferred_locale` sets the language of **notifications**.
+
+They are separate because a notification is rendered inside a queue worker
+long after the request that caused it, and a worker has no header to read. So
+sending only the header gives Tamil screens and English notifications, and
+nothing anywhere reports a problem. Send the header on every request and write
+the choice to the profile when the rider picks it.
+
+A language we hold no translations for falls back to English rather than
+failing. Tamil matters most here — many riders will not read English
+comfortably.
 
 ## What to build now
 

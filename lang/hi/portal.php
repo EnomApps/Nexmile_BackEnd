@@ -363,6 +363,17 @@ return [
         'cancelled' => 'रद्द',
     ],
 
+    /*
+     | Where the search for a rider stands. Separate from the order status
+     | on purpose: the kitchen and the dispatcher work at the same time.
+     */
+    'dispatch' => [
+        'searching' => 'डिलीवरी पार्टनर खोज रहे हैं',
+        'assigned' => 'डिलीवरी पार्टनर नियुक्त',
+        'no_rider_found' => 'अभी कोई डिलीवरी पार्टनर उपलब्ध नहीं है',
+        'idle' => 'खोज नहीं रहे',
+    ],
+
     'surplus' => [
         'title' => 'फ़ूड रेस्क्यू',
         'intro' => 'बचा हुआ खाना फेंकने के बजाय छूट पर बेचें। कीमत, बचे हुए हिस्से और अवधि तय करें — ग्राहकों को समय दिखता है और अवधि खत्म होते ही ऑफ़र अपने आप बंद हो जाता है।',

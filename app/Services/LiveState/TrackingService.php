@@ -76,6 +76,9 @@ class TrackingService
         return array_merge([
             'name' => $order->rider?->full_name,
             'vehicle_number' => $order->rider?->vehicle_number,
+            // bicycle | motorcycle | scooter | ev — enough to draw the right
+            // icon. There is no model and no photo on a rider; see RiderResource.
+            'vehicle_type' => $order->rider?->vehicle_type,
             'phone' => $order->rider?->user?->phone,
             'latitude' => null,
             'longitude' => null,
@@ -96,7 +99,9 @@ class TrackingService
     {
         $carrying = in_array($order->status, [
             OrderStatus::RiderAssigned,
+            OrderStatus::ReachedRestaurant,
             OrderStatus::PickedUp,
+            OrderStatus::ReachedCustomer,
         ], true);
 
         if (! $carrying || $order->rider_id === null) {
@@ -171,8 +176,15 @@ class TrackingService
             'to_lng' => (float) $order->delivery_longitude,
         ];
 
-        // Carrying the food: the rider's own path is the delivery.
-        if ($order->status === OrderStatus::PickedUp && $position !== null) {
+        /*
+         * Carrying the food: the rider's own path is the delivery.
+         *
+         * Keyed on the handover having happened rather than on one status,
+         * because `reached_customer` is also after pickup — matching the
+         * status alone would draw the kitchen-to-door leg again for a rider
+         * already standing at the door.
+         */
+        if ($order->picked_up_at !== null && $position !== null) {
             return $destination + [
                 'from_lat' => $position['latitude'],
                 'from_lng' => $position['longitude'],
@@ -292,7 +304,7 @@ class TrackingService
         }
 
         // Carrying it: the drawn leg is the whole remaining journey.
-        if ($order->status === OrderStatus::PickedUp) {
+        if ($order->picked_up_at !== null) {
             return $this->atLeastOne($this->legMinutes($order, $position, $route));
         }
 

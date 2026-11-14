@@ -288,17 +288,44 @@ flight. It reads Redis and falls back to MySQL.
 
 ```
 placed → accepted → preparing → ready_for_pickup
-       → rider_assigned → picked_up → delivered
+       → rider_assigned → reached_restaurant
+       → picked_up → reached_customer → delivered
 ```
 
 Plus `rejected` and `cancelled`. Both carry `cancellation_reason` meant to be
 shown **verbatim** — the merchant wrote it for the customer.
 
-Returns `estimated_prep_minutes` once accepted, the lifecycle timestamps, the
-`pickup_code`, and rider name and vehicle number once one is assigned.
+`reached_restaurant` and `reached_customer` are optional stages a rider may
+skip, so **drive the screen from the status you were given, never from the
+assumption that the previous one happened.** The rider stays on the map
+through both.
 
-Rider assignment and live rider location are built. `rider` fills in once one
-accepts the job, and the order runs through to `delivered`.
+Returns `estimated_prep_minutes` once accepted, the lifecycle timestamps, the
+`pickup_code`, and rider name, vehicle number and vehicle type once one is
+assigned.
+
+### `dispatch_status` — the search for a rider
+
+A second column beside `status`, not a later stage in it. An order is
+`preparing` and `searching` at the same moment, because the hunt for a rider
+starts when the kitchen accepts rather than when the food is ready.
+
+| `dispatch_status` | Show |
+|---|---|
+| `searching` | "Finding a delivery partner" — `dispatch_label` says it, translated |
+| `assigned` | the rider's card; this is when `rider` fills in |
+| `no_rider_found` | **a real message, not a spinner** |
+| `idle`, or `null` | nothing. Not started, or offers are switched off |
+
+**`no_rider_found` is the one not to swallow.** The food is cooked and nobody
+is coming for it. Operations get an alert and will usually assign a rider by
+hand within a minute or two — so this is "taking longer than usual, we are on
+it", not a dead end and not a cancellation. A customer left watching the same
+spinner they saw during `searching` learns none of that.
+
+`dispatch_label` is the same fact already translated into the language the
+request asked for, so the app does not have to carry the copy in three
+languages itself.
 
 ### Map pins
 

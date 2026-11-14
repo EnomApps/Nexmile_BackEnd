@@ -90,7 +90,7 @@ class OfferDispatchService
          * a retried job, a release that walks the status back through
          * ready_for_pickup on its way to being re-dispatched properly.
          */
-        $startable = [null, DispatchStatus::Idle->value, DispatchStatus::NoRiderFound->value];
+        $startable = [null, DispatchStatus::Idle, DispatchStatus::NoRiderFound];
 
         if (! in_array($order->dispatch_status, $startable, true)) {
             return;
@@ -291,6 +291,21 @@ class OfferDispatchService
      *
      * @return array<string, string>
      */
+    /**
+     * The ringing card, as flat strings.
+     *
+     * FCM data payloads are string-to-string and flat, so every value is
+     * cast — a number here makes FCM reject the whole message.
+     *
+     * **Every key must also exist in `RiderOfferResource` under the same
+     * name and meaning.** The app parses the push and `GET /offers/current`
+     * with one parser, so a name that differs between the two is a card
+     * drawn wrong in exactly one of the paths — the harder one to notice,
+     * because the push path only runs on a real device. A test asserts the
+     * subset; `type` is the message envelope and is excluded from it.
+     *
+     * @return array<string, string>
+     */
     public function offerPayload(Order $order, RiderOffer $offer): array
     {
         return [
@@ -318,6 +333,15 @@ class OfferDispatchService
             'delivery_distance_metres' => (string) ($order->distance_metres ?? ''),
 
             'item_count' => (string) $order->loadMissing('items')->items->sum('quantity'),
+
+            /*
+             * The kitchen's state, so the card can say "food ready in about
+             * 12 min" rather than leaving the rider to find out at the
+             * counter. An offer goes out when the merchant accepts, which is
+             * before anything is cooked.
+             */
+            'order_status' => (string) $order->status->value,
+            'estimated_prep_minutes' => (string) ($order->estimated_prep_minutes ?? ''),
             'earnings' => (string) $this->earnings($order),
             'collect_cash' => (string) $order->cashToCollect(),
             'wave' => (string) $offer->wave,

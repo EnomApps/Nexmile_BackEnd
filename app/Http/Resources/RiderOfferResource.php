@@ -9,11 +9,22 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * One ringing order card, over HTTP.
  *
- * The same facts as the push payload, in proper types rather than the flat
- * strings FCM is limited to. The app fetches this when it starts cold, when
- * it comes back from the background, and whenever it wants to be sure the
- * card on screen is still real — the push message starts the ring, this is
- * the source of truth about it.
+ * The app fetches this when it starts cold, when it comes back from the
+ * background, and whenever it wants to be sure the card on screen is still
+ * real — the push message starts the ring, this is the source of truth about
+ * it.
+ *
+ * **Flat, and deliberately the same field names as the push payload.** The
+ * app parses both with one parser, so a nested shape here would mean two
+ * parsers for one card and a second place for the card to be drawn wrong.
+ * Every key `OfferDispatchService::offerPayload()` sends appears here under
+ * the same name and the same meaning; this response carries a few extra that
+ * are too long or too private to put in a 4 KB push. A test asserts the
+ * subset holds, because the two drift the moment nothing is watching.
+ *
+ * The types are real here — numbers are numbers — where FCM allows only
+ * strings. That is the one difference, and the reason the app should parse
+ * through a tolerant cast rather than a direct type assertion.
  *
  * No customer address and no customer phone, same as the push payload. A
  * rider who is only being asked has not been trusted with where somebody
@@ -31,6 +42,8 @@ class RiderOfferResource extends JsonResource
         return [
             'offer_id' => $this->ulid,
             'status' => $this->status,
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
 
             /*
              * Both are given. `expires_at` is what the countdown should run
@@ -43,38 +56,27 @@ class RiderOfferResource extends JsonResource
             'seconds_left' => $this->secondsLeft(),
             'wave' => $this->wave,
 
-            'order' => [
-                'id' => $order->id,
-                'order_number' => $order->order_number,
-                'item_count' => (int) $order->items->sum('quantity'),
-                'order_value' => (float) $order->grand_total,
-                'collect_cash' => $order->cashToCollect(),
-                'delivery_distance_metres' => $order->distance_metres,
-                'customer_note' => $order->customer_note,
+            // Where the food is.
+            'restaurant' => $order->merchant?->business_name,
+            'restaurant_area' => $order->merchant?->city,
+            'restaurant_latitude' => $order->merchant?->latitude !== null ? (float) $order->merchant->latitude : null,
+            'restaurant_longitude' => $order->merchant?->longitude !== null ? (float) $order->merchant->longitude : null,
+            'pickup_distance_metres' => $this->distance_metres,
 
-                /*
-                 * The kitchen's state, because it decides what the rider
-                 * does next. Offered at acceptance, the food is still being
-                 * cooked — a rider who rides straight there waits at the
-                 * counter, and should be told the wait is expected.
-                 */
-                'status' => $order->status,
-                'ready_at' => $order->ready_at,
-                'estimated_prep_minutes' => $order->estimated_prep_minutes,
-            ],
+            // The drop area, not the drop address. Enough to judge the job.
+            'dropoff_area' => $order->delivery_city,
+            'delivery_distance_metres' => $order->distance_metres,
 
-            'pickup' => [
-                'name' => $order->merchant?->business_name,
-                'area' => $order->merchant?->city,
-                'latitude' => $order->merchant?->latitude !== null ? (float) $order->merchant->latitude : null,
-                'longitude' => $order->merchant?->longitude !== null ? (float) $order->merchant->longitude : null,
-                'distance_metres' => $this->distance_metres,
-            ],
+            'item_count' => (int) $order->items->sum('quantity'),
 
-            // Area only, until it is theirs.
-            'dropoff' => [
-                'area' => $order->delivery_city,
-            ],
+            /*
+             * The kitchen's state, because it decides what the rider does
+             * next. Offered at acceptance, the food is still being cooked —
+             * a rider who rides straight there waits at the counter, and
+             * should be told the wait is expected.
+             */
+            'order_status' => $order->status,
+            'estimated_prep_minutes' => $order->estimated_prep_minutes,
 
             /*
              * Quoted with the code that settles it, so a rider is never
@@ -87,6 +89,12 @@ class RiderOfferResource extends JsonResource
                 round((float) $order->delivery_fee, 2),
                 report: false,
             ),
+            'collect_cash' => $order->cashToCollect(),
+
+            // HTTP only. Too long for a push payload with a 4 KB ceiling.
+            'order_value' => (float) $order->grand_total,
+            'ready_at' => $order->ready_at,
+            'customer_note' => $order->customer_note,
         ];
     }
 }

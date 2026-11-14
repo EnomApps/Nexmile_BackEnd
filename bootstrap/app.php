@@ -37,6 +37,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             SetLocale::class,
         ]);
+
+        /*
+         * The apps get the same treatment from Accept-Language. Without this
+         * every API response is English regardless of what the phone asked
+         * for — a token request has no session, so the portal path above
+         * never fires for it, and the Tamil and Hindi files sit there unused
+         * with nothing failing anywhere.
+         */
+        $middleware->api(append: [
+            SetLocale::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         /*

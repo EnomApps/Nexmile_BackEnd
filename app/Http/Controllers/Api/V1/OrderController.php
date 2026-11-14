@@ -85,6 +85,22 @@ class OrderController extends Controller
                 'order_number' => $model->order_number,
                 'status' => $status,
                 'status_label' => __('portal.status.'.$status->value),
+
+                /*
+                 * Where the search for a rider stands, which is a different
+                 * question from where the food is — an order is `preparing`
+                 * and `searching` at the same moment. Null before dispatch
+                 * starts, or when offers are switched off.
+                 *
+                 * `no_rider_found` is the one the app must not swallow: the
+                 * food is getting cold and nobody is coming for it, and a
+                 * customer watching a spinner will not learn that on their own.
+                 */
+                'dispatch_status' => $model->dispatch_status,
+                'dispatch_label' => $model->dispatch_status === null
+                    ? null
+                    : __('portal.dispatch.'.$model->dispatch_status->value),
+
                 'estimated_prep_minutes' => $model->estimated_prep_minutes,
                 'accepted_at' => $model->accepted_at,
                 'ready_at' => $model->ready_at,

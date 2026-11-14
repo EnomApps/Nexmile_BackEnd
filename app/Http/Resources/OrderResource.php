@@ -17,6 +17,18 @@ class OrderResource extends JsonResource
             'order_number' => $this->order_number,
             'status' => $this->status,
             'status_label' => __('portal.status.'.$this->status->value),
+
+            /*
+             * Where the search for a rider stands, which is a different
+             * question from where the food is. An order can be `preparing`
+             * and `searching` at the same moment, and null before dispatch
+             * has started or when offers are switched off entirely.
+             */
+            'dispatch_status' => $this->dispatch_status,
+            'dispatch_label' => $this->dispatch_status === null
+                ? null
+                : __('portal.dispatch.'.$this->dispatch_status->value),
+
             'fulfilment_type' => $this->fulfilment_type,
 
             'customer_name' => $this->delivery_contact_name ?? $this->whenLoaded('customer', fn () => $this->customer?->name),

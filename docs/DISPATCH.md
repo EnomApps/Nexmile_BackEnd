@@ -66,9 +66,20 @@ addresses and the first-mile credit; the status stays with the kitchen until
 `ready`, at which point it moves straight to `rider_assigned` because somebody
 is already standing there.
 
-The customer app reads `dispatch_status === 'searching'` for *"finding a
-delivery partner"*. It is written in **both** dispatch modes, so that screen
-does not have to know which one is running.
+### Who can see it
+
+Published on `GET /v1/orders/{id}` and `GET /v1/orders/{id}/track`, as
+`dispatch_status` plus a translated `dispatch_label`. It is written in **both**
+dispatch modes, so the customer's screen does not have to know which one is
+running.
+
+The customer app reads `searching` for *"finding a delivery partner"* and
+`no_rider_found` for a real message rather than the same spinner. Without the
+second one there is no way for an app to tell a slow search from a failed one,
+and a customer sits watching a spinner over food nobody is coming for.
+
+Riders never see it. It is the dispatcher's own state, and a rider has no
+question it answers.
 
 ## Board or push
 

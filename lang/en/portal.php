@@ -363,6 +363,17 @@ return [
         'cancelled' => 'Cancelled',
     ],
 
+    /*
+     | Where the search for a rider stands. Separate from the order status
+     | on purpose: the kitchen and the dispatcher work at the same time.
+     */
+    'dispatch' => [
+        'searching' => 'Finding a delivery partner',
+        'assigned' => 'Delivery partner assigned',
+        'no_rider_found' => 'No delivery partner available right now',
+        'idle' => 'Not searching',
+    ],
+
     'surplus' => [
         'title' => 'Food Rescue',
         'intro' => 'Sell surplus food at a discount instead of throwing it away. Set a price, how many portions are left and how long the offer runs — customers see a countdown, and the deal closes itself.',

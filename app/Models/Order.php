@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DispatchStatus;
 use App\Enums\FulfilmentType;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
@@ -23,6 +24,7 @@ class Order extends Model
     {
         return [
             'status' => OrderStatus::class,
+            'dispatch_status' => DispatchStatus::class,
             'fulfilment_type' => FulfilmentType::class,
             'delivery_latitude' => 'decimal:7',
             'delivery_longitude' => 'decimal:7',

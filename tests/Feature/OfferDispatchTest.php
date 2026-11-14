@@ -9,6 +9,7 @@ use App\Enums\OrderStatus;
 use App\Enums\RiderStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Http\Resources\RiderOfferResource;
 use App\Jobs\CloseDispatchWave;
 use App\Models\Merchant;
 use App\Models\Order;
@@ -173,7 +174,7 @@ class OfferDispatchTest extends DispatchTest
 
         $order = $this->acceptedOrder();
 
-        $this->assertSame(DispatchStatus::Searching->value, $order->fresh()->dispatch_status);
+        $this->assertSame(DispatchStatus::Searching, $order->fresh()->dispatch_status);
         $this->assertSame(1, $order->fresh()->dispatch_wave);
 
         $this->assertEqualsCanonicalizing(
@@ -214,6 +215,82 @@ class OfferDispatchTest extends DispatchTest
 
         // The area is there, because a rider needs to judge the job.
         $this->assertSame($order->delivery_city, $card['dropoff_area']);
+    }
+
+    public function test_the_push_card_and_the_http_card_use_one_set_of_field_names(): void
+    {
+        /*
+         * The app parses the push payload and GET /offers/current with one
+         * parser, because they are one card. A field named differently in the
+         * two is a card drawn wrong down exactly one of the paths — and it
+         * would be the push path, which only runs on a real device and so
+         * fails where nobody is looking.
+         *
+         * The push is allowed to carry fewer fields: it has a 4 KB ceiling
+         * and no business holding a customer note. It is not allowed to carry
+         * a field under another name, or one the HTTP card has never heard of.
+         */
+        $this->withDevice($this->rider());
+
+        $sender = $this->recordingSender();
+
+        $order = $this->acceptedOrder();
+        $offer = RiderOffer::where('order_id', $order->id)->firstOrFail();
+
+        $pushed = array_keys($this->payloadOfType($sender, 'ORDER_OFFER'));
+        $http = array_keys((new RiderOfferResource($offer->load('order.merchant', 'order.items')))
+            ->toArray(request()));
+
+        // `type` is the message envelope, not a fact about the order.
+        $missing = array_diff($pushed, $http, ['type']);
+
+        $this->assertSame([], array_values($missing), sprintf(
+            'These push fields have no counterpart in RiderOfferResource: %s',
+            implode(', ', $missing),
+        ));
+
+        // The two the Flutter side went looking for and did not find.
+        $this->assertContains('estimated_prep_minutes', $pushed);
+        $this->assertContains('order_status', $pushed);
+    }
+
+    public function test_the_http_card_is_flat_so_one_parser_reads_both(): void
+    {
+        // A nested shape here would mean two parsers for one card.
+        $this->withDevice($this->rider());
+
+        $order = $this->acceptedOrder();
+        $offer = RiderOffer::where('order_id', $order->id)->firstOrFail();
+
+        $card = (new RiderOfferResource($offer->load('order.merchant', 'order.items')))
+            ->toArray(request());
+
+        foreach ($card as $field => $value) {
+            $this->assertIsNotArray($value, "`{$field}` is nested; the offer card is flat.");
+        }
+    }
+
+    public function test_the_http_card_keeps_the_customers_address_and_phone_out_of_it(): void
+    {
+        /*
+         * Asserted separately from the push payload. The two are built by
+         * different code, and the privacy rule has to hold in both — an
+         * offer goes to up to fifteen phones either way.
+         */
+        $this->withDevice($this->rider());
+
+        $order = $this->acceptedOrder();
+        $offer = RiderOffer::where('order_id', $order->id)->firstOrFail();
+
+        $rider = $offer->rider;
+        Sanctum::actingAs($rider->user);
+
+        $response = $this->getJson('/api/v1/rider/offers/current')->assertOk();
+        $flat = strtolower(json_encode($response->json('data')));
+
+        $this->assertStringNotContainsString(strtolower($order->delivery_line1), $flat);
+        $this->assertStringNotContainsString((string) $order->delivery_contact_phone, $flat);
+        $this->assertSame($order->delivery_city, $response->json('data.dropoff_area'));
     }
 
     public function test_the_card_expires_on_the_servers_clock_not_the_apps(): void
@@ -312,7 +389,7 @@ class OfferDispatchTest extends DispatchTest
         $order->refresh();
 
         $this->assertSame($winner->id, $order->rider_id);
-        $this->assertSame(DispatchStatus::Assigned->value, $order->dispatch_status);
+        $this->assertSame(DispatchStatus::Assigned, $order->dispatch_status);
         $this->assertNotNull($order->assigned_at);
     }
 
@@ -483,7 +560,7 @@ class OfferDispatchTest extends DispatchTest
         );
 
         $this->assertSame(2, $order->fresh()->dispatch_wave);
-        $this->assertSame(DispatchStatus::Searching->value, $order->fresh()->dispatch_status);
+        $this->assertSame(DispatchStatus::Searching, $order->fresh()->dispatch_status);
     }
 
     public function test_the_same_rider_is_not_rung_twice_for_one_order(): void
@@ -522,7 +599,7 @@ class OfferDispatchTest extends DispatchTest
 
         $order->refresh();
 
-        $this->assertSame(DispatchStatus::NoRiderFound->value, $order->dispatch_status);
+        $this->assertSame(DispatchStatus::NoRiderFound, $order->dispatch_status);
         $this->assertNotNull($order->dispatch_failed_at);
 
         // And still not cancelled: the food exists and somebody has to decide
@@ -565,7 +642,7 @@ class OfferDispatchTest extends DispatchTest
 
         app(OfferDispatchService::class)->closeWave($order->refresh(), 1);
 
-        $this->assertSame(DispatchStatus::Assigned->value, $order->fresh()->dispatch_status);
+        $this->assertSame(DispatchStatus::Assigned, $order->fresh()->dispatch_status);
         $this->assertSame($rider->id, $order->fresh()->rider_id);
     }
 
@@ -636,13 +713,15 @@ class OfferDispatchTest extends DispatchTest
 
         $data = $this->getJson('/api/v1/rider/offers/current')->assertOk()->json('data');
 
-        $this->assertSame($order->id, $data['order']['id']);
+        $this->assertSame($order->id, $data['order_id']);
         $this->assertGreaterThan(0, $data['seconds_left']);
         $this->assertNotNull($data['expires_at']);
-        $this->assertSame('Ponnusamy Hotel', $data['pickup']['name']);
+        $this->assertSame('Ponnusamy Hotel', $data['restaurant']);
 
-        // Still no address, same as the push payload.
-        $this->assertArrayNotHasKey('address', $data['dropoff']);
+        // Still the area and nothing finer, same as the push payload.
+        $this->assertSame($order->delivery_city, $data['dropoff_area']);
+        $this->assertArrayNotHasKey('dropoff_address', $data);
+        $this->assertArrayNotHasKey('delivery_line1', $data);
     }
 
     public function test_no_card_ringing_is_a_successful_answer(): void
@@ -720,7 +799,7 @@ class OfferDispatchTest extends DispatchTest
         $order->refresh();
 
         $this->assertNull($order->rider_id);
-        $this->assertSame(DispatchStatus::Searching->value, $order->dispatch_status);
+        $this->assertSame(DispatchStatus::Searching, $order->dispatch_status);
 
         // Including back to the rider who gave it up, because time has passed
         // and the reason they could not take it may have gone with it.
@@ -870,7 +949,7 @@ class OfferDispatchTest extends DispatchTest
 
         // The dispatch state is still recorded, so the customer's "finding a
         // delivery partner" reads one field in both modes.
-        $this->assertSame(DispatchStatus::Searching->value, $order->fresh()->dispatch_status);
+        $this->assertSame(DispatchStatus::Searching, $order->fresh()->dispatch_status);
     }
 
     // ------------------------------------------------------------- ops escape
@@ -951,7 +1030,7 @@ class OfferDispatchTest extends DispatchTest
 
         $this->postJson("/api/v1/admin/dispatch/{$order->id}/retry")->assertOk();
 
-        $this->assertSame(DispatchStatus::Searching->value, $order->fresh()->dispatch_status);
+        $this->assertSame(DispatchStatus::Searching, $order->fresh()->dispatch_status);
         $this->assertSame(1, $order->fresh()->dispatch_wave);
         $this->assertTrue(RiderOffer::where('order_id', $order->id)->where('rider_id', $rider->id)->exists());
     }

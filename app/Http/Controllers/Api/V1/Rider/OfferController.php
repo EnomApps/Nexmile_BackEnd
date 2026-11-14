@@ -64,7 +64,10 @@ class OfferController extends Controller
 
         return response()->json([
             'message' => 'Order accepted. Head to the restaurant.',
-            'data' => new RiderOrderResource($order->load('merchant', 'items', 'customer')),
+            // Loaded to match GET /rider/orders/{order} exactly, options
+            // included: the app puts this response straight onto the delivery
+            // screen rather than fetching the order again.
+            'data' => new RiderOrderResource($order->load('merchant', 'items.options', 'customer')),
         ]);
     }
 

@@ -78,8 +78,22 @@ class LocationController extends Controller
                 'longitude' => $data['longitude'],
             ]);
 
+            /*
+             * Shaped like every other 422 this API returns, as well as
+             * carrying the flag. A client that reads `errors` for validation
+             * failures should not need a special case for this one, and the
+             * app had written one — which is how a contract quietly grows a
+             * second way of saying the same thing.
+             *
+             * The rider is left on duty. The ping is dropped, so their
+             * position goes stale and the geo entry expires on its own,
+             * which takes them out of dispatch without taking them off a
+             * shift they may be honestly working — a spoofer app left
+             * installed from last week looks exactly like this.
+             */
             return response()->json([
                 'message' => 'Turn off mock locations to go on duty.',
+                'errors' => ['is_mock' => ['Turn off mock locations to go on duty.']],
                 'data' => ['tracking' => false, 'accepted' => false, 'mock_location' => true],
             ], 422);
         }

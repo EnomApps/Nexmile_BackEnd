@@ -347,4 +347,133 @@ class LiveTrackingTest extends DispatchTest
         Sanctum::actingAs($this->customer());
         $this->getJson("/api/v1/orders/{$order->id}/track")->assertNotFound();
     }
+
+    // ------------------------------------------------- waiting, and arriving
+
+    public function test_the_rider_stays_on_the_map_while_they_wait_at_the_counter(): void
+    {
+        /*
+         * `reached_restaurant` sits between assigned and picked up. Gating
+         * the position on a list of statuses that did not include it made the
+         * rider vanish from the customer's map for exactly as long as they
+         * stood at the counter — which is the part of a late delivery a
+         * customer most wants to see.
+         */
+        $this->positionIs();
+        [$order, $customer, $rider] = $this->assignedOrder();
+
+        Sanctum::actingAs($rider->user);
+        $this->postJson("/api/v1/rider/orders/{$order->id}/reached-restaurant")->assertOk();
+
+        Sanctum::actingAs($customer);
+        $this->getJson("/api/v1/orders/{$order->id}/track")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'reached_restaurant')
+            ->assertJsonPath('data.rider.latitude', self::RIDER_LAT);
+    }
+
+    public function test_the_rider_stays_on_the_map_while_they_stand_at_the_door(): void
+    {
+        $this->positionIs();
+        [$order, $customer, $rider] = $this->assignedOrder();
+        $this->pickUp($order, $rider);
+
+        Sanctum::actingAs($customer);
+        $carrying = $this->getJson("/api/v1/orders/{$order->id}/track")->assertOk();
+
+        Sanctum::actingAs($rider->user);
+        $this->postJson("/api/v1/rider/orders/{$order->id}/reached-customer")->assertOk();
+
+        Sanctum::actingAs($customer);
+        $atDoor = $this->getJson("/api/v1/orders/{$order->id}/track")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'reached_customer')
+            ->assertJsonPath('data.rider.latitude', self::RIDER_LAT);
+
+        /*
+         * And the estimate does not grow at the door. Both of these are the
+         * same journey from the same position — the rider to the customer —
+         * so they must be the same number. Keying the drawn leg on the
+         * `picked_up` status alone instead of on the handover having happened
+         * sent this branch back through "rider rides to the kitchen, plus
+         * handover, plus the delivery", quietly adding minutes to an order
+         * whose rider was already outside the door.
+         */
+        $this->assertSame(
+            $carrying->json('data.estimated_minutes'),
+            $atDoor->json('data.estimated_minutes'),
+        );
+    }
+
+    // --------------------------------------------------------- the dispatcher
+
+    public function test_the_customer_is_told_that_a_rider_is_being_looked_for(): void
+    {
+        /*
+         * A different question from where the food is: an order is
+         * `preparing` and `searching` at the same moment. Without this the
+         * app can only show a spinner, and `no_rider_found` — food going cold
+         * with nobody coming for it — looks identical to it.
+         */
+        $this->positionIs();
+        $order = $this->readyOrder();
+
+        Sanctum::actingAs($order->customer);
+        $this->getJson("/api/v1/orders/{$order->id}/track")
+            ->assertOk()
+            ->assertJsonPath('data.dispatch_status', 'searching')
+            ->assertJsonPath('data.dispatch_label', 'Finding a delivery partner');
+    }
+
+    public function test_the_dispatch_state_turns_to_assigned_when_a_rider_takes_it(): void
+    {
+        $this->positionIs();
+        [$order, $customer] = $this->assignedOrder();
+
+        Sanctum::actingAs($customer);
+        $this->getJson("/api/v1/orders/{$order->id}/track")
+            ->assertOk()
+            ->assertJsonPath('data.dispatch_status', 'assigned');
+    }
+
+    public function test_a_phone_asking_for_tamil_is_answered_in_tamil(): void
+    {
+        /*
+         * The API ignored Accept-Language entirely: the locale middleware ran
+         * only on the web group and read the session, which a token request
+         * does not have. So every app response was English however the phone
+         * was set, with lang/ta sitting there unused and nothing failing
+         * anywhere — the exact shape of bug a fallback hides.
+         */
+        $this->positionIs();
+        [$order, $customer] = $this->assignedOrder();
+
+        Sanctum::actingAs($customer);
+
+        $english = $this->getJson("/api/v1/orders/{$order->id}/track")
+            ->assertOk()
+            ->json('data.status_label');
+
+        $tamil = $this->getJson("/api/v1/orders/{$order->id}/track", [
+            // Quality values and a region, as a real phone sends them.
+            'Accept-Language' => 'ta-IN,ta;q=0.9,en;q=0.8',
+        ])->assertOk()->json('data.status_label');
+
+        $this->assertSame(__('portal.status.rider_assigned', [], 'en'), $english);
+        $this->assertSame(__('portal.status.rider_assigned', [], 'ta'), $tamil);
+        $this->assertNotSame($english, $tamil);
+    }
+
+    public function test_a_language_we_do_not_have_falls_back_rather_than_failing(): void
+    {
+        $this->positionIs();
+        [$order, $customer] = $this->assignedOrder();
+
+        Sanctum::actingAs($customer);
+        $this->getJson("/api/v1/orders/{$order->id}/track", [
+            'Accept-Language' => 'fr-CA,fr;q=0.9',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status_label', __('portal.status.rider_assigned', [], 'en'));
+    }
 }

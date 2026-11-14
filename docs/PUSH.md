@@ -17,11 +17,37 @@ like a broken integration. That is not hypothetical; it cost a round trip.
 | `order.ready` | ✅ | | | Food is ready for collection |
 | `order.offer` | | | ✅ | A ready order needs a rider |
 | `order.rider_assigned` | ✅ | ✅ | | A rider took the job |
+| `order.rider_waiting` | | ✅ | | The rider is at the counter |
 | `order.picked_up` | ✅ | | | Food left the restaurant |
+| `order.rider_outside` | ✅ | | | The rider is at the door |
 | `order.delivered` | ✅ | | | Handed over |
 | `order.cancelled` | ✅ | | | Cancelled after acceptance |
+| `ORDER_OFFER` | | | ✅ | A rider is being rung for an order (data only) |
+| `OFFER_CANCELLED` | | | ✅ | That card is withdrawn (data only) |
+| `rider.auto_offline` | | | ✅ | Three offers rung out; the rider is off duty |
+| `order.no_rider` | | ✅ | | Every wave failed. The shop has to be told |
+| `test` | ✅ | ✅ | ✅ | `nexmile:test-push` only. Never from a real event |
 
-**The customer app receives seven of the nine.** `order.placed` is the "new
+**This table is the full list of `data.type` values**, which is a question the
+app side has had to ask. Nothing else is sent, and a type not in this table
+arriving on a device is a bug rather than something to handle.
+
+Everything here is a notification message except the two in capitals, which
+are data-only and are the ringing card. The naming is inconsistent on purpose — the spec
+these were built from named them that way, and quietly renaming a field in a
+contract somebody has already coded against is worse than an ugly pair of
+conventions.
+
+**`order.offer` and `ORDER_OFFER` are different things.** The first is the
+board — "a ready order needs a rider", sent when `DISPATCH_MODE=board`. The
+second is the ringing card, sent when it is `push`. Only one mode runs at a
+time, so a rider build should handle both and will see one.
+
+**Every message carries `data.order_id`** except `rider.auto_offline`, which
+is about the rider rather than an order, and `test`. So an app can open the
+order screen from any of the rest without checking which type it was.
+
+**The customer app receives eight of them.** `order.placed` is the "new
 order in your kitchen" alert for a shop whose tablet is on a shelf, and
 `order.offer` is the one that justifies the whole feature — an order going cold
 until a rider's phone rings.
@@ -89,6 +115,8 @@ blank tray entry and never call the app.
     "restaurant": "Ponnusamy Hotel",
     "restaurant_latitude": "9.9195",
     "dropoff_area": "Madurai",
+    "order_status": "accepted",
+    "estimated_prep_minutes": "12",
     "earnings": "34.50",
     "collect_cash": "420.00"
   },
@@ -102,6 +130,24 @@ blank tray entry and never call the app.
 
 `PushSender::sendData()`, via `PushService::dataToUsers()` and the
 `SendDataPush` job.
+
+**Every value is a string.** FCM data payloads are string-to-string, and a
+number anywhere in there makes FCM reject the whole message rather than the
+one field.
+
+**The field names are the same as `GET /v1/rider/offers/current`**, which
+returns the same card flat, in real types, with a few extra fields that are
+too long or too private for a 4 KB push. The app parses both with one parser,
+so a name that differs between the two draws the card wrong down exactly one
+path — the push path, which only runs on a real device and so fails where
+nobody is watching. A test asserts every pushed field exists in
+`RiderOfferResource`; `type` is the envelope and is excluded.
+
+**`order_status` and `estimated_prep_minutes` are in there because the card
+goes out before the food exists.** Dispatch starts when the merchant accepts,
+so a rider who rides straight over waits at the counter. A card that can say
+"ready in about 12 min" is the difference between an expected wait and a rider
+who thinks the shop is messing them about.
 
 **`priority: high` is what makes a ringing card possible.** A normal-priority
 data message is held until the phone next wakes on its own, which on a locked
@@ -183,6 +229,21 @@ rider offer with them.
 
 Every notification is written in the recipient's own language, from
 `users.preferred_locale` — not the sender's, and not the server default.
+
+**A push cannot use `Accept-Language`, and an API response cannot use
+`preferred_locale`.** They are two different mechanisms for one setting, and
+the split catches people out:
+
+| | Language comes from |
+|---|---|
+| API responses — `status_label`, error messages | the request's `Accept-Language` header |
+| Notifications | the recipient's `users.preferred_locale` |
+
+A notification is rendered inside a queue worker with no request to read a
+header from, which is why it cannot use the header. So **an app offering a
+language picker has to do both**: send the header, and `PATCH /v1/profile`
+with `preferred_locale`. Doing only the first gives Tamil screens and English
+notifications, and nothing anywhere reports a problem.
 
 This is the one thing in here that is easy to get wrong without noticing. A
 notification is rendered inside a queue worker, long after the request that
