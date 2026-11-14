@@ -324,6 +324,28 @@ php artisan nexmile:test-push <user-id|phone|email> --app=customer --now
 Reports exactly what FCM returned. `--now` sends inline, bypassing the queue —
 if that works and the queued path does not, the worker is the problem.
 
+### Run it as the PHP-FPM user
+
+The service account key is chmod 600 and owned by the PHP-FPM user, so
+**`--now` as `ubuntu` cannot read it** and fails with "Permission denied".
+That is the file permissions working, not push being broken: the queue worker
+runs as the owner and sends perfectly well.
+
+```bash
+sudo -u www-data php artisan nexmile:test-push <user> --app=rider --now
+```
+
+**A bare `--now` that succeeds is not proof the key is readable.** The OAuth
+access token is cached for fifty minutes, so once the worker has minted one,
+any user who can reach the cache sends happily without ever opening the file —
+and the same command then fails an hour later with nothing having changed. The
+command now says so when it happens, rather than printing a cheerful "Sent."
+
+This bit once already: `is_file()` was standing in for "readable" in the
+preflight, so the command reported a readable key and failed on the next line.
+A diagnostic that lies is worse than no diagnostic, because it sends the person
+reading it somewhere else entirely.
+
 The three failures worth recognising:
 
 **`UNREGISTERED`** / **`INVALID_ARGUMENT`** on the token — the install is gone.

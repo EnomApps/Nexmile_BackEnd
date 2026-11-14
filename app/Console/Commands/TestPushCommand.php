@@ -39,11 +39,9 @@ class TestPushCommand extends Command
             );
 
             $this->check(
-                $credentials !== null && is_file($credentials),
+                $credentials !== null && is_file($credentials) && is_readable($credentials),
                 'Credentials file readable',
-                $credentials === null
-                    ? 'FCM_CREDENTIALS is not set'
-                    : (is_file($credentials) ? $credentials : "not found at {$credentials}"),
+                $this->credentialsDetail($credentials),
             );
 
             /*
@@ -114,6 +112,20 @@ class TestPushCommand extends Command
                 // worker's log where nobody is looking.
                 $push->deliver([$user->id], $app, $key, [], $data);
                 $this->line('  <fg=green;options=bold>Sent.</> Check the device.');
+
+                /*
+                 * A success here does not prove this user can read the key.
+                 * The access token is cached for fifty minutes, so once the
+                 * worker has minted one, anybody who can reach the cache
+                 * sends happily without ever opening the file — and then the
+                 * same command fails an hour later for no visible reason.
+                 */
+                if ($credentials !== null && ! is_readable((string) $credentials)) {
+                    $this->line('');
+                    $this->line('  <fg=yellow>Sent on a cached access token, not on the key file —</>');
+                    $this->line('  <fg=yellow>which this user cannot read. It will fail once the</>');
+                    $this->line('  <fg=yellow>cached token expires. Fix the permissions above.</>');
+                }
             } else {
                 $push->toUser($user, $app, $key, [], $data);
                 $this->line('  <fg=green;options=bold>Queued.</> It sends when a worker picks it up —');
@@ -131,6 +143,52 @@ class TestPushCommand extends Command
         $this->line('');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Why the service account file cannot be read, in the words of whoever
+     * has to fix it.
+     *
+     * `is_file()` alone was the test here, and it passes happily for a file
+     * the current user cannot open — so the command reported a readable key
+     * and then failed on the very next line with "Permission denied", in the
+     * one command whose whole job is to explain why push is not working.
+     *
+     * The file is deliberately chmod 600 and owned by the PHP-FPM user, so
+     * running this as anybody else is the ordinary way to arrive here rather
+     * than a misconfiguration.
+     */
+    private function credentialsDetail(?string $path): string
+    {
+        if ($path === null) {
+            return 'FCM_CREDENTIALS is not set';
+        }
+
+        if (! is_file($path)) {
+            return "not found at {$path}";
+        }
+
+        if (! is_readable($path)) {
+            return sprintf(
+                '%s cannot be read by %s — it belongs to %s, so run this with sudo -u %s',
+                $path,
+                function_exists('posix_geteuid') ? $this->userName(posix_geteuid()) : 'this user',
+                $owner = $this->userName(fileowner($path) ?: 0),
+                $owner,
+            );
+        }
+
+        return $path;
+    }
+
+    /** A uid as the name a person would type, falling back to the number. */
+    private function userName(int $uid): string
+    {
+        if (! function_exists('posix_getpwuid')) {
+            return (string) $uid;
+        }
+
+        return posix_getpwuid($uid)['name'] ?? (string) $uid;
     }
 
     private function check(bool $ok, string $label, string $detail): void
