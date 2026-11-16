@@ -37,6 +37,15 @@ use Illuminate\View\View;
  */
 class RiderController extends Controller
 {
+    /**
+     * The most points either trail view will draw.
+     *
+     * A map the browser cannot render is no more honest than a truncated
+     * one, so the view is told when it has hit this rather than quietly
+     * showing part of a day as though it were all of it.
+     */
+    private const TRAIL_LIMIT = 2000;
+
     /** Columns an admin may sort by, mapped to how it is actually done. */
     private const SORTS = [
         'name' => 'full_name',
@@ -158,15 +167,52 @@ class RiderController extends Controller
     public function show(Request $request, Rider $rider): View
     {
         $data = $request->validate([
+            'scope' => ['sometimes', 'in:order,day'],
+            'order' => ['sometimes', 'nullable', 'integer'],
             'date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
         ]);
 
         $rider->load(['user:id,name,phone,email,status,preferred_locale,created_at', 'zone:id,name']);
         $rider->loadCount(['warnings as counting_warnings' => fn ($q) => $q->counting()]);
 
+        /*
+         * The trail is shown one delivery at a time unless an admin
+         * deliberately asks for a whole day.
+         *
+         * A day includes the hours between orders — a rider on duty and
+         * idle, which is where they eat, where they wait and plausibly
+         * where they live. None of that is needed to answer the question
+         * this trail exists for, which is always about a specific order:
+         * did the rider reach this address, and when. Scoping to the order
+         * answers that completely and exposes almost nothing else.
+         *
+         * The wide view is kept rather than removed. "Where was this rider
+         * all afternoon" is a legitimate question when somebody is being
+         * paid for a shift that produced nothing — it is just not the
+         * default, so looking at an idle rider's whole day is a decision
+         * somebody made rather than the screen they happened to land on.
+         */
+        $trailOrders = $this->trailOrders($rider);
+        $scope = $data['scope'] ?? 'order';
+
         $date = isset($data['date'])
             ? Carbon::parse($data['date'])->startOfDay()
             : Carbon::now()->startOfDay();
+
+        if ($scope === 'day') {
+            $trail = $this->trailForDay($rider, $date);
+            $trailOrderId = null;
+        } else {
+            /*
+             * Defaults to the most recent delivery with anything recorded,
+             * because that is overwhelmingly the one being asked about.
+             */
+            $trailOrderId = isset($data['order'])
+                ? (int) $data['order']
+                : $trailOrders->first()?->order_id;
+
+            $trail = $this->trailForOrder($rider, $trailOrderId);
+        }
 
         return view('admin.riders.show', [
             'rider' => $rider,
@@ -186,7 +232,10 @@ class RiderController extends Controller
             'performance' => $this->performance($rider),
             'earnings' => $this->earnings($rider),
             'sessions' => $this->sessions($rider),
-            'trail' => $this->trail($rider, $date),
+            'trail' => $trail,
+            'trailScope' => $scope,
+            'trailOrders' => $trailOrders,
+            'trailOrderId' => $trailOrderId,
             'trailDays' => $this->trailDays($rider),
             'trailDate' => $date,
             'retentionDays' => (int) config('tracking.history.retention_days'),
@@ -486,7 +535,69 @@ class RiderController extends Controller
     }
 
     /**
-     * One day of the rider's kept trail.
+     * The deliveries there is a trail for, newest first.
+     *
+     * The picker for the default view. Built from the pings rather than from
+     * the orders, because an order with nothing recorded against it has no
+     * trail to offer and listing it only invites a click that shows nothing.
+     *
+     * @return Collection<int, object>
+     */
+    protected function trailOrders(Rider $rider): Collection
+    {
+        $rows = $rider->locationPings()
+            ->whereNotNull('order_id')
+            ->selectRaw('order_id, COUNT(*) as points, MIN(recorded_at) as started_at, MAX(recorded_at) as ended_at')
+            ->groupBy('order_id')
+            ->orderByDesc('started_at')
+            ->limit(50)
+            ->get();
+
+        $orders = Order::whereIn('id', $rows->pluck('order_id'))
+            ->get(['id', 'order_number', 'status', 'delivered_at'])
+            ->keyBy('id');
+
+        return $rows->map(function ($row) use ($orders) {
+            $row->order = $orders->get($row->order_id);
+            $row->started_at = Carbon::parse($row->started_at);
+            $row->ended_at = Carbon::parse($row->ended_at);
+
+            return $row;
+        });
+    }
+
+    /**
+     * The trail for one delivery — the default, and the narrow view.
+     *
+     * Scoped through the rider's own pings rather than queried by order id
+     * alone, so a guessed or pasted id belonging to somebody else returns
+     * nothing instead of another rider's movements.
+     *
+     * @return array<string, mixed>
+     */
+    protected function trailForOrder(Rider $rider, ?int $orderId): array
+    {
+        if ($orderId === null) {
+            return $this->noTrail('order', null);
+        }
+
+        $points = $rider->locationPings()
+            ->where('order_id', $orderId)
+            ->orderBy('recorded_at')
+            ->limit(self::TRAIL_LIMIT + 1)
+            ->get(['order_id', 'latitude', 'longitude', 'heading', 'speed', 'accuracy_metres', 'recorded_at']);
+
+        return [
+            'scope' => 'order',
+            'order_id' => $orderId,
+            'points' => $points->take(self::TRAIL_LIMIT),
+            'truncated' => $points->count() > self::TRAIL_LIMIT,
+            'limit' => self::TRAIL_LIMIT,
+        ];
+    }
+
+    /**
+     * One whole day — the wide view, only reached deliberately.
      *
      * Capped. A full shift at twenty metres a point is a few thousand rows
      * for a rider who covered real ground, and a map the browser cannot draw
@@ -495,20 +606,32 @@ class RiderController extends Controller
      *
      * @return array<string, mixed>
      */
-    protected function trail(Rider $rider, Carbon $date): array
+    protected function trailForDay(Rider $rider, Carbon $date): array
     {
-        $limit = 2000;
-
         $points = $rider->locationPings()
             ->whereBetween('recorded_at', [$date->copy()->startOfDay(), $date->copy()->endOfDay()])
             ->orderBy('recorded_at')
-            ->limit($limit + 1)
+            ->limit(self::TRAIL_LIMIT + 1)
             ->get(['order_id', 'latitude', 'longitude', 'heading', 'speed', 'accuracy_metres', 'recorded_at']);
 
         return [
-            'points' => $points->take($limit),
-            'truncated' => $points->count() > $limit,
-            'limit' => $limit,
+            'scope' => 'day',
+            'order_id' => null,
+            'points' => $points->take(self::TRAIL_LIMIT),
+            'truncated' => $points->count() > self::TRAIL_LIMIT,
+            'limit' => self::TRAIL_LIMIT,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    protected function noTrail(string $scope, ?int $orderId): array
+    {
+        return [
+            'scope' => $scope,
+            'order_id' => $orderId,
+            'points' => collect(),
+            'truncated' => false,
+            'limit' => self::TRAIL_LIMIT,
         ];
     }
 

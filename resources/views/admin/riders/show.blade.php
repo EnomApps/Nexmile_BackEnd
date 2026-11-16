@@ -384,17 +384,35 @@
             <div>
                 <h2 class="font-semibold text-white">Where they went</h2>
                 <p class="mt-1 text-sm text-gray-500 max-w-2xl leading-relaxed">
-                    Kept for {{ $retentionDays }} days, then deleted — this is
-                    personal data about somebody's working day, so the period is
-                    a commitment rather than however long the table grew.
-                    Only fixes that moved the rider more than
-                    {{ config('tracking.history.min_metres') }} m are stored, so a
-                    rider standing still is one point, not hundreds.
+                    One delivery at a time. Kept for {{ $retentionDays }} days,
+                    then deleted — this is personal data about somebody's
+                    working day, so the period is a commitment rather than
+                    however long the table grew. Only fixes that moved the
+                    rider more than {{ config('tracking.history.min_metres') }} m
+                    are stored, so a rider standing still is one point, not
+                    hundreds.
                 </p>
             </div>
 
-            @if ($trailDays->isNotEmpty())
+            {{-- The picker is a list of deliveries, not a calendar. The
+                 question this trail answers is always about an order. --}}
+            @if ($trailScope === 'order' && $trailOrders->isNotEmpty())
                 <form method="GET" class="flex items-end gap-2 shrink-0">
+                    <div>
+                        <label for="order" class="block text-xs text-gray-500 mb-1.5">Delivery</label>
+                        <select id="order" name="order" class="{{ $input }}" onchange="this.form.submit()">
+                            @foreach ($trailOrders as $candidate)
+                                <option value="{{ $candidate->order_id }}" @selected((int) $trailOrderId === (int) $candidate->order_id)>
+                                    {{ $candidate->order?->order_number ?? '#'.$candidate->order_id }}
+                                    — {{ $candidate->started_at->format('d M, H:i') }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </form>
+            @elseif ($trailScope === 'day' && $trailDays->isNotEmpty())
+                <form method="GET" class="flex items-end gap-2 shrink-0">
+                    <input type="hidden" name="scope" value="day">
                     <div>
                         <label for="date" class="block text-xs text-gray-500 mb-1.5">Day</label>
                         <select id="date" name="date" class="{{ $input }}" onchange="this.form.submit()">
@@ -409,6 +427,26 @@
             @endif
         </div>
 
+        {{-- Switching to the whole day is a deliberate act, and says what it
+             will show before it shows it. A day includes the hours between
+             orders, which is where a rider eats, waits and plausibly lives —
+             none of it needed to settle a question about a delivery. --}}
+        <div class="mt-4">
+            @if ($trailScope === 'day')
+                <div class="rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-200 px-4 py-3 text-sm">
+                    Showing a whole day, including the time between orders.
+                    <a href="{{ route('admin.riders.show', $rider) }}" class="underline hover:text-white">
+                        Back to one delivery
+                    </a>
+                </div>
+            @elseif ($trailDays->isNotEmpty())
+                <a href="{{ route('admin.riders.show', [$rider, 'scope' => 'day', 'date' => $trailDate->toDateString()]) }}"
+                   class="text-xs text-gray-600 hover:text-gray-400">
+                    Show a whole day instead — includes time between orders
+                </a>
+            @endif
+        </div>
+
         @unless ($historyEnabled)
             <p class="mt-4 rounded-lg bg-amber-400/10 border border-amber-400/30 text-amber-200 px-4 py-3 text-sm">
                 Trail recording is switched off — <code>TRACKING_HISTORY_ENABLED</code> is false.
@@ -418,12 +456,18 @@
 
         @if ($trail['points']->isEmpty())
             <p class="mt-5 text-sm text-gray-600">
-                Nothing recorded on {{ $trailDate->format('D d M Y') }}.
+                @if ($trailScope === 'day')
+                    Nothing recorded on {{ $trailDate->format('D d M Y') }}.
+                @elseif ($trailOrders->isEmpty())
+                    No trail recorded against any of this rider's deliveries yet.
+                @else
+                    Nothing recorded against that delivery.
+                @endif
             </p>
         @else
             @if ($trail['truncated'])
                 <p class="mt-4 rounded-lg bg-white/[0.03] border border-white/10 text-gray-400 px-4 py-2.5 text-xs">
-                    Showing the first {{ $trail['limit'] }} points of this day. There are more.
+                    Showing the first {{ $trail['limit'] }} points. There are more.
                 </p>
             @endif
 

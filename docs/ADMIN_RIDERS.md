@@ -100,7 +100,40 @@ actually start work — becomes unanswerable.
 
 ## Location history
 
-`rider_location_pings`. This is the one genuinely new thing on the page.
+`rider_location_pings`. This is the one genuinely new thing on the page, and
+the only part of it that is a power rather than a view: everything else an
+admin sees here, the rider can also see in their own app. The trail is the one
+thing they cannot check.
+
+### One delivery at a time
+
+**The default view is a single order, not a day.** A day includes the hours
+between orders — a rider on duty and idle, which is where they eat, where they
+wait and plausibly where they live. None of that is needed to answer the
+question this trail exists for, which is always about a specific delivery: did
+the rider reach this address, and when. Scoping to the order answers that
+completely and exposes almost nothing else.
+
+The picker is therefore a list of deliveries, built from the pings rather than
+from the orders — an order with nothing recorded against it has no trail to
+offer, and listing it only invites a click that shows nothing.
+
+The whole-day view is kept, behind `?scope=day`, with a banner saying what it
+includes. "Where was this rider all afternoon" is a fair question when somebody
+is being paid for a shift that produced nothing. It is just not the screen an
+admin lands on, so looking at an idle rider's whole day is a decision somebody
+made rather than a default they drifted into.
+
+Both views are scoped through `$rider->locationPings()` rather than queried by
+order id alone, so a guessed or pasted order id belonging to another rider
+returns nothing instead of somebody else's movements. There is a test for that.
+
+### Tell riders it exists
+
+Not covered by code, and the most important part. A line in the rider app and
+in their terms. The DPDP Act requires notice anyway, but the practical reason
+is sharper: a tracking feature riders discover by accident costs more trust
+than the feature was ever worth.
 
 Live positions live in Redis, latest only, because dispatch asks "who is near
 this restaurant now" and never "where was this rider at 14:30". That answered
@@ -206,7 +239,7 @@ rather than a field.
 
 ## Tests
 
-`tests/Feature/AdminRiderManagementTest.php`, 22 tests. The ones that matter
+`tests/Feature/AdminRiderManagementTest.php`, 26 tests. The ones that matter
 most are not about the page:
 
 - a ping that moved is kept; ten pings from a parked bike write nothing
@@ -215,3 +248,13 @@ most are not about the page:
 - a mock-GPS ping leaves no trail
 - the pruner deletes past retention, refuses zero days, and dry-runs clean
 - the server Maps key is never rendered into the page
+- the trail defaults to one delivery; a whole day needs asking for
+- an order id belonging to another rider returns nothing
+
+## Known limits
+
+**Every admin is the same admin.** `role:admin` is a single level, so a support
+hire and the owner can see identical things, and nothing records which admin
+opened which rider's trail. Fine while the team is one person. The day it
+isn't, a support role that can read orders and earnings but not open a trail —
+and an access log — is the gap to close.

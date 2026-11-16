@@ -536,7 +536,79 @@ class AdminRiderManagementTest extends TestCase
         $this->assertDatabaseCount('rider_location_pings', 0);
     }
 
-    public function test_the_trail_shown_is_the_day_that_was_asked_for(): void
+    public function test_the_trail_shows_one_delivery_rather_than_a_whole_day(): void
+    {
+        $rider = $this->rider();
+        $order = $this->order($rider, OrderStatus::Delivered, ['delivered_at' => now()->subHour()]);
+
+        // On the delivery.
+        RiderLocationPing::create([
+            'rider_id' => $rider->id,
+            'order_id' => $order->id,
+            'latitude' => 9.9252,
+            'longitude' => 78.1197,
+            'recorded_at' => now()->subHours(2),
+        ]);
+
+        /*
+         * Idle, between orders. This is the point the narrow view exists to
+         * leave out: where a rider waits is where they eat, and plausibly
+         * where they live, and none of it is needed to answer a question
+         * about a delivery.
+         */
+        RiderLocationPing::create([
+            'rider_id' => $rider->id,
+            'order_id' => null,
+            'latitude' => 9.9400,
+            'longitude' => 78.1400,
+            'recorded_at' => now()->subMinutes(30),
+        ]);
+
+        $response = $this->actingAs($this->admin())
+            ->get("/admin/riders/{$rider->id}")
+            ->assertOk();
+
+        $this->assertSame('order', $response->viewData('trailScope'));
+
+        $points = $response->viewData('trail')['points'];
+
+        $this->assertCount(1, $points);
+        $this->assertSame($order->id, $points->first()->order_id);
+    }
+
+    public function test_a_whole_day_is_shown_only_when_it_is_asked_for(): void
+    {
+        $rider = $this->rider();
+        $order = $this->order($rider, OrderStatus::Delivered, ['delivered_at' => now()->subHour()]);
+
+        RiderLocationPing::create([
+            'rider_id' => $rider->id,
+            'order_id' => $order->id,
+            'latitude' => 9.9252,
+            'longitude' => 78.1197,
+            'recorded_at' => now()->subHours(2),
+        ]);
+
+        RiderLocationPing::create([
+            'rider_id' => $rider->id,
+            'order_id' => null,
+            'latitude' => 9.9400,
+            'longitude' => 78.1400,
+            'recorded_at' => now()->subMinutes(30),
+        ]);
+
+        // Kept, not removed: "where was this rider all afternoon" is fair
+        // when somebody is being paid for a shift that produced nothing. It
+        // is just a decision somebody makes rather than the default screen.
+        $response = $this->actingAs($this->admin())
+            ->get("/admin/riders/{$rider->id}?scope=day&date=".now()->toDateString())
+            ->assertOk();
+
+        $this->assertSame('day', $response->viewData('trailScope'));
+        $this->assertCount(2, $response->viewData('trail')['points']);
+    }
+
+    public function test_the_day_asked_for_is_the_day_returned(): void
     {
         $rider = $this->rider();
 
@@ -554,15 +626,68 @@ class AdminRiderManagementTest extends TestCase
             'recorded_at' => now()->setTime(9, 30),
         ]);
 
-        $yesterdayish = now()->subDays(2)->toDateString();
+        $earlier = now()->subDays(2)->toDateString();
 
         $trail = $this->actingAs($this->admin())
-            ->get("/admin/riders/{$rider->id}?date={$yesterdayish}")
+            ->get("/admin/riders/{$rider->id}?scope=day&date={$earlier}")
             ->assertOk()
             ->viewData('trail');
 
         $this->assertCount(1, $trail['points']);
         $this->assertSame('10:15', $trail['points']->first()->recorded_at->format('H:i'));
+    }
+
+    public function test_one_riders_trail_cannot_be_read_through_another_riders_page(): void
+    {
+        $watched = $this->rider();
+        $other = $this->rider(['full_name' => 'Anbu R']);
+
+        $othersOrder = $this->order($other, OrderStatus::Delivered, ['delivered_at' => now()]);
+
+        RiderLocationPing::create([
+            'rider_id' => $other->id,
+            'order_id' => $othersOrder->id,
+            'latitude' => 13.0827,
+            'longitude' => 80.2707,
+            'recorded_at' => now()->subMinutes(20),
+        ]);
+
+        /*
+         * The order id is guessable and pasteable, so the scoping has to be
+         * through the rider's own pings rather than a query by order alone.
+         */
+        $trail = $this->actingAs($this->admin())
+            ->get("/admin/riders/{$watched->id}?order={$othersOrder->id}")
+            ->assertOk()
+            ->viewData('trail');
+
+        $this->assertCount(0, $trail['points']);
+    }
+
+    public function test_the_delivery_picker_lists_only_orders_with_something_recorded(): void
+    {
+        $rider = $this->rider();
+
+        $withTrail = $this->order($rider, OrderStatus::Delivered, ['delivered_at' => now()]);
+        $withoutTrail = $this->order($rider, OrderStatus::Delivered, ['delivered_at' => now()]);
+
+        RiderLocationPing::create([
+            'rider_id' => $rider->id,
+            'order_id' => $withTrail->id,
+            'latitude' => 9.9252,
+            'longitude' => 78.1197,
+            'recorded_at' => now()->subHour(),
+        ]);
+
+        $orders = $this->actingAs($this->admin())
+            ->get("/admin/riders/{$rider->id}")
+            ->assertOk()
+            ->viewData('trailOrders');
+
+        // Listing an order with no trail only invites a click that shows
+        // nothing, and makes the page look broken rather than empty.
+        $this->assertSame([$withTrail->id], $orders->pluck('order_id')->map(fn ($id) => (int) $id)->all());
+        $this->assertNotContains($withoutTrail->id, $orders->pluck('order_id')->all());
     }
 
     // ------------------------------------------------------------- retention
