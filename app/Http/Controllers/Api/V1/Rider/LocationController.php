@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Rider;
 use App\Enums\RiderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Rider;
+use App\Models\RiderLocationPing;
 use App\Services\Discovery\NearbyMerchantService;
 use App\Services\LiveState\RiderLocationService;
 use Illuminate\Http\JsonResponse;
@@ -137,9 +138,18 @@ class LocationController extends Controller
         $this->noteArrival($rider, (float) $data['latitude'], (float) $data['longitude']);
 
         /*
+         * Read before the row below overwrites it. The trail writer decides
+         * by how far the rider has moved since the last kept fix, and after
+         * the save there is nothing left to compare against.
+         */
+        $previousLatitude = $rider->last_latitude !== null ? (float) $rider->last_latitude : null;
+        $previousLongitude = $rider->last_longitude !== null ? (float) $rider->last_longitude : null;
+
+        /*
          * Also written to MySQL, but only as a fallback for the board after a
-         * Redis restart. This is a single indexed row update per ping, not a
-         * history — the trail is not worth the write volume.
+         * Redis restart. This is a single indexed row update per ping, latest
+         * only — the trail is a separate table written by recordTrail(), and
+         * deliberately not one row per ping.
          */
         $rider->forceFill([
             'last_latitude' => $data['latitude'],
@@ -147,10 +157,78 @@ class LocationController extends Controller
             'last_location_at' => $recordedAt,
         ])->save();
 
+        $this->recordTrail($rider, $data, $recordedAt, $previousLatitude, $previousLongitude);
+
         return response()->json([
             'message' => 'Location updated.',
             'data' => ['tracking' => true, 'accepted' => true],
         ]);
+    }
+
+    /**
+     * Keep this fix, if it says anything the last kept one did not.
+     *
+     * Everything about this method is about not writing. The app pings every
+     * ten seconds while carrying, and a rider standing at a counter for a
+     * quarter of an hour is ninety rows that all say the same thing — which
+     * is the write rate that kept any trail from being stored at all until
+     * now. So a fix is kept only once the rider has moved
+     * `tracking.history.min_metres`; the first fix of a shift is always kept,
+     * because there is nothing yet to compare it against.
+     *
+     * Never allowed to fail the ping. A trail is read afterwards and by one
+     * admin; a rejected ping takes a rider out of dispatch now. A broken
+     * write here must cost a row and nothing else.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function recordTrail(
+        Rider $rider,
+        array $data,
+        Carbon $recordedAt,
+        ?float $previousLatitude,
+        ?float $previousLongitude,
+    ): void {
+        if (! config('tracking.history.enabled')) {
+            return;
+        }
+
+        if ($previousLatitude !== null && $previousLongitude !== null) {
+            $moved = app(NearbyMerchantService::class)->distance(
+                $previousLatitude,
+                $previousLongitude,
+                (float) $data['latitude'],
+                (float) $data['longitude'],
+            );
+
+            if ($moved < (float) config('tracking.history.min_metres')) {
+                return;
+            }
+        }
+
+        rescue(function () use ($rider, $data, $recordedAt) {
+            RiderLocationPing::create([
+                'rider_id' => $rider->id,
+                /*
+                 * Which delivery this belonged to, resolved now rather than
+                 * inferred from timestamps later. A fix taken seconds either
+                 * side of a handover is otherwise guesswork, and those are
+                 * precisely the ones somebody comes back to ask about.
+                 *
+                 * Only queried for a fix that is being kept, so the gate
+                 * above pays for this query too.
+                 */
+                'order_id' => $rider->orders()->active()->value('id'),
+                'latitude' => $data['latitude'],
+                'longitude' => $data['longitude'],
+                'heading' => $data['heading'] ?? null,
+                'speed' => $data['speed'] ?? null,
+                'accuracy_metres' => isset($data['accuracy_metres'])
+                    ? (int) round((float) $data['accuracy_metres'])
+                    : null,
+                'recorded_at' => $recordedAt,
+            ]);
+        }, report: true);
     }
 
     /**

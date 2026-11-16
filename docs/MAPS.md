@@ -115,3 +115,23 @@ Rotate it. In Google Cloud Console → APIs & Services → Credentials, create a
 replacement, restrict it, deploy it, then delete the old one. Restriction
 limits the damage but does not undo the disclosure, and rotating costs two
 minutes.
+
+---
+
+## The browser key
+
+`GOOGLE_MAPS_BROWSER_KEY` — for maps drawn in a page rather than called from
+the server. The admin rider page is the only consumer today.
+
+It **cannot** be `GOOGLE_MAPS_SERVER_KEY`. That key is restricted to the
+backend's IP address, which a browser request can never satisfy; and a key used
+in a page is public by construction, so it is restricted by **HTTP referrer**
+and granted only the **Maps JavaScript API**. Rendering the server key into a
+page would publish a key carrying Directions and Distance Matrix to anybody who
+viewed the source, with the billing attached.
+
+Unset, the admin rider page shows coordinates and a link out to Google Maps and
+says why there is no map. Nothing breaks.
+
+Restrict it to the admin host only — not a wildcard — and give it its own daily
+quota cap, because a key in a page is a key anybody can copy.

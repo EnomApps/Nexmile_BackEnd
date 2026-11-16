@@ -45,6 +45,24 @@ return [
      */
     'google_maps' => [
         'key' => env('GOOGLE_MAPS_SERVER_KEY'),
+
+        /*
+         * A second key, for maps drawn in a browser rather than called from
+         * the server.
+         *
+         * It has to be a different key, not a convenience. The server key is
+         * restricted to this machine's IP address, which a browser request
+         * can never satisfy; a key that works in a browser is necessarily
+         * visible in the page, so it is restricted by HTTP referrer instead
+         * and given only the Maps JavaScript API. Putting the server key in
+         * a page would publish a key with Directions and Distance Matrix on
+         * it to anybody who opened the source.
+         *
+         * Optional. Unset, the admin rider page shows coordinates and a link
+         * out to Google Maps instead of an embedded map, which answers the
+         * same question with one more click.
+         */
+        'browser_key' => env('GOOGLE_MAPS_BROWSER_KEY'),
     ],
 
     'slack' => [

@@ -6,6 +6,7 @@ use App\Http\Controllers\Web\Admin\DashboardController;
 use App\Http\Controllers\Web\Admin\MerchandisingController;
 use App\Http\Controllers\Web\Admin\ReviewModerationController;
 use App\Http\Controllers\Web\Admin\RiderConductController;
+use App\Http\Controllers\Web\Admin\RiderController as AdminRiderController;
 use App\Http\Controllers\Web\LanguageController;
 use App\Http\Controllers\Web\MerchantEarningsController;
 use App\Http\Controllers\Web\MerchantMenuController;
@@ -265,6 +266,30 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/', [AdminOrderController::class, 'index'])->name('index');
             Route::get('{order}', [AdminOrderController::class, 'show'])->name('show');
             Route::post('{order}/cancel', [AdminOrderController::class, 'cancel'])->name('cancel');
+        });
+
+        /*
+         * Rider management.
+         *
+         * Registered before the {type}/{id} catch-all below, deliberately:
+         * admin/riders/{id} used to be the verification screen, and now
+         * reaches the full rider page — which carries the document review
+         * with it, so nothing was lost by taking the URL. Merchants still
+         * use the catch-all, and the POST actions under it still serve both.
+         */
+        Route::prefix('riders')->name('riders.')->group(function () {
+            Route::get('/', [AdminRiderController::class, 'index'])->name('index');
+
+            Route::get('{rider}', [AdminRiderController::class, 'show'])
+                ->whereNumber('rider')->name('show');
+
+            /*
+             * Polled by the rider page while an admin watches somebody move.
+             * Its own endpoint so that following a rider does not re-run the
+             * earnings and performance queries every few seconds.
+             */
+            Route::get('{rider}/position', [AdminRiderController::class, 'position'])
+                ->whereNumber('rider')->name('position');
         });
 
         Route::get('{type}/{id}', [AdminController::class, 'show'])

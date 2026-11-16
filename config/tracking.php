@@ -122,4 +122,45 @@ return [
      * the rider backwards across the customer's map.
      */
     'max_ping_age_seconds' => 120,
+
+    /*
+     * The rider's trail, for the admin rider page.
+     *
+     * Dispatch never needs this — it asks who is near a restaurant now, and
+     * Redis answers that from the latest fix alone. It exists because a
+     * disputed delivery is otherwise unanswerable: "the rider never came"
+     * against "I waited outside for six minutes" has no tiebreak when the
+     * only stored position is the one that overwrote all the others.
+     */
+    'history' => [
+
+        'enabled' => env('TRACKING_HISTORY_ENABLED', true),
+
+        /*
+         * How long a trail is kept, and the reason this is a setting rather
+         * than a constant: continuous location history of a worker is
+         * personal data, so the retention period is a stated commitment
+         * rather than an accident of whatever the table grew to.
+         *
+         * Thirty days covers the window a delivery can still be disputed in.
+         * Raising it needs a reason that survives being written down.
+         */
+        'retention_days' => env('TRACKING_HISTORY_RETENTION_DAYS', 30),
+
+        /*
+         * Only pings that moved the rider at least this far are kept.
+         *
+         * The app pings every ten seconds while carrying. A rider parked at a
+         * counter for fifteen minutes is ninety identical rows — the write
+         * rate this file's header warns about, and the reason no trail was
+         * stored before. At twenty metres a stationary rider costs one row,
+         * and the trail still draws as a continuous line, because the points
+         * that matter are the ones where the position changed.
+         *
+         * The cost is that a trail cannot say how long a rider stood still,
+         * only that they did and between which two fixes. That is enough for
+         * every question this page was built to answer.
+         */
+        'min_metres' => env('TRACKING_HISTORY_MIN_METRES', 20),
+    ],
 ];

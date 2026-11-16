@@ -76,6 +76,24 @@ class Rider extends Model
         return $this->hasMany(RiderOffer::class);
     }
 
+    /** Weekly statements. One row per week, written once. */
+    public function payouts(): HasMany
+    {
+        return $this->hasMany(RiderPayout::class);
+    }
+
+    /**
+     * The kept trail. Not every ping — see the table's own note.
+     *
+     * Ordered nowhere here on purpose: every caller wants it by time, and
+     * which direction depends on whether they are drawing a line or reading
+     * the latest fix.
+     */
+    public function locationPings(): HasMany
+    {
+        return $this->hasMany(RiderLocationPing::class);
+    }
+
     /**
      * Share of offers this rider answered yes to, as a percentage.
      *

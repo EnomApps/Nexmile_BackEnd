@@ -292,3 +292,23 @@ Polling, not push. A WebSocket or an FCM data message would cut the request
 volume, but polling every 8 seconds is cheap on our side — the cost is the
 Directions calls, and those are already capped by the cache regardless of how
 often anyone asks.
+
+---
+
+## Stored trails (admin only)
+
+Everything above is about the live position: Redis, latest only, overwritten on
+every ping. That is what dispatch and the customer map need and all they need.
+
+Since the admin rider page, accepted pings that **moved the rider more than
+`tracking.history.min_metres`** are also written to `rider_location_pings` —
+a kept trail rather than the ping stream, swept daily by
+`nexmile:prune-location-history` after `tracking.history.retention_days`.
+
+It changes nothing on this page's read paths. `TrackingService` still reads
+Redis and never touches the trail: a customer watching their order wants where
+the rider is, and a query over stored history to answer that would be slower and
+no more accurate.
+
+Design, retention and the reason the distance gate is load-bearing:
+`docs/ADMIN_RIDERS.md`.

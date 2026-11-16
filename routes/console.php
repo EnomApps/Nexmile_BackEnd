@@ -33,3 +33,18 @@ Schedule::command('nexmile:prune-devices')->weeklyOn(1, '03:30');
  * already happened.
  */
 Schedule::command('nexmile:apply-commission-changes')->dailyAt('00:15');
+
+/*
+ * Rider location trails past their retention period.
+ *
+ * Not housekeeping. A trail is personal data about somebody's working day,
+ * and `tracking.history.retention_days` is only a commitment while something
+ * enforces it — without this line the table keeps every position every rider
+ * has ever reported, which is a promise quietly broken by inaction.
+ *
+ * At 03:50, after the device sweep and before the morning.
+ */
+Schedule::command('nexmile:prune-location-history')
+    ->dailyAt('03:50')
+    ->withoutOverlapping()
+    ->runInBackground();

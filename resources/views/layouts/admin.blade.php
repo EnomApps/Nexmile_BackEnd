@@ -43,6 +43,7 @@
                         ['route' => 'admin.dashboard', 'pattern' => 'admin.dashboard', 'label' => 'Dashboard'],
                         ['route' => 'admin.index', 'pattern' => 'admin.index', 'label' => 'Verification'],
                         ['route' => 'admin.orders.index', 'pattern' => 'admin.orders.*', 'label' => 'Orders'],
+                        ['route' => 'admin.riders.index', 'pattern' => 'admin.riders.*', 'label' => 'Riders'],
                         ['route' => 'admin.merchandising.index', 'pattern' => 'admin.merchandising.*', 'label' => 'Home screen'],
                         ['route' => 'admin.reviews.index', 'pattern' => 'admin.reviews.*', 'label' => 'Reviews'],
                         ['route' => 'admin.conduct.index', 'pattern' => 'admin.conduct.*', 'label' => 'Conduct'],
@@ -85,6 +86,10 @@
 
     @yield('content')
 </main>
+
+{{-- Pages that need their own behaviour push it here rather than
+     loading a bundle on every admin screen. --}}
+@stack('scripts')
 
 </body>
 </html>

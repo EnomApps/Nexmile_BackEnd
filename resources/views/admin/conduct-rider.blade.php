@@ -11,6 +11,11 @@
 <section class="max-w-4xl mx-auto px-4 sm:px-6 py-10">
 
     <a href="{{ route('admin.conduct.index') }}" class="text-sm text-gray-500 hover:text-gray-300">&larr; Conduct</a>
+    {{-- A complaint is rarely the whole story. The rider's file has their
+         shifts, their trail and their earnings, which is usually what decides
+         whether a report is a pattern or a bad evening. --}}
+    <a href="{{ route('admin.riders.show', $rider) }}"
+       class="ml-4 text-sm text-gray-500 hover:text-gray-300">Full rider file &rarr;</a>
 
     <h1 class="mt-3 text-2xl font-bold text-white">{{ $rider->full_name }}</h1>
     <p class="mt-1 text-sm text-gray-500">
