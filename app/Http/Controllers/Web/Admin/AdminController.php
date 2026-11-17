@@ -185,18 +185,17 @@ class AdminController extends Controller
         ]);
     }
 
-    /** One account with its documents. */
-    public function show(string $type, int $id): View
-    {
-        $owner = $this->resolve($type, $id);
-
-        return view('admin.show', [
-            'type' => $type,
-            'owner' => $owner->load('user'),
-            'documents' => $owner->kycDocuments()->latest('id')->get(),
-            'required' => config("kyc.required.{$this->roleFor($type)}"),
-        ]);
-    }
+    /*
+     * There is no show() here any more.
+     *
+     * Reviewing an account used to mean one generic page per type. Both
+     * types now have a section of their own — admin/merchants/{id} and
+     * admin/riders/{id} — which carry the documents and these decisions
+     * alongside everything else known about them, so a reviewer is not
+     * approving paperwork with no sight of the orders behind it.
+     *
+     * The POST actions below still serve both, and still take `$type`.
+     */
 
     public function reviewDocument(Request $request, string $type, int $id, int $document): RedirectResponse
     {

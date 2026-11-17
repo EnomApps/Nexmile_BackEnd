@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\Admin\AdminController;
 use App\Http\Controllers\Web\Admin\AdminOrderController;
 use App\Http\Controllers\Web\Admin\DashboardController;
 use App\Http\Controllers\Web\Admin\MerchandisingController;
+use App\Http\Controllers\Web\Admin\MerchantController as AdminMerchantController;
 use App\Http\Controllers\Web\Admin\ReviewModerationController;
 use App\Http\Controllers\Web\Admin\RiderConductController;
 use App\Http\Controllers\Web\Admin\RiderController as AdminRiderController;
@@ -269,6 +270,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
         });
 
         /*
+         * Restaurant management. Same arrangement as riders below: ahead of
+         * the {type}/{id} catch-all, and carrying the document review, the
+         * food licence and the commission terms with it, so taking the URL
+         * costs nothing.
+         */
+        Route::prefix('merchants')->name('merchants.')->group(function () {
+            Route::get('/', [AdminMerchantController::class, 'index'])->name('index');
+
+            Route::get('{merchant}', [AdminMerchantController::class, 'show'])
+                ->whereNumber('merchant')->name('show');
+        });
+
+        /*
          * Rider management.
          *
          * Registered before the {type}/{id} catch-all below, deliberately:
@@ -292,8 +306,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 ->whereNumber('rider')->name('position');
         });
 
-        Route::get('{type}/{id}', [AdminController::class, 'show'])
-            ->whereIn('type', ['merchants', 'riders'])->name('show');
         Route::post('{type}/{id}/documents/{document}', [AdminController::class, 'reviewDocument'])
             ->whereIn('type', ['merchants', 'riders'])->name('documents.review');
         Route::post('{type}/{id}/verify', [AdminController::class, 'verify'])

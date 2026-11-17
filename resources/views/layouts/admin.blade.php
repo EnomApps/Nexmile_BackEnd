@@ -43,6 +43,7 @@
                         ['route' => 'admin.dashboard', 'pattern' => 'admin.dashboard', 'label' => 'Dashboard'],
                         ['route' => 'admin.index', 'pattern' => 'admin.index', 'label' => 'Verification'],
                         ['route' => 'admin.orders.index', 'pattern' => 'admin.orders.*', 'label' => 'Orders'],
+                        ['route' => 'admin.merchants.index', 'pattern' => 'admin.merchants.*', 'label' => 'Restaurants'],
                         ['route' => 'admin.riders.index', 'pattern' => 'admin.riders.*', 'label' => 'Riders'],
                         ['route' => 'admin.merchandising.index', 'pattern' => 'admin.merchandising.*', 'label' => 'Home screen'],
                         ['route' => 'admin.reviews.index', 'pattern' => 'admin.reviews.*', 'label' => 'Reviews'],

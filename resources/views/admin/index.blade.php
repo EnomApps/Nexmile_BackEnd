@@ -65,7 +65,9 @@
                                     <td class="px-4 py-3 text-gray-400">{{ $row->kyc_documents_count }}</td>
                                     <td class="px-4 py-3 text-gray-500">{{ $row->updated_at?->diffForHumans() }}</td>
                                     <td class="px-4 py-3 text-right">
-                                        <a href="{{ route('admin.show', [$type, $row->id]) }}"
+                                        <a href="{{ $type === 'merchants'
+                                                ? route('admin.merchants.show', $row->id)
+                                                : route('admin.riders.show', $row->id) }}"
                                            class="px-3 py-1.5 rounded-lg bg-white/10 text-white text-xs font-semibold hover:bg-white/20">
                                             Review
                                         </a>
