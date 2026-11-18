@@ -312,3 +312,12 @@ no more accurate.
 
 Design, retention and the reason the distance gate is load-bearing:
 `docs/ADMIN_RIDERS.md`.
+
+## Also personal data about a delivery
+
+`docs/DOOR_PHOTO.md` adds a photograph of the customer's front door to the
+assigned rider's delivery screen. It is withheld from the offer card and from
+the available board for the same reason the trail is retained for a stated
+period rather than forever, and it belongs in the same DPDP notice: riders have
+not yet been told the trail exists, and customers have not been told who sees
+the photo.

@@ -251,6 +251,9 @@ class CheckoutService
             'delivery_line1' => $address->line1,
             'delivery_line2' => $address->line2,
             'delivery_landmark' => $address->landmark,
+            // Copied, not referenced: a customer who replaces the photo must
+            // not change what the rider on tonight's delivery is shown.
+            'delivery_photo_path' => $address->photo_path,
             'delivery_city' => $address->city,
             'delivery_pincode' => $address->pincode,
             'delivery_latitude' => $address->latitude,

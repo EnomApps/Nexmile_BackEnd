@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\Media\ImageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,6 +21,14 @@ class AddressResource extends JsonResource
             'line1' => $this->line1,
             'line2' => $this->line2,
             'landmark' => $this->landmark,
+
+            /*
+             * Signed and short-lived; fetch the address again for a fresh
+             * link. Null when the customer has not taken one, which the app
+             * reads as "offer to add a photo", not as an error.
+             */
+            'photo_url' => app(ImageService::class)->doorUrl($this->photo_path),
+
             'city' => $this->city,
             'state' => $this->state,
             'pincode' => $this->pincode,

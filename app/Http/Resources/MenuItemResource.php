@@ -43,6 +43,14 @@ class MenuItemResource extends JsonResource
             'contains_egg' => (bool) $this->contains_egg,
             'is_available' => (bool) $this->is_available,
 
+            /*
+             * Recomputed overnight from delivered orders, per restaurant.
+             * False for every dish at a restaurant with too little history to
+             * say — see config/menu.php. The badge is worth more when it is
+             * sometimes absent.
+             */
+            'is_bestseller' => (bool) $this->is_bestseller,
+
             'prep_time_minutes' => (int) $this->prep_time_minutes,
             'sort_order' => (int) $this->sort_order,
 

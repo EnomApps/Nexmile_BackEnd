@@ -49,4 +49,18 @@ return [
      */
     'max_storefront_photos' => 8,
 
+    /*
+     * A door photo is not a dish photo.
+     *
+     * The 24-hour link above is right for a menu: the image leaks nothing and
+     * a short TTL would expire under a customer's thumb mid-scroll. A picture
+     * of somebody's front door, paired with the coordinates sitting next to it
+     * in the same response, is the answer to "where does this person live" —
+     * so its link lasts about as long as a delivery and no longer.
+     *
+     * Long enough to outlive a slow delivery and an app backgrounded at the
+     * gate; short enough that a URL copied out of a log is dead by morning.
+     */
+    'door_url_ttl_minutes' => env('DOOR_PHOTO_URL_TTL_MINUTES', 180),
+
 ];

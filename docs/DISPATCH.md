@@ -424,3 +424,13 @@ and when. That last part is what makes "who cancelled this and why" answerable.
 
 Admin cancel works from any non-terminal status — the escape hatch for an order
 no rider ever took, or one stuck behind a problem nobody else can resolve.
+
+## What the offer card deliberately does not say
+
+The app side has asked once for the customer's name, number, flat and door
+photo on the ringing offer, and will likely ask again. `offerPayload()` sends
+`dropoff_area` and `delivery_distance_metres` and nothing more precise: an
+offer goes to up to fifteen riders a wave, most of whom decline, and the
+accept response already returns the full `RiderOrderResource` so the rider who
+takes the job has everything the instant it is theirs. Reasoning and the two
+tests that hold the line are in `docs/DOOR_PHOTO.md`.

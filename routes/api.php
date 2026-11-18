@@ -93,6 +93,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('{address}', [AddressController::class, 'show'])->name('show');
             Route::patch('{address}', [AddressController::class, 'update'])->name('update');
             Route::post('{address}/default', [AddressController::class, 'makeDefault'])->name('default');
+
+            // A photo of the door, for the rider who has to find it.
+            Route::post('{address}/photo', [AddressController::class, 'photo'])->name('photo');
+            Route::delete('{address}/photo', [AddressController::class, 'deletePhoto'])->name('photo.destroy');
+
             Route::delete('{address}', [AddressController::class, 'destroy'])->name('destroy');
         });
 

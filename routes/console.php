@@ -48,3 +48,13 @@ Schedule::command('nexmile:prune-location-history')
     ->dailyAt('03:50')
     ->withoutOverlapping()
     ->runInBackground();
+
+/*
+ * Which dishes each restaurant is known for, from the last 30 days of
+ * delivered orders. Overnight because the answer barely moves in a day and
+ * the GROUP BY is not something to run while kitchens are busy.
+ */
+Schedule::command('nexmile:mark-bestsellers')
+    ->dailyAt('04:10')
+    ->withoutOverlapping()
+    ->runInBackground();

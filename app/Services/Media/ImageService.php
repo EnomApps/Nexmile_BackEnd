@@ -102,8 +102,12 @@ class ImageService
     /**
      * A signed, expiring link. Null when there is no photo — the apps show a
      * placeholder rather than a broken image.
+     *
+     * `$ttlMinutes` overrides the default lifetime for the objects that need a
+     * shorter one. A door photo is the case this exists for: see
+     * `media.door_url_ttl_minutes`.
      */
-    public function url(?string $path): ?string
+    public function url(?string $path, ?int $ttlMinutes = null): ?string
     {
         if ($path === null || $path === '') {
             return null;
@@ -111,8 +115,20 @@ class ImageService
 
         return Storage::disk($this->disk())->temporaryUrl(
             $path,
-            now()->addMinutes(config('media.url_ttl_minutes')),
+            now()->addMinutes($ttlMinutes ?? config('media.url_ttl_minutes')),
         );
+    }
+
+    /**
+     * A link to a photo of somebody's front door.
+     *
+     * Its own method rather than a TTL passed at each call site, so the two
+     * places that hand this photo out — the customer's address book and the
+     * assigned rider's delivery screen — cannot drift to different lifetimes.
+     */
+    public function doorUrl(?string $path): ?string
+    {
+        return $this->url($path, (int) config('media.door_url_ttl_minutes'));
     }
 
     /**

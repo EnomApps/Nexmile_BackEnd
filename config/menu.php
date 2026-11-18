@@ -34,4 +34,24 @@ return [
      */
     'gst_rates' => [5.00, 12.00, 18.00],
 
+    /*
+     * The BESTSELLER badge.
+     *
+     * Recomputed overnight by `nexmile:mark-bestsellers`, per restaurant,
+     * from delivered orders only — an order the kitchen rejected or the
+     * customer abandoned at payment says nothing about whether a dish is any
+     * good.
+     *
+     * `min_orders` is the part that matters. On a menu with four days of
+     * history the top three dishes are whatever three people happened to
+     * order, and a badge that appears on a dish nobody has bought teaches
+     * customers to ignore every badge on the platform. Below the threshold a
+     * restaurant simply has no bestsellers, which is the honest answer.
+     */
+    'bestsellers' => [
+        'per_merchant' => env('MENU_BESTSELLERS_PER_MERCHANT', 5),
+        'window_days' => env('MENU_BESTSELLERS_WINDOW_DAYS', 30),
+        'min_orders' => env('MENU_BESTSELLERS_MIN_ORDERS', 5),
+    ],
+
 ];

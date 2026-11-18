@@ -30,6 +30,10 @@ class MenuItem extends Model
             'is_veg' => 'boolean',
             'contains_egg' => 'boolean',
             'is_available' => 'boolean',
+            // Deliberately absent from $fillable: the badge is earned from
+            // delivered orders by nexmile:mark-bestsellers, never set by the
+            // restaurant it advertises.
+            'is_bestseller' => 'boolean',
             'rating' => 'float',
             'rating_count' => 'integer',
             'is_surplus_deal' => 'boolean',

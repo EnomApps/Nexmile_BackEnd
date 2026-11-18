@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\Media\ImageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -47,8 +48,38 @@ class RiderOrderResource extends JsonResource
              * list of where customers live.
              */
             'dropoff' => $this->when($this->rider_id !== null, fn () => [
+                /*
+                 * Whoever is actually taking the delivery, which is not always
+                 * the person who paid. A customer ordering for their parents
+                 * puts their parents' number here, and a rider who rings the
+                 * account holder instead is calling a different city.
+                 */
                 'contact_name' => $this->delivery_contact_name,
                 'contact_phone' => $this->delivery_contact_phone,
+
+                /*
+                 * Also sent apart from the composed `address` line below, so
+                 * the app can give each part its own weight on screen instead
+                 * of hunting for it inside one long string.
+                 *
+                 * The customer app fills these from three different places:
+                 * `line1` is typed by hand (flat, floor, house number),
+                 * `line2` is the street and `landmark` the locality, both off
+                 * the map pin. The flat is what a rider reads at the gate and
+                 * the street is what they navigate by, so all three go out
+                 * rather than the two that were asked for.
+                 */
+                'line1' => $this->delivery_line1,
+                'line2' => $this->delivery_line2,
+                'landmark' => $this->delivery_landmark,
+
+                /*
+                 * The door itself. Snapshotted with the order, so replacing
+                 * the photo on the address book does not change what the rider
+                 * on an in-flight delivery is looking at.
+                 */
+                'photo_url' => app(ImageService::class)->doorUrl($this->delivery_photo_path),
+
                 'address' => trim(implode(', ', array_filter([
                     $this->delivery_line1,
                     $this->delivery_line2,
