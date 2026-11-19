@@ -116,6 +116,25 @@ class RestaurantResource extends JsonResource
                 fn () => (int) round($this->road_distance_metres),
             ),
 
+            /*
+             * "25-30 min" on the card — cooking plus the ride out to the
+             * customer. `avg_prep_time_minutes` above is only the kitchen, and
+             * a card showing that alone promises food that teleports.
+             *
+             * Absent, not null, when there is no distance to measure: the
+             * storefront fetched on its own has no customer position in the
+             * request. Same rule as `road_distance_metres` — show it when it
+             * is here, fall back to the prep time when it is not.
+             */
+            'eta_min_minutes' => $this->when(
+                $this->etaBand() !== null,
+                fn () => $this->etaBand()[0],
+            ),
+            'eta_max_minutes' => $this->when(
+                $this->etaBand() !== null,
+                fn () => $this->etaBand()[1],
+            ),
+
             'area' => $this->city,
 
             'operating_hours' => $this->whenLoaded('operatingHours', fn () => $this->operatingHours
@@ -130,6 +149,54 @@ class RestaurantResource extends JsonResource
 
             'menu' => CategoryResource::collection($this->whenLoaded('categories')),
         ];
+    }
+
+    /** Memoised: `toArray` asks for the band three times per card. */
+    private ?array $etaBand = null;
+
+    private bool $etaResolved = false;
+
+    /**
+     * The delivery window for the card, in minutes.
+     *
+     * Cooking plus the ride from the kitchen to the customer. Not plus the
+     * ride *to* the kitchen: dispatch starts hunting a rider the moment the
+     * merchant accepts, so that leg runs while the food cooks, and adding both
+     * would double-count the overlap on every card.
+     *
+     * The ride uses `tracking.average_speed_kmh` — the same figure the live
+     * map counts down with — so the promise on the card and the countdown
+     * during the delivery cannot drift apart.
+     *
+     * Road distance where routing measured it, straight line otherwise. A
+     * straight line across a river sets an expectation nothing can keep, which
+     * is why the road figure wins when it exists.
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    private function etaBand(): ?array
+    {
+        if ($this->etaResolved) {
+            return $this->etaBand;
+        }
+
+        $this->etaResolved = true;
+
+        $metres = $this->road_distance_metres ?? $this->distance_metres;
+
+        if ($metres === null) {
+            return $this->etaBand = null;
+        }
+
+        $kmh = max(1.0, (float) config('tracking.average_speed_kmh'));
+        $travel = (int) ceil((float) $metres / 1000 / $kmh * 60);
+
+        $minutes = max(
+            (int) config('discovery.eta.floor_minutes'),
+            (int) $this->avg_prep_time_minutes + $travel,
+        );
+
+        return $this->etaBand = [$minutes, $minutes + (int) config('discovery.eta.spread_minutes')];
     }
 
     /**

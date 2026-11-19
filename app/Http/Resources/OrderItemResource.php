@@ -38,6 +38,18 @@ class OrderItemResource extends JsonResource
             'is_veg' => (bool) $this->is_veg,
             'notes' => $this->notes,
             'options' => $this->whenLoaded('options', fn () => $this->options->map(fn ($option) => [
+                /*
+                 * The live option, where it still exists. Null once the
+                 * restaurant has removed that choice — same reasoning as
+                 * `menu_item_id` above: the line stands because the order
+                 * happened, there is just nothing left to point at.
+                 *
+                 * Sent so an app can rebuild this line itself rather than
+                 * depending on POST /orders/{id}/reorder. That endpoint is
+                 * the better path, because it applies the menu's own rules;
+                 * this is here so there is a way through if it is ever down.
+                 */
+                'item_option_id' => $option->item_option_id,
                 'group_name' => $option->group_name,
                 'name' => $option->name,
                 'price_delta' => (float) $option->price_delta,

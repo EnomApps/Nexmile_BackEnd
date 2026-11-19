@@ -77,9 +77,28 @@ class TrackingService
             'name' => $order->rider?->full_name,
             'vehicle_number' => $order->rider?->vehicle_number,
             // bicycle | motorcycle | scooter | ev — enough to draw the right
-            // icon. There is no model and no photo on a rider; see RiderResource.
+            // icon. There is no model on a rider; see RiderResource.
             'vehicle_type' => $order->rider?->vehicle_type,
             'phone' => $order->rider?->user?->phone,
+
+            /*
+             * Null, never 0.0, until enough people have rated. "0.0" beside a
+             * stranger's name at the door reads as a warning where a new rider
+             * is only new, and the app hides the badge on null.
+             */
+            'rating' => $order->rider?->rating === null ? null : (float) $order->rider->rating,
+            'rating_count' => (int) ($order->rider?->rating_count ?? 0),
+
+            /*
+             * Always null for now, and sent anyway so the app can ship the
+             * layout today and light up when there is a photo to show.
+             *
+             * Riders have no photo column. Adding one is not the work — the
+             * work is deciding who takes the picture, whether a rider may
+             * refuse, and what happens to it when they leave, none of which
+             * is ours to decide. See docs/HOME_AND_TRACKING.md.
+             */
+            'photo_url' => null,
             'latitude' => null,
             'longitude' => null,
             'heading' => null,

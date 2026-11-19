@@ -129,4 +129,33 @@ return [
         'timeout_seconds' => 4,
     ],
 
+    /*
+     * The "25-30 min" band on a restaurant card.
+     *
+     * Cooking plus the ride from the kitchen to the customer — not plus the
+     * ride to the kitchen. Dispatch starts hunting a rider when the merchant
+     * accepts, so the rider travels towards the kitchen while the food is
+     * being cooked; adding both legs would double-count the overlap and quote
+     * every card ten minutes long.
+     *
+     * The ride itself is measured with `tracking.average_speed_kmh`, the same
+     * figure the live tracking map uses, so the estimate on the card and the
+     * countdown during the delivery cannot drift apart.
+     */
+    'eta' => [
+        /*
+         * How wide the band is. A single number invites a complaint about one
+         * minute; a range is read as an estimate, which is what it is.
+         */
+        'spread_minutes' => env('DISCOVERY_ETA_SPREAD_MINUTES', 5),
+
+        /*
+         * Nothing is promised faster than this however close the restaurant
+         * is. A rider still has to be found, reach the counter, be handed a
+         * bag and park at the other end — and a card reading "4-9 min" is a
+         * complaint being written in advance.
+         */
+        'floor_minutes' => env('DISCOVERY_ETA_FLOOR_MINUTES', 15),
+    ],
+
 ];

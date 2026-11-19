@@ -191,6 +191,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('{order}/track', [OrderController::class, 'track'])->name('track');
             Route::get('{order}/invoice', [OrderController::class, 'invoice'])->name('invoice');
 
+            // Order again: the same basket back, minus whatever the kitchen
+            // no longer sells.
+            Route::post('{order}/reorder', [OrderController::class, 'reorder'])->name('reorder');
+
             /*
              * Payment (EP6). `start` returns what the Razorpay SDK needs;
              * `confirm` reports back what it produced. Neither is the

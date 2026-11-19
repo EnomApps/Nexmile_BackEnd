@@ -4,16 +4,19 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CartResource;
 use App\Http\Resources\OrderResource;
 use App\Models\Order;
 use App\Services\LiveState\OrderStateService;
 use App\Services\LiveState\TrackingService;
+use App\Services\Orders\CartService;
 use App\Services\Orders\InvoiceService;
 use App\Services\Payments\WalletService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The customer's own orders (EP5, EP9).
@@ -217,6 +220,81 @@ class OrderController extends Controller
         return response()->json([
             'message' => 'Order cancelled.',
             'data' => new OrderResource($model->fresh('items')),
+        ]);
+    }
+
+    /**
+     * Order it again
+     *
+     * Puts the same dishes, options and notes back into that restaurant's
+     * cart and answers with the cart, in the same shape as
+     * `GET /restaurants/{id}/cart`.
+     *
+     * Anything that cannot be ordered again is **named in `skipped`** rather
+     * than dropped quietly: a basket that silently comes back one dish short
+     * is a customer paying for an order they did not mean to place. A dish is
+     * skipped when it has been taken off the menu, is out of stock, is a
+     * rescue deal outside its window, or had a choice attached that no longer
+     * exists.
+     *
+     * The cart is **replaced, not added to**. "Order again" means that order,
+     * and merging it into whatever was left in the basket from yesterday
+     * produces a third thing the customer never asked for.
+     */
+    public function reorder(Request $request, int $order, CartService $carts): JsonResponse
+    {
+        $model = $this->find($request, $order, ['items.options']);
+
+        if ($model->merchant_id === null) {
+            return response()->json(['message' => 'That restaurant is no longer on Nexmile.'], 422);
+        }
+
+        $cart = $carts->forMerchant($request->user(), $model->merchant_id);
+
+        $skipped = [];
+
+        DB::transaction(function () use ($carts, $cart, $model, &$skipped) {
+            $carts->clear($cart);
+
+            foreach ($model->items as $line) {
+                /*
+                 * A line whose dish row is gone cannot be rebuilt — the name
+                 * on the order is a snapshot, and there is nothing to add to
+                 * a cart. Named from the snapshot so the customer is told
+                 * what is missing rather than how many things are.
+                 */
+                if ($line->menu_item_id === null) {
+                    $skipped[] = ['name' => $line->name];
+
+                    continue;
+                }
+
+                $optionIds = $line->options
+                    ->pluck('item_option_id')
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                try {
+                    $carts->add($cart, $line->menu_item_id, (int) $line->quantity, $optionIds, $line->notes);
+                } catch (ValidationException) {
+                    /*
+                     * Out of stock, off the menu, a deal that has ended, or a
+                     * required choice that no longer exists. All of them mean
+                     * the same thing to the customer, so they get the same
+                     * answer: this dish, not this time.
+                     */
+                    $skipped[] = ['name' => $line->name];
+                }
+            }
+        });
+
+        return response()->json([
+            'message' => $skipped === []
+                ? 'Added back to your basket.'
+                : 'Added back to your basket, minus what is unavailable.',
+            'data' => new CartResource($cart->fresh(['items.menuItem', 'items.options.itemOption', 'merchant'])),
+            'skipped' => $skipped,
         ]);
     }
 
