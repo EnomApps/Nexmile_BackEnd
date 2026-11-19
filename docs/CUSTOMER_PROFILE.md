@@ -150,6 +150,36 @@ redemption row written in the same transaction. Checking it when the list is
 fetched, or when the code is applied, lets two phones redeem the same
 single-use coupon.
 
+#### The `applied_coupon` contract, agreed before it was built
+
+The app side built its cart UI against this before the endpoints existed, so
+the names are fixed here rather than left to whoever writes the resource:
+
+```json
+"applied_coupon": {
+  "id": 7,
+  "code": "WELCOME50",
+  "title": "Flat ₹50 off your first order",
+  "discount_type": "flat",
+  "discount_value": 50,
+  "discount_amount": 50
+}
+```
+
+`null` when none is applied — **present as null, never omitted**, so the app's
+null check is stable across both states.
+
+The first five fields are the same names `GET /v1/coupons` uses, so one parser
+reads both. `discount_amount` is the sixth and only new one: what the coupon
+actually took off *this* cart, which differs from `discount_value` for a
+percent coupon and whenever `max_discount` caps it.
+
+**Read the saving from `discount_amount`, not from `totals.discount_total`.**
+They are equal today because a cart can hold one coupon and nothing else
+discounts it. The moment a second source exists — referral credit, a rescue
+deal — `discount_total` becomes the sum of all of them and stops being the
+coupon's saving, while `discount_amount` keeps meaning exactly one thing.
+
 ### `GET /v1/app/config`
 
 Needs a settings table the ops team can edit, and the actual values from the
