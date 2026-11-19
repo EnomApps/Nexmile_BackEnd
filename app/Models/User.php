@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -32,6 +33,23 @@ class User extends Authenticatable
         'role',
         'status',
         'preferred_locale',
+        'veg_mode',
+        'promotional_notifications',
+    ];
+
+    /**
+     * Defaults for a model that has not been read back from the database.
+     *
+     * The column defaults alone are not enough: a User built in memory and
+     * used before it is reloaded has these as null, and `(bool) null` is
+     * false — which would have read as "this customer turned offers off" for
+     * every account in its first moments.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'veg_mode' => false,
+        'promotional_notifications' => true,
     ];
 
     /**
@@ -57,7 +75,23 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => UserRole::class,
             'status' => UserStatus::class,
+            'veg_mode' => 'boolean',
+            'promotional_notifications' => 'boolean',
         ];
+    }
+
+    /**
+     * Customers who have not turned marketing pushes off.
+     *
+     * The only door marketing is allowed through — see
+     * `PushService::promotionalToUsers()`. A scope rather than a check at each
+     * call site, because the call site that forgets is the one that sends.
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeWantsPromotions(Builder $query): void
+    {
+        $query->where('promotional_notifications', true);
     }
 
     public function merchant(): HasOne

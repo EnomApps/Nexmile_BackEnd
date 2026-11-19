@@ -372,4 +372,66 @@ class HomeScreenTest extends TestCase
 
         $this->assertCount(config('discovery.matched_dishes_shown'), $matched);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Veg mode
+    |--------------------------------------------------------------------------
+    */
+
+    public function test_veg_mode_leaves_non_veg_restaurants_out_of_the_home_sections(): void
+    {
+        $veg = $this->restaurant(['business_name' => 'Green Leaf', 'is_pure_veg' => true]);
+        $other = $this->restaurant(['business_name' => 'Chicken House', 'is_pure_veg' => false]);
+
+        Sanctum::actingAs($this->customer());
+
+        $body = $this->getJson('/api/v1/home?'.$this->query(['veg_only' => 1]))
+            ->assertOk()
+            ->json();
+
+        $names = [];
+
+        foreach ($body['data']['sections'] as $section) {
+            if (($section['type'] ?? null) === 'restaurants') {
+                $names = array_merge($names, array_column($section['items'], 'name'));
+            }
+        }
+
+        $this->assertContains('Green Leaf', $names);
+        $this->assertNotContains('Chicken House', $names);
+
+        // Echoed back, so the app can label the screen it is looking at
+        // rather than the one it believes it asked for.
+        $this->assertTrue($body['meta']['veg_only']);
+    }
+
+    public function test_the_home_screen_shows_everything_when_veg_mode_is_off(): void
+    {
+        $this->restaurant(['business_name' => 'Chicken House', 'is_pure_veg' => false]);
+
+        Sanctum::actingAs($this->customer());
+
+        $body = $this->getJson('/api/v1/home?'.$this->query())->assertOk()->json();
+
+        $names = [];
+
+        foreach ($body['data']['sections'] as $section) {
+            if (($section['type'] ?? null) === 'restaurants') {
+                $names = array_merge($names, array_column($section['items'], 'name'));
+            }
+        }
+
+        $this->assertContains('Chicken House', $names);
+        $this->assertFalse($body['meta']['veg_only']);
+    }
+
+    public function test_a_nonsense_veg_only_value_is_refused(): void
+    {
+        Sanctum::actingAs($this->customer());
+
+        $this->getJson('/api/v1/home?'.$this->query(['veg_only' => 'yes please']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('veg_only');
+    }
 }

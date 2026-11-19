@@ -47,6 +47,7 @@
                         ['route' => 'admin.riders.index', 'pattern' => 'admin.riders.*', 'label' => 'Riders'],
                         ['route' => 'admin.merchandising.index', 'pattern' => 'admin.merchandising.*', 'label' => 'Home screen'],
                         ['route' => 'admin.reviews.index', 'pattern' => 'admin.reviews.*', 'label' => 'Reviews'],
+                        ['route' => 'admin.feedback.index', 'pattern' => 'admin.feedback.*', 'label' => 'App feedback'],
                         ['route' => 'admin.conduct.index', 'pattern' => 'admin.conduct.*', 'label' => 'Conduct'],
                     ] as $tab)
                         <a href="{{ route($tab['route']) }}"

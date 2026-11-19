@@ -111,6 +111,48 @@ class PushService
     }
 
     /**
+     * Queue a marketing or offer notification, skipping anyone who said no.
+     *
+     * **Every promotional push must go through this method**, never through
+     * `toUsers()`. Nothing sends marketing yet, which is exactly why this
+     * exists now: the first campaign will be written in a hurry, and the
+     * choice between two method names is a smaller thing to get right than
+     * remembering to filter a list of user ids under deadline.
+     *
+     * Order updates do not come through here and must not — "your rider is
+     * outside" is not marketing, and a customer who muted offers has not
+     * asked to stop being told where their food is.
+     *
+     * @param  list<int>|Collection<int, int>  $userIds
+     * @param  array<string, string|int>  $replacements
+     * @param  array<string, string>  $data
+     */
+    public function promotionalToUsers(array|Collection $userIds, string $app, string $key, array $replacements = [], array $data = []): void
+    {
+        $ids = collect($userIds)->filter()->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        /*
+         * Filtered here rather than inside the job. The job retries, and a
+         * consent check that runs on retry is a consent check that can be
+         * skipped by a failure.
+         */
+        $permitted = User::query()
+            ->whereIn('id', $ids->all())
+            ->wantsPromotions()
+            ->pluck('id');
+
+        if ($permitted->isEmpty()) {
+            return;
+        }
+
+        SendPushNotification::dispatch($permitted->all(), $app, $key, $replacements, $data);
+    }
+
+    /**
      * Queue a data-only payload — no notification, for the app to act on.
      *
      * This is the ringing order card, and its withdrawal. There is no

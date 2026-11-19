@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CollectionController;
 use App\Http\Controllers\Api\V1\DeviceTokenController;
 use App\Http\Controllers\Api\V1\FavouriteController;
+use App\Http\Controllers\Api\V1\FeedbackController;
 use App\Http\Controllers\Api\V1\FilterController;
 use App\Http\Controllers\Api\V1\HomeController;
 use App\Http\Controllers\Api\V1\Merchant\AuthController as MerchantAuthController;
@@ -81,6 +82,15 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
         Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+        // Veg mode and offer notifications. Against the account, so they
+        // follow the customer to a new phone.
+        Route::get('profile/preferences', [ProfileController::class, 'preferences'])->name('profile.preferences');
+        Route::patch('profile/preferences', [ProfileController::class, 'updatePreferences'])
+            ->name('profile.preferences.update');
+
+        // Rate the app. Not a review of a restaurant, a rider or an order.
+        Route::post('feedback', [FeedbackController::class, 'store'])->name('feedback.store');
 
         /*
         |----------------------------------------------------------------------

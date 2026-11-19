@@ -130,7 +130,10 @@ class AppServiceProvider extends ServiceProvider
                     // Reporting the rider who brought an order.
                     'api/v1/report-categories',
                     // Wallet: balance, statement and topping up.
-                    'api/v1/wallet'],
+                    'api/v1/wallet',
+                    // Rating the app, from the profile page. Preferences ride
+                    // in on the shared api/v1/profile prefix above.
+                    'api/v1/feedback'],
             ],
             'rider' => [
                 'title' => 'Nexmile — Rider app',

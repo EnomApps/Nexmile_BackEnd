@@ -3,6 +3,7 @@
 use App\Http\Controllers\Web\Admin\AdminController;
 use App\Http\Controllers\Web\Admin\AdminOrderController;
 use App\Http\Controllers\Web\Admin\DashboardController;
+use App\Http\Controllers\Web\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Web\Admin\MerchandisingController;
 use App\Http\Controllers\Web\Admin\MerchantController as AdminMerchantController;
 use App\Http\Controllers\Web\Admin\ReviewModerationController;
@@ -212,6 +213,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
          * Review moderation. Without it the only options for an abusive
          * comment are leaving it up or reaching into the database.
          */
+        /*
+         * What customers say about the app. Read-only on purpose: this is a
+         * sentence about the software, not a support ticket, and a half-built
+         * reply workflow invites somebody to treat it as one.
+         */
+        Route::get('feedback', [AdminFeedbackController::class, 'index'])->name('feedback.index');
+
         Route::get('reviews', [ReviewModerationController::class, 'index'])->name('reviews.index');
         Route::post('reviews/{review}/hide', [ReviewModerationController::class, 'hide'])->name('reviews.hide');
         Route::post('reviews/{review}/unhide', [ReviewModerationController::class, 'unhide'])->name('reviews.unhide');

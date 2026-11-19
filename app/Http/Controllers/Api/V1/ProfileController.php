@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -97,5 +98,64 @@ class ProfileController extends Controller
         $user->delete();
 
         return response()->json(['message' => 'Your account has been closed.']);
+    }
+
+    /**
+     * Your preferences
+     *
+     * Veg mode and whether offers may be pushed. Stored against the account,
+     * not the handset, so both follow the customer to a new phone.
+     *
+     * Theme and app language are not here on purpose: those belong to the
+     * device. A customer who picks dark mode on a tablet has said nothing
+     * about their phone.
+     */
+    public function preferences(Request $request): JsonResponse
+    {
+        return response()->json(['data' => $this->preferenceState($request->user())]);
+    }
+
+    /**
+     * Change your preferences
+     *
+     * Send only what changed. Both values come back either way, so the app
+     * never has to merge a partial answer into what it already had.
+     */
+    public function updatePreferences(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'veg_mode' => ['sometimes', 'boolean'],
+            'promotional_notifications' => ['sometimes', 'boolean'],
+        ]);
+
+        $user = $request->user();
+
+        /*
+         * An empty body is accepted rather than refused. The app sends one
+         * field per toggle, and a 422 for "you changed nothing" would be an
+         * error message about a tap that did no harm.
+         */
+        if ($data !== []) {
+            $user->fill($data)->save();
+        }
+
+        return response()->json([
+            'message' => 'Preferences saved.',
+            'data' => $this->preferenceState($user),
+        ]);
+    }
+
+    /**
+     * Cast explicitly rather than leaned on the model's casts, so the app is
+     * given real JSON booleans and never the 1 and 0 a driver might hand back.
+     *
+     * @return array<string, bool>
+     */
+    private function preferenceState(User $user): array
+    {
+        return [
+            'veg_mode' => (bool) $user->veg_mode,
+            'promotional_notifications' => (bool) $user->promotional_notifications,
+        ];
     }
 }

@@ -45,6 +45,13 @@ class HomeController extends Controller
             'address_id' => ['required_without_all:latitude,longitude', 'integer'],
             'latitude' => ['required_without:address_id', 'numeric', 'between:-90,90'],
             'longitude' => ['required_without:address_id', 'numeric', 'between:-180,180'],
+
+            /*
+             * Veg mode. Without this the app had to abandon the home sections
+             * entirely and fall back to the plain restaurant list, which is
+             * the one screen veg mode made worse.
+             */
+            'veg_only' => ['sometimes', 'boolean'],
         ], [
             'address_id.required_without_all' => 'Send an address_id, or latitude and longitude.',
         ]);
@@ -88,8 +95,15 @@ class HomeController extends Controller
          * alternative is a nearby search per section, which is the same
          * bounding box and haversine run three times for one screen.
          */
+        $vegOnly = $request->boolean('veg_only');
+
+        /*
+         * The same filter object `GET /restaurants` builds, so veg mode means
+         * one thing on both screens. Every restaurant section below reads this
+         * collection, so the flag applies to all of them at once.
+         */
         $nearby = $this->nearby
-            ->search($latitude, $longitude, new RestaurantFilters(perPage: 50))
+            ->search($latitude, $longitude, new RestaurantFilters(vegOnly: $vegOnly, perPage: 50))
             ->getCollection();
 
         foreach ($merchandising['tiles'] as $tile) {
@@ -126,7 +140,20 @@ class HomeController extends Controller
 
         return response()->json([
             'data' => ['sections' => $sections],
-            'meta' => ['radius_metres' => $this->nearby->radiusFor($latitude, $longitude)],
+            'meta' => [
+                'radius_metres' => $this->nearby->radiusFor($latitude, $longitude),
+                /*
+                 * Echoed back so the app can show "veg mode on" against the
+                 * screen it is actually looking at, rather than against what
+                 * it believes it asked for.
+                 *
+                 * Banners, cuisine tiles and curated collections are not
+                 * filtered: they are merchandising, not restaurants or dishes,
+                 * and they are the same for everybody — which is also why they
+                 * can be cached under one key while these sections cannot.
+                 */
+                'veg_only' => $vegOnly,
+            ],
         ]);
     }
 
